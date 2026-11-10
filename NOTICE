@@ -1,0 +1,41 @@
+scRust
+Copyright (C) 2026 Harvard Informatics
+
+scRust is free software, licensed under the GNU General Public License,
+version 3 only (SPDX: GPL-3.0-only). See LICENSE.
+
+scRust reimplements in Rust the algorithms of the software listed below.
+Where a reimplementation is ported from the original source code, it is a
+derivative of that software and is distributed under the GPL-3.0 as permitted
+by the original license. We gratefully acknowledge the authors of all of these
+packages. Versions and licenses are as declared by the versions used as
+references (see docs/PLAN.md).
+
+Reference implementations
+-------------------------
+DoubletFinder 2.0.6 (commit 1b244d8)   CC0
+sctransform 0.4.3                      GPL-3
+glmGamPoi 1.22.0                       GPL-3
+irlba 2.4.1                            GPL-3
+DropletUtils 1.30.0                    GPL-3
+scDblFinder 1.24.10                    GPL-3
+Seurat 5.5.1, SeuratObject 5.4.0       MIT
+decontX 1.8.0, celda 1.26.0            MIT
+xgboost 3.2.0                          Apache-2.0
+fields 17.3                            GPL (>= 2)
+RcppAnnoy 0.0.23 (Annoy)               GPL (>= 2); Annoy itself is Apache-2.0
+matrixStats 1.5.0                      Artistic-2.0
+KernSmooth 2.23-27                     Unlimited
+Matrix 1.7-6                           GPL (>= 2)
+R 4.5.3                                GPL-2 | GPL-3 (random number generation
+                                       and numerical routines)
+
+Planned, with licensing to be handled when the work starts
+----------------------------------------------------------
+SoupX 1.6.2                            GPL-2 only. This is incompatible with
+                                       GPL-3, so a SoupX reimplementation will be
+                                       built and distributed as a separate
+                                       program (or written from the published
+                                       method rather than ported).
+CellBender                             BSD-3-Clause (to be confirmed for the
+                                       version used).

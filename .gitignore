@@ -1,0 +1,22 @@
+# Rust build output
+/target/
+**/*.rs.bk
+
+# Project-local toolchain, envs and caches (env.sh keeps everything inside the repo)
+/.cargo-home/
+/.envs/
+
+# Large fixtures and downloaded upstream sources (tracked through validation/manifest.toml)
+/data/
+/third_party/src/
+
+# R and Python byproducts
+.Rhistory
+.RData
+Rplots.pdf
+__pycache__/
+*.pyc
+
+# SLURM logs
+slurm-*.out
+*.sbatch.log
