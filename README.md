@@ -13,7 +13,7 @@ Each reimplementation is validated against the original tool's outputs, exactly 
 6. SoupX
 7. CellBender
 
-**Status:** milestone M0. The Cargo workspace, environments and validation skeleton are in place; no tool is implemented yet.
+**Status:** milestone M1. The Cargo workspace, environments and validation skeleton are in place (M0); the upstream sources can be fetched (M1b, [`third_party/`](third_party/README.md)); and `rcompat`, R's random numbers and arithmetic semantics, matches R 4.5.3 bit for bit on its reference vectors (M1). No tool is implemented yet.
 
 - Plan and validation framework: [docs/PLAN.md](docs/PLAN.md)
 - License: GPL-3.0 ([LICENSE](LICENSE)). Acknowledgements and upstream licenses: [NOTICE](NOTICE)
@@ -41,7 +41,7 @@ To rebuild the env exactly as solved, use `conda create -p .envs/rust-dev --file
 
 | Crate | Contents |
 |---|---|
-| `rcompat` | R-compatible random numbers and R arithmetic semantics |
+| `rcompat` | R-compatible random numbers and R arithmetic semantics (sampling, `rnorm`, long-double `sum`/`mean`/`var`, `round`, `seq`, `order`, number formatting) |
 | `scio` | sparse matrix and table I/O |
 | `sctransform` | SCTransform v2 (sctransform with glmGamPoi's fitting) |
 | `pca` | irlba as Seurat's `RunPCA` calls it |
