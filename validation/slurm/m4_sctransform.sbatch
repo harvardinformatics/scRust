@@ -12,6 +12,8 @@
 # An existing output directory is never overwritten: its run is skipped. Work in progress goes
 # to <dir>.partial.<job id>, renamed when complete. Exit status 1 if any comparison differs.
 #
+# SCRUST_BIN (environment) names the scrust binary to run (default target/release/scrust): copy
+# the build to a file of its own before submitting, so that later builds do not change it.
 # SCT_MODE (environment) selects the checks: both (default), teacher (each sub-stage on R's own
 # inputs) or chained (the whole SCTransform on Rust's own results), passed to --mode.
 #
@@ -42,8 +44,11 @@ echo "host=$(hostname) cpu='$(lscpu | sed -n 's/^Model name: *//p')' $(ldd --ver
 echo "OPENBLAS_CORETYPE=${OPENBLAS_CORETYPE:-auto} OPENBLAS_NUM_THREADS=$OPENBLAS_NUM_THREADS SCT_MODE=${SCT_MODE:-both}" \
      "$(rustc --version) commit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 
-bin=target/release/scrust
+# SCRUST_BIN pins the binary (a copy made at submission), so that a rebuild while the job waits
+# or runs cannot change what later runs execute
+bin=${SCRUST_BIN:-target/release/scrust}
 [ -x "$bin" ] || { echo "no $bin: run cargo build --release -p scrust first" >&2; exit 1; }
+echo "binary=$bin sha256=$(sha256sum "$bin" | cut -c1-16) $("$bin" --version)"
 [ $# -ge 2 ] || { echo "usage: m4_sctransform.sbatch <label> <object> [<object> ...]" >&2; exit 2; }
 label=$1
 shift
