@@ -15,11 +15,6 @@
 //! - R's `fft` (Singleton's mixed-radix algorithm), and OpenBLAS and LAPACK calls through FFI with
 //!   the routines and arguments R uses.
 
-#[cfg(test)]
-mod tests {
-    /// Placeholder until M1: shows the crate builds and its tests run.
-    #[test]
-    fn skeleton() {
-        assert_eq!(env!("CARGO_PKG_NAME"), "rcompat");
-    }
-}
+pub mod ldouble;
+
+pub use ldouble::F80;
