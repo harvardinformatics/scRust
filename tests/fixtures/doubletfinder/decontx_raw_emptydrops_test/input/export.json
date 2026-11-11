@@ -1,0 +1,22 @@
+{
+  "object": "decontx_raw_emptydrops_test",
+  "source": "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing/tests/reference_outputs/testdata/results/decontx_raw/seurat_decontx_raw_emptydrops_test.rds",
+  "source_sha256": "c011232beb26be9a64a6ea8cc68e0d71c969f8de90eb3876b98f20f312bc0efe",
+  "source_bytes": 2453174,
+  "seurat_object_version": "5.4.0",
+  "rna_assay_class": "Assay5",
+  "rna_layers": "counts",
+  "default_assay": "SCT",
+  "n_features": 2000,
+  "n_cells": 267,
+  "nnz": 58001,
+  "explicit_zeros": 0,
+  "non_integer_values": 0,
+  "min_value": 1,
+  "max_value": 172,
+  "feature_metadata_columns": [],
+  "cluster_levels": ["0", "1", "2", "3"],
+  "cluster_sizes": [81, 65, 61, 60],
+  "mtx_field": "integer",
+  "round_trip_identical": true
+}

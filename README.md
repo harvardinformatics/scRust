@@ -13,7 +13,7 @@ Each reimplementation is validated against the original tool's outputs, exactly 
 6. SoupX
 7. CellBender
 
-**Status:** milestone M1. The Cargo workspace, environments and validation skeleton are in place (M0); the upstream sources can be fetched (M1b, [`third_party/`](third_party/README.md)); and `rcompat`, R's random numbers and arithmetic semantics, matches R 4.5.3 bit for bit on its reference vectors (M1). No tool is implemented yet.
+**Status:** milestone M2. The Cargo workspace, environments and validation skeleton are in place (M0); the upstream sources can be fetched (M1b, [`third_party/`](third_party/README.md)); `rcompat`, R's random numbers and arithmetic semantics, matches R 4.5.3 bit for bit on its reference vectors (M1); and DoubletFinder's R reference data are built (M2): exports of the five workflow test objects and five production objects, direct and instrumented reference runs that reproduce every saved workflow output exactly in both reference profiles, stage dumps S1–S7, and the R-vs-R floor ([docs/validation/doubletfinder_m2.md](docs/validation/doubletfinder_m2.md)). No tool is implemented yet.
 
 - Plan and validation framework: [docs/PLAN.md](docs/PLAN.md)
 - License: GPL-3.0 ([LICENSE](LICENSE)). Acknowledgements and upstream licenses: [NOTICE](NOTICE)
@@ -48,4 +48,4 @@ To rebuild the env exactly as solved, use `conda create -p .envs/rust-dev --file
 | `knn` | exact nearest neighbours, memory-bounded |
 | `kde` | `KernSmooth::bkde`, `approxfun` and moments |
 | `doubletfinder` | DoubletFinder |
-| `scrust` | the command-line binary, `scrust <tool> ...` |
+| `scrust` | the command-line binary, `scrust <tool> ...`; `scrust fingerprint` prints the environment fingerprint (CPU, OpenBLAS kernel and threads, glibc) |

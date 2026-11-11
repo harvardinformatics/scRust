@@ -1,0 +1,16 @@
+{
+  "object": "cellbender_fromraw_test",
+  "source": "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_test.rds",
+  "source_sha256": "6926d303f01ff953d0c1314c1b4769fe67c1f7e38f01aed42e5d14081dbc130c",
+  "source_bytes": 2297036,
+  "pANN_column": "pANN_0.25_0.23_31",
+  "classification_column": "DF.classifications_0.25_0.23_31",
+  "pN_label": "0.25",
+  "pK_label": "0.23",
+  "nExp_label": "31",
+  "pK": 0.23000000000000001,
+  "nExp": 31,
+  "n_input": 278,
+  "n_kept": 247,
+  "n_doublets": 31
+}

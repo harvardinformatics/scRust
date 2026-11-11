@@ -1,0 +1,16 @@
+{
+  "object": "decontx_raw_emptydrops_test",
+  "source": "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_emptydrops_test.rds",
+  "source_sha256": "68c7eaf613dec99cc1fc815cc757dca4b4b55c9e0be5f52b6ec20ac5e234a41e",
+  "source_bytes": 2206746,
+  "pANN_column": "pANN_0.25_0.22_30",
+  "classification_column": "DF.classifications_0.25_0.22_30",
+  "pN_label": "0.25",
+  "pK_label": "0.22",
+  "nExp_label": "30",
+  "pK": 0.22,
+  "nExp": 30,
+  "n_input": 267,
+  "n_kept": 237,
+  "n_doublets": 30
+}

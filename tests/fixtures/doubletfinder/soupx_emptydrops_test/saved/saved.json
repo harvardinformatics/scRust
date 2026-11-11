@@ -1,0 +1,16 @@
+{
+  "object": "soupx_emptydrops_test",
+  "source": "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_test.rds",
+  "source_sha256": "5b329ad5138b833535bc6ff49839c0cd75bd2f1e10b5ce7977190b9411dd2e11",
+  "source_bytes": 2288403,
+  "pANN_column": "pANN_0.25_0.28_30",
+  "classification_column": "DF.classifications_0.25_0.28_30",
+  "pN_label": "0.25",
+  "pK_label": "0.28",
+  "nExp_label": "30",
+  "pK": 0.28000000000000003,
+  "nExp": 30,
+  "n_input": 267,
+  "n_kept": 237,
+  "n_doublets": 30
+}

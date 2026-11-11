@@ -16,6 +16,31 @@
 [doubletfinder.S0]
 criterion = "exact"
 
+# R-vs-R floor (M2; docs/validation/doubletfinder_m2.md): how far R itself moves when only the
+# machine changes. Measured with instrumented runs (every stage array and .Random.seed
+# checkpoint, block by block) on the five tier-T objects and on soupx_tenx_SRR18256555,
+# soupx_tenx_10xmousebrain and soupx_emptydrops_4500871lane; the two large objects end to end.
+# Settled as measurements; the stage criteria below are settled at their milestones.
+#
+# Same kernel, different CPU types: OPENBLAS_CORETYPE=Haswell (the portable profile) on Sapphire
+# Rapids (Xeon Platinum 8480CL) and Cascade Lake (Xeon Platinum 8268), tier T and
+# soupx_tenx_SRR18256555: every stage array, RNG checkpoint and final file bit-identical.
+[doubletfinder.floor.cpu_type]
+all_stages = "identical"
+
+# Different kernels, same CPU type: Haswell against SapphireRapids (the production profile, by
+# detection) on Sapphire Rapids. Maxima over objects and contexts; max_scaled is
+# max|a - b| / max|a| within one block; S3 embeddings and loadings after aligning each
+# component's sign (irlba's signs can flip between kernels). Everything not listed is identical:
+# S1, S2a, S2b, S2c, all RNG checkpoints (so irlba's draw count), S4, S5, S6, S7 and the final
+# cells.tsv, sweep_stats.tsv and bcmvn.tsv.
+[doubletfinder.floor.kernel]
+S2d_residual_stats = { max_abs = 5.7e-14, max_scaled = 1.4e-16 }
+S2d_scale_data = { max_abs = 2.2e-14, max_scaled = 1.2e-15, max_fraction_differing = 0.008 }
+S3_sdev = { max_rel = 7.3e-15 }
+S3_embeddings = { max_abs = 3.6e-11, max_scaled = 2.5e-13 }
+S3_loadings = { max_abs = 8.1e-14, max_scaled = 3.0e-13 }
+
 # S1 sampling: subsample and doublet index pairs, RNG state after each step (M3)
 # [doubletfinder.S1]
 # criterion = "exact"
@@ -38,6 +63,10 @@ criterion = "exact"
 # S2d SCTransform residuals: residual variance, the 3,000 variable features (ordered) and
 # scale.data, given R's parameters (M4d). Exact when the BLAS kernel matches; otherwise a
 # numeric tolerance set from the R-vs-R floor.
+# Floor (M2): across OpenBLAS kernels, residual statistics and scale.data differ in the last
+# bits on the larger objects (at most 5.7e-14 absolute, in at most 0.8% of a scale.data block);
+# bit-identical on tier T, and across CPU types with the same kernel. Proposed fallback, about
+# 20 times the floor: numeric, abs = 1e-12.
 # [doubletfinder.S2d]
 # criterion = "exact"
 # blas_dependent = true
@@ -45,6 +74,8 @@ criterion = "exact"
 # S3 PCA: standard deviations, embeddings (up to sign per component), RNG state afterwards (M5).
 # Identical when the BLAS kernel matches the fixture; otherwise relative <= 1e-10. The RNG state
 # must always match exactly.
+# Floor (M2): across kernels, sdev relative 7.3e-15, embeddings max|diff|/max|value| 2.5e-13
+# (components can flip sign); RNG states identical. The plan's 1e-10 leaves a margin of ~400.
 # [doubletfinder.S3]
 # criterion = "exact"
 # blas_dependent = true
@@ -53,6 +84,8 @@ criterion = "exact"
 
 # S4 neighbours: the first `ind` order positions for each real cell (M3). Identical for
 # >= 99.99% of cells, each difference explained by a near-tie.
+# Floor (M2): identical across kernels and CPU types on every object (the S3 differences above
+# move no neighbour), so S5-S7 are identical too.
 # [doubletfinder.S4]
 # criterion = "agreement"
 # min_identical_fraction = 0.9999

@@ -1,0 +1,22 @@
+{
+  "object": "cellbender_fromraw_test",
+  "source": "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing/tests/reference_outputs/testdata/results/cellbender_fromraw/seurat_cellbender_fromraw_test.rds",
+  "source_sha256": "0518669b01c19425f7dba14a7652ae4d59dd180b3fbc5dcdf4eae27e5636130a",
+  "source_bytes": 2616850,
+  "seurat_object_version": "5.4.0",
+  "rna_assay_class": "Assay5",
+  "rna_layers": "counts",
+  "default_assay": "SCT",
+  "n_features": 2000,
+  "n_cells": 278,
+  "nnz": 63782,
+  "explicit_zeros": 0,
+  "non_integer_values": 0,
+  "min_value": 1,
+  "max_value": 201,
+  "feature_metadata_columns": [],
+  "cluster_levels": ["0", "1", "2", "3"],
+  "cluster_sizes": [85, 76, 61, 56],
+  "mtx_field": "integer",
+  "round_trip_identical": true
+}

@@ -1,0 +1,16 @@
+{
+  "object": "soupx_tenx_test",
+  "source": "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_tenx_test.rds",
+  "source_sha256": "b0598725da418f0bcc33b9ae49befd0c44b0eb7c243fc215c8485acbe6c35ee8",
+  "source_bytes": 2602504,
+  "pANN_column": "pANN_0.25_0.29_24",
+  "classification_column": "DF.classifications_0.25_0.29_24",
+  "pN_label": "0.25",
+  "pK_label": "0.29",
+  "nExp_label": "24",
+  "pK": 0.28999999999999998,
+  "nExp": 24,
+  "n_input": 300,
+  "n_kept": 276,
+  "n_doublets": 24
+}
