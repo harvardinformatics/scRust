@@ -23,6 +23,8 @@ dependencies:
   - gcc_linux-64=16.2.0
   - pkg-config
   # BLAS/LAPACK, pinned to the R reference env's exact builds.
+  # Linking: these packages ship no unversioned libopenblas.so, so link with -lblas
+  # (libblas.so -> libopenblasp-r0.3.34.so, the same library R uses), not -lopenblas.
   - libopenblas=0.3.34=pthreads_hf13c14d_2
   - libblas=3.11.0=12_h4a7cf45_openblas
   - libcblas=3.11.0=12_h0358290_openblas
