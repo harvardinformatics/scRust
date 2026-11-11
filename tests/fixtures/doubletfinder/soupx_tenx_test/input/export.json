@@ -1,0 +1,22 @@
+{
+  "object": "soupx_tenx_test",
+  "source": "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing/tests/reference_outputs/testdata/results/soupx/seurat_soupx_tenx_test.rds",
+  "source_sha256": "7057be8f6c6efee26d6323a5cea2a90c217d72682b1e7fdef8552aae80e37073",
+  "source_bytes": 2838801,
+  "seurat_object_version": "5.4.0",
+  "rna_assay_class": "Assay5",
+  "rna_layers": "counts",
+  "default_assay": "SCT",
+  "n_features": 2000,
+  "n_cells": 300,
+  "nnz": 64934,
+  "explicit_zeros": 2686,
+  "non_integer_values": 0,
+  "min_value": 0,
+  "max_value": 192,
+  "feature_metadata_columns": [],
+  "cluster_levels": ["0", "1", "2"],
+  "cluster_sizes": [165, 121, 14],
+  "mtx_field": "integer",
+  "round_trip_identical": true
+}

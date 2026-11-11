@@ -1,0 +1,129 @@
+{
+  "result": {
+    "n_cells": 267,
+    "n_genes": 2000,
+    "seed": 12345,
+    "PCs": 10,
+    "pN": 0.25,
+    "sweep_pK_labels": ["0.04", "0.05", "0.06", "0.07", "0.08", "0.09", "0.1", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", "0.2", "0.21", "0.22", "0.23", "0.24", "0.25", "0.26", "0.27", "0.28", "0.29", "0.3"],
+    "sweep_pN_labels": ["0.05", "0.1", "0.15", "0.2", "0.25", "0.3"],
+    "bcmvn_max_row": 19,
+    "pK": 0.22,
+    "pK_label": "0.22",
+    "nExp_poi": 40,
+    "homotypic_prop": 0.25399430487171937,
+    "nExp": 30,
+    "n_doublets": 89,
+    "n_cells_with_doublets": 356,
+    "k": 78,
+    "pANN_column": "pANN_0.25_0.22_30",
+    "classification_column": "DF.classifications_0.25_0.22_30",
+    "n_doublet_calls": 30,
+    "rng_end_sha256": "cc9e0240adcbc5ad0c4022d8e8203f6b3f76a99aee9ec6a6f11b535a23b2f012"
+  },
+  "run": {
+    "kind": "validation/R/reference_doubletfinder.R",
+    "input": "data/doubletfinder/decontx_raw_emptydrops_test/input",
+    "input_source": "export",
+    "outdir": "data/doubletfinder/decontx_raw_emptydrops_test/runs/direct-portable-sapphirerapids.partial.59637958",
+    "script": "validation/R/reference_doubletfinder.R",
+    "start_time": "2026-11-10T22:37:13-0500",
+    "slurm_job_id": "59637958",
+    "profile": "portable",
+    "fingerprint": {
+      "scrust_version": "0.1.0",
+      "host": "holy8a32607.rc.fas.harvard.edu",
+      "kernel": "4.18.0-553.155.1.el8_10.x86_64",
+      "cpu_model": "Intel(R) Xeon(R) Platinum 8480CL",
+      "cpu_flags": ["avx2", "fma", "avx512f", "avx512bw", "avx512_bf16", "amx_tile"],
+      "glibc": "2.28",
+      "openblas_corename": "Haswell",
+      "openblas_config": "OpenBLAS 0.3.34 DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=128",
+      "openblas_num_threads": 1,
+      "openblas_library": "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRust/.envs/rust-dev/lib/libopenblasp-r0.3.34.so",
+      "OPENBLAS_CORETYPE": "Haswell",
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": null,
+      "SLURM_JOB_ID": "59637958",
+      "SLURM_JOB_PARTITION": "sapphire",
+      "SLURMD_NODENAME": "holy8a32607",
+      "SLURM_CPUS_PER_TASK": "1",
+      "R": "R version 4.5.3 (2026-03-11)",
+      "platform": "x86_64-conda-linux-gnu",
+      "packages": {
+        "Seurat": {
+          "version": "5.5.1"
+        },
+        "SeuratObject": {
+          "version": "5.4.0"
+        },
+        "sctransform": {
+          "version": "0.4.3"
+        },
+        "glmGamPoi": {
+          "version": "1.22.0"
+        },
+        "irlba": {
+          "version": "2.4.1"
+        },
+        "fields": {
+          "version": "17.3"
+        },
+        "KernSmooth": {
+          "version": "2.23-27"
+        },
+        "matrixStats": {
+          "version": "1.5.0"
+        },
+        "Matrix": {
+          "version": "1.7-6"
+        },
+        "DoubletFinder": {
+          "version": "2.0.6",
+          "remote_sha": "1b244d8f0d54b4b1cb4365639931bbb16f01e1cd"
+        },
+        "future": {
+          "version": "1.82.0"
+        },
+        "future.apply": {
+          "version": "1.21.0"
+        },
+        "Rcpp": {
+          "version": "1.1.2"
+        }
+      },
+      "blas_library": "/n/holylfs05/LABS/informatics/Users/afreedman/smk-conda-envs/d3ca7f730a70e6f748bb65a12a5ed3f9_/lib/libopenblasp-r0.3.34.so",
+      "lapack_library": "/n/holylfs05/LABS/informatics/Users/afreedman/smk-conda-envs/d3ca7f730a70e6f748bb65a12a5ed3f9_/lib/libopenblasp-r0.3.34.so",
+      "lapack_version": "3.12.0",
+      "blas_md5": "d77a762c672e6e8c39a458506f73cfd1",
+      "rng_kind": ["Mersenne-Twister", "Inversion", "Rejection"],
+      "locale": "LC_CTYPE=en_US.UTF-8;LC_NUMERIC=C;LC_TIME=en_US.UTF-8;LC_COLLATE=en_US.UTF-8;LC_MONETARY=en_US.UTF-8;LC_MESSAGES=en_US.UTF-8;LC_PAPER=en_US.UTF-8;LC_NAME=C;LC_ADDRESS=C;LC_TELEPHONE=C;LC_MEASUREMENT=en_US.UTF-8;LC_IDENTIFICATION=C",
+      "sizeof_longdouble": 16
+    },
+    "load_input_s": 0.28800000000000026,
+    "peak_rss_after_load_kib": 410300,
+    "phases": {
+      "paramSweep": {
+        "elapsed_s": 21.096999999999998,
+        "peak_rss_kib": 1022468
+      },
+      "summarizeSweep": {
+        "elapsed_s": 21.137,
+        "peak_rss_kib": 1022468
+      },
+      "find.pK": {
+        "elapsed_s": 21.140999999999998,
+        "peak_rss_kib": 1022468
+      },
+      "sweep_cleanup": {
+        "elapsed_s": 21.971999999999998,
+        "peak_rss_kib": 1022468
+      },
+      "doubletFinder": {
+        "elapsed_s": 24.271000000000001,
+        "peak_rss_kib": 1031060
+      }
+    },
+    "peak_rss_kib": 1031060
+  }
+}

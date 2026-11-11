@@ -11,3 +11,14 @@ Small fixtures committed to the repository, which `cargo test` checks on every c
 ## rcompat/
 
 R 4.5.3's results for the `rcompat` crate (stage S0), made by [`validation/R/rcompat_vectors.R`](../../validation/R/rcompat_vectors.R) and checked by `crates/rcompat/tests/r_vectors.rs`. One tab-separated file per family (`unif`, `random_seed`, `random_seed_after`, `sample`, `rnorm`, `qnorm`, `round`, `pow`, `seq_by`, `seq_len`, `order`, `summary`, `format`); lines starting with `#` name the columns. Doubles are written as their IEEE-754 bit patterns (16 hex digits), so the comparison is bitwise; lists are comma-separated, `-` for an empty one.
+
+## doubletfinder/
+
+The five tier-T objects (the workflow's test data, plan B4), one directory each: `soupx_tenx_test`, `soupx_emptydrops_test`, `decontx_raw_tenx_test`, `decontx_raw_emptydrops_test`, `cellbender_fromraw_test`. Each is a copy of files under `data/doubletfinder/<object>/` (milestone M2; recipes and checks in [`docs/validation/doubletfinder_m2.md`](../../docs/validation/doubletfinder_m2.md)), made in the portable profile:
+
+- `input/`: what DoubletFinder reads, exported by [`export_doubletfinder.R`](../../validation/R/export_doubletfinder.R): `matrix.mtx.gz`, `barcodes.tsv.gz`, `features.tsv.gz` (10x Matrix Market, entries exactly as stored in the object's RNA `counts` layer, **explicit zeros included**: the SoupX objects have them, and sctransform's `min_variance` is `median(umi@x)`, so a reader must keep them), `seurat_clusters.tsv` and `seurat_clusters_levels.txt` (the factor's level order), `export.json`.
+- `saved/`: the saved workflow output's compared fields: `cells.tsv` (kept barcodes and their pANN), `doublets.txt` (the doublet set), `saved.json` (column names, pK, nExp).
+- `reference/`: the direct run's `cells.tsv` (barcode, pANN, classification for every cell), `sweep_stats.tsv`, `bcmvn.tsv` and `summary.json` (compare its `result` section; the `run` section holds timings, node and job).
+- `stages/`: the instrumented run's stage arrays S1–S7 (`.npy`), `index.tsv` (which rows of which file belong to which context and stage), `rng.npy`/`rng.tsv` (`.Random.seed` checkpoints) and `stages.json`. Conventions: [`validation/R/lib/doubletfinder_hooks.R`](../../validation/R/lib/doubletfinder_hooks.R). Not copied, to stay within the size budget (they remain in `data/` and in `index.tsv`): the per-context matrices `S2d_y.<ctx>.npy`, `S2d_scale_data.<ctx>.npy` and `S4_positions.<ctx>.npy`, and `S6_bkde.npy`.
+
+Doubles in the TSV and JSON files have 17 significant digits, so Rust's `str::parse::<f64>` gives back the exact value; `crates/doubletfinder/tests/m2_fixtures.rs` checks this against the `.npy` copies.

@@ -1,0 +1,16 @@
+{
+  "object": "decontx_raw_tenx_test",
+  "source": "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_tenx_test.rds",
+  "source_sha256": "44efbaef9ea22351a6985cc564456a65aa34376502bbb0f09e7b17b59043dfec",
+  "source_bytes": 2439870,
+  "pANN_column": "pANN_0.25_0.09_27",
+  "classification_column": "DF.classifications_0.25_0.09_27",
+  "pN_label": "0.25",
+  "pK_label": "0.09",
+  "nExp_label": "27",
+  "pK": 0.089999999999999997,
+  "nExp": 27,
+  "n_input": 300,
+  "n_kept": 273,
+  "n_doublets": 27
+}
