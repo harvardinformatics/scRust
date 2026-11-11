@@ -81,7 +81,8 @@ fn reproduces_the_reference_runs() {
         let identical: Vec<&str> = report.checks.iter().filter(|c| c.status == Status::Identical).map(|c| c.name.as_str()).collect();
         for want in ["cells.tsv", "sweep_stats.tsv", "bcmvn.tsv", "pK", "nExp", "k", "pANN_column", "S4_digest.npy",
                      "S5_pann_sweep.npy", "S5_pann_final.npy", "S6_gkde.npy", "S7_doublet.npy",
-                     "S6_gkde (teacher-forced on R's S5)", "BCreal (teacher-forced on R's S5)", "S7_doublet (teacher-forced on R's S5)"] {
+                     "S6_gkde (teacher-forced on R's S5)", "BCreal (teacher-forced on R's S5)", "S7_doublet (teacher-forced on R's S5)",
+                     "S1_subsample (from R's RNG state)", "S1_doublets (from R's RNG states)"] {
             assert!(identical.contains(&want), "{object}: {want} not compared");
         }
         assert_eq!(report.checks.iter().filter(|c| c.stage == "result" && c.status == Status::Identical).count(), 19, "{object}");

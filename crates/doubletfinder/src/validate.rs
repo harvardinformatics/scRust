@@ -7,7 +7,9 @@
 //! - every block of the stage arrays S4-S7 that both runs dumped, bit for bit;
 //! - S6 and S7 teacher-forced on R's own S5: BCreal and the values passed to
 //!   `bimodality_coefficient` recomputed from R's sweep pANN, and the calls from R's final pANN
-//!   and nExp, so that a difference in S6 or S7 cannot hide behind one in S5.
+//!   and nExp, so that a difference in S6 or S7 cannot hide behind one in S5;
+//! - S1 from R's own random-number states: the sweep subsample and every doublet draw, redrawn
+//!   with rcompat from R's `.Random.seed` before them.
 //!
 //! Every criterion is exact (`validation/tolerances.toml`, S4-S7).
 
@@ -335,6 +337,67 @@ fn teacher_forced_s6_s7(reference: &Path, rs: &StageDir, result: Option<&Json>, 
     Ok(())
 }
 
+/// Stage S1 from R's own `.Random.seed` checkpoints: the sweep subsample (`sample(1:n, 10000)`
+/// from the state at `paramSweep` entry, when n > 10,000) and, for every sweep iteration and the
+/// final run, the two `sample(real.cells, n_doublets, replace = TRUE)` draws from the state
+/// before them; the draws must equal R's (S1_subsample, S1_doublets) and leave R's state after
+/// them. This checks rcompat's sampling on DoubletFinder's own draws; Rust's teacher-forced runs
+/// take the subsample from R.
+fn s1_from_rng(rs: &StageDir, n_cells: Option<usize>, checks: &mut Vec<Check>) -> Result<(), DfError> {
+    let (Ok(rng), Ok(labels), Ok(doublets)) = (rs.read("rng.npy"), Table::read(&rs.dir.join("rng.tsv")), rs.read("S1_doublets.npy")) else {
+        checks.push(check("S1", "S1 (from R's RNG checkpoints)", Status::Missing, 0, 0, "no rng.npy, rng.tsv or S1_doublets.npy"));
+        return Ok(());
+    };
+    let n_cells = match n_cells.or_else(|| rs.block("S5_pann_final.npy", "final").map(|b| b.nrow)) {
+        Some(n) => n,
+        None => return Ok(()),
+    };
+    let state = |row: usize| -> Vec<i32> { (0..rng.ncol()).map(|c| rng.get_i32(row, c)).collect() };
+    let find = |ctx: &str, label: &str| -> Option<usize> {
+        labels.rows.iter().find(|r| r[1] == ctx && r[3] == label).and_then(|r| r[0].parse().ok())
+    };
+    let rng_at = |row: usize| rcompat::RRng::from_random_seed(&state(row)).map_err(|e| DfError::Input(format!("rng.npy row {row}: {e:?}")));
+    // the sweep subsample
+    let first_ctx = rs.blocks_of("S1_doublets.npy").first().map(|b| b.ctx.clone()).unwrap_or_default();
+    let (entry, first) = (find("sweep", "paramSweep_entry"), find(&first_ctx, "before_doublets"));
+    let mut real = n_cells;
+    if let (Some(entry), Some(first)) = (entry, first) {
+        let mut g = rng_at(entry)?;
+        let (mut n, mut nd) = (0usize, 0usize);
+        if let Some(b) = rs.block("S1_subsample.npy", "sweep") {
+            let want = rs.read("S1_subsample.npy")?.col_i32(0, b.row_start, b.nrow);
+            let got = rcompat::sample_int(&mut g, n_cells, want.len(), false).map_err(|e| DfError::Input(format!("{e:?}")))?;
+            n = want.len();
+            nd = got.iter().zip(&want).filter(|(a, b)| **a as i32 != **b).count();
+            real = want.len();
+        }
+        let same_state = g.random_seed() == state(first);
+        let status = if nd == 0 && same_state { Status::Identical } else { Status::Differ };
+        let detail = format!("{}; RNG state afterwards {}", if n > 0 { format!("{n} cells drawn") } else { "no subsample (n <= 10,000)".into() }, if same_state { "identical" } else { "DIFFERS" });
+        checks.push(check("S1", "S1_subsample (from R's RNG state)", status, n.max(1), nd + (!same_state) as usize, detail));
+    }
+    // the doublet pairs of every context
+    let (mut n, mut nd, mut states_bad, mut blocks) = (0usize, 0usize, 0usize, 0usize);
+    for b in rs.blocks_of("S1_doublets.npy") {
+        let (Some(before), Some(after)) = (find(&b.ctx, "before_doublets"), find(&b.ctx, "after_doublets")) else { continue };
+        let n_real = if b.ctx == "final" { n_cells } else { real };
+        let mut g = rng_at(before)?;
+        let d1 = rcompat::sample_int(&mut g, n_real, b.nrow, true).map_err(|e| DfError::Input(format!("{e:?}")))?;
+        let d2 = rcompat::sample_int(&mut g, n_real, b.nrow, true).map_err(|e| DfError::Input(format!("{e:?}")))?;
+        let (w1, w2) = (doublets.col_i32(0, b.row_start, b.nrow), doublets.col_i32(1, b.row_start, b.nrow));
+        n += 2 * b.nrow;
+        nd += d1.iter().zip(&w1).chain(d2.iter().zip(&w2)).filter(|(a, b)| **a as i32 != **b).count();
+        states_bad += (g.random_seed() != state(after)) as usize;
+        blocks += 1;
+    }
+    if blocks > 0 {
+        let status = if nd == 0 && states_bad == 0 { Status::Identical } else { Status::Differ };
+        checks.push(check("S1", "S1_doublets (from R's RNG states)", status, n, nd + states_bad,
+            format!("{blocks} contexts; RNG state after the draws differs in {states_bad}")));
+    }
+    Ok(())
+}
+
 /// Compares the candidate (a Rust output directory: the final files, `summary.json` and
 /// `stages/`) with an R reference run: its directory (the final files and `summary.json`) and
 /// the stage directory of an instrumented run (usually `<reference>/stages`).
@@ -347,6 +410,8 @@ pub fn compare(reference: &Path, reference_stages: &Path, candidate: &Path, thre
         let (rs, cs) = (StageDir::open(&rsd)?, StageDir::open(&csd)?);
         compare_stage_blocks(&rs, &cs, &mut checks)?;
         teacher_forced_s6_s7(reference, &rs, result.as_ref(), &mut checks, threads)?;
+        let n_cells = result.as_ref().and_then(|r| r.get("n_cells")).and_then(Json::as_f64).map(|v| v as usize);
+        s1_from_rng(&rs, n_cells, &mut checks)?;
     } else {
         checks.push(check("S4-S7", "stages", Status::Missing, 0, 0, "no stage dumps in one of the runs"));
     }
