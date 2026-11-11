@@ -69,8 +69,34 @@ pub enum Order {
 }
 
 /// Distances from point `q` to every point, as `fields::rdist` computes them.
-#[allow(clippy::assign_op_pattern)] // rdist's `k = (x - y)**2 + k`, kept as written
+///
+/// On x86-64 CPUs with AVX2 the same code is compiled for 4-wide vectors and chosen at run
+/// time; it performs the same IEEE operations on every element (subtract, multiply, add, square
+/// root; no fused multiply-add, which is not even enabled), so the distances are bit-identical
+/// on every machine.
 pub fn distances(points: &Points, q: usize, out: &mut [f64]) {
+    #[cfg(target_arch = "x86_64")]
+    {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            // SAFETY: the CPU supports AVX2, checked just above.
+            unsafe { distances_avx2(points, q, out) };
+            return;
+        }
+    }
+    distances_body(points, q, out);
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn distances_avx2(points: &Points, q: usize, out: &mut [f64]) {
+    distances_body(points, q, out);
+}
+
+/// The distance loop: per block of points, `s = (x[1] - y[1])^2`, `s = (x[c] - y[c])^2 + s`
+/// for each further coordinate, then `sqrt(s)`.
+#[inline(always)]
+#[allow(clippy::assign_op_pattern)] // rdist's `k = (x - y)**2 + k`, kept as written
+fn distances_body(points: &Points, q: usize, out: &mut [f64]) {
     let n = points.n;
     debug_assert_eq!(out.len(), n);
     // blocks keep the running sums in L1; the inner loops vectorize without changing any
@@ -121,51 +147,102 @@ struct Scratch {
     dist: Vec<f64>,
     keys: Vec<u64>,
     sel: Vec<u32>,
+    band: Vec<(u64, u32)>,
+    tmp: Vec<u64>,
 }
+
+impl Scratch {
+    fn new(n: usize, l: usize) -> Scratch {
+        Scratch { dist: vec![0.0; n], keys: Vec::with_capacity(n), sel: Vec::with_capacity(l), band: Vec::new(), tmp: Vec::new() }
+    }
+}
+
+/// Below this many points the threshold is found by a plain selection.
+const SAMPLE_MIN_N: usize = 8192;
+/// Sample size for the threshold estimate.
+const SAMPLE: usize = 2048;
 
 /// The first `l` positions (0-based indices) of `order(d)` for the distances in `scratch.dist`,
 /// in the requested `order`, left in `scratch.sel`.
+///
+/// The positions are the indices whose key is below the l-th smallest key t, then the indices
+/// with key t in index order until there are l. t is found exactly: a sorted sample of the keys
+/// brackets it by [lo, hi]; one pass takes the indices below lo and collects the band
+/// [lo, hi], and t is selected within the band. If the band misses t (a sampling accident),
+/// the whole key vector is selected instead. Either way the result is the same.
 fn select(scratch: &mut Scratch, l: usize, order: Order) {
-    let Scratch { dist, keys, sel } = scratch;
+    let Scratch { dist, keys, sel, band, tmp } = scratch;
     let n = dist.len();
     sel.clear();
     if l == 0 {
         return;
     }
+    keys.clear();
+    keys.extend(dist.iter().map(|&d| key(d)));
     if l >= n {
         sel.extend(0..n as u32);
     } else {
-        // threshold: the l-th smallest distance key
-        keys.clear();
-        keys.extend(dist.iter().map(|&d| key(d)));
-        let (_, &mut t, _) = keys.select_nth_unstable(l - 1);
-        // every index below the threshold, then threshold ties in index order
-        let mut ties = 0usize;
-        for (i, &d) in dist.iter().enumerate() {
-            let k = key(d);
-            if k < t {
-                sel.push(i as u32);
-            } else if k == t {
-                ties += 1;
+        let r = l - 1; // rank of the threshold, 0-based
+        let mut done = false;
+        if n >= SAMPLE_MIN_N {
+            let stride = n / SAMPLE;
+            tmp.clear();
+            tmp.extend((0..SAMPLE).map(|j| keys[j * stride]));
+            tmp.sort_unstable();
+            // expected rank of t in the sample, and a margin of about 5 standard deviations
+            let p = r as f64 / n as f64;
+            let rs = (p * SAMPLE as f64) as usize;
+            let margin = (5.0 * (SAMPLE as f64 * p * (1.0 - p)).sqrt()) as usize + 8;
+            let lo = if rs > margin { tmp[rs - margin] } else { 0 };
+            let hi = if rs + margin < SAMPLE - 1 { tmp[rs + margin] } else { u64::MAX };
+            // one branch-free pass: indices below lo, and the band [lo, hi] in index order
+            sel.resize(n, 0);
+            band.resize(n, (0, 0));
+            let (mut nb, mut nm) = (0usize, 0usize);
+            for (i, &k) in keys.iter().enumerate() {
+                sel[nb] = i as u32;
+                nb += (k < lo) as usize;
+                band[nm] = (k, i as u32);
+                nm += (k >= lo && k <= hi) as usize;
+            }
+            sel.truncate(nb);
+            band.truncate(nm);
+            let below = sel.len();
+            if below <= r && r < below + band.len() {
+                tmp.clear();
+                tmp.extend(band.iter().map(|&(k, _)| k));
+                let (_, &mut t, _) = tmp.select_nth_unstable(r - below);
+                // band entries are in index order: those below t, then ties at t
+                sel.extend(band.iter().filter(|&&(k, _)| k < t).map(|&(_, i)| i));
+                let need = l - sel.len();
+                sel.extend(band.iter().filter(|&&(k, _)| k == t).take(need).map(|&(_, i)| i));
+                done = true;
+            } else {
+                sel.clear();
             }
         }
-        let need = l - sel.len();
-        debug_assert!(need >= 1 && need <= ties);
-        let mut taken = 0;
-        for (i, &d) in dist.iter().enumerate() {
-            if taken == need {
-                break;
+        if !done {
+            tmp.clear();
+            tmp.extend_from_slice(keys);
+            let (_, &mut t, _) = tmp.select_nth_unstable(r);
+            let mut ties = 0usize;
+            for (i, &k) in keys.iter().enumerate() {
+                if k < t {
+                    sel.push(i as u32);
+                } else if k == t {
+                    ties += 1;
+                }
             }
-            if key(d) == t {
-                sel.push(i as u32);
-                taken += 1;
-            }
+            let need = l - sel.len();
+            debug_assert!(need >= 1 && need <= ties);
+            sel.extend(keys.iter().enumerate().filter(|&(_, &k)| k == t).take(need).map(|(i, _)| i as u32));
         }
+        debug_assert_eq!(sel.len(), l);
     }
     match order {
-        Order::Sorted => sel.sort_unstable_by_key(|&i| (key(dist[i as usize]), i)),
+        Order::Sorted => sel.sort_unstable_by_key(|&i| (keys[i as usize], i)),
         Order::FirstThenSet => {
-            let first = (0..sel.len()).min_by_key(|&j| (key(dist[sel[j] as usize]), sel[j])).unwrap();
+            let first = (0..sel.len()).min_by_key(|&j| (keys[sel[j] as usize], sel[j])).unwrap();
             sel.swap(0, first);
         }
     }
@@ -188,7 +265,7 @@ where
     let next = AtomicUsize::new(0);
     let results: Mutex<Vec<(usize, Vec<R>)>> = Mutex::new(Vec::new());
     let work = || {
-        let mut scratch = Scratch { dist: vec![0.0; points.n], keys: Vec::with_capacity(points.n), sel: Vec::with_capacity(l) };
+        let mut scratch = Scratch::new(points.n, l);
         loop {
             let start = next.fetch_add(chunk, Ordering::Relaxed);
             if start >= n_query {
@@ -296,6 +373,29 @@ mod tests {
     }
 
     #[test]
+    fn vector_paths_are_bit_identical() {
+        let (n, dim) = (1000usize, 10usize);
+        let mut g = Lcg(5);
+        let data: Vec<f64> = (0..n * dim).map(|_| g.next() * 40.0 - 20.0).collect();
+        let p = Points::new(&data, n, dim);
+        let (mut a, mut b) = (vec![0.0; n], vec![0.0; n]);
+        for q in [0, 1, 517, 999] {
+            distances(&p, q, &mut a);
+            distances_body(&p, q, &mut b);
+            assert!(a.iter().zip(&b).all(|(x, y)| x.to_bits() == y.to_bits()), "query {q}");
+            // and the scalar definition, element by element
+            for (i, &ai) in a.iter().enumerate() {
+                let d0 = p.get(i, 0) - p.get(q, 0);
+                let s = (1..dim).fold(d0 * d0, |s, c| {
+                    let d = p.get(i, c) - p.get(q, c);
+                    d * d + s
+                });
+                assert_eq!(ai.to_bits(), s.sqrt().to_bits());
+            }
+        }
+    }
+
+    #[test]
     fn rdist_arithmetic() {
         // 3 points in 2 dimensions; d(0, 1) = sqrt(3^2 + 4^2)
         let data = [0.0, 3.0, 1.0, 0.0, 4.0, 1.0];
@@ -324,6 +424,29 @@ mod tests {
                 b.sort_unstable();
                 assert_eq!(a, b, "set, n={n} q={q}");
             }
+        }
+    }
+
+    /// The sampled threshold on large inputs (n >= 8192), with heavy ties and skewed
+    /// distributions, against a full stable sort.
+    #[test]
+    fn sampled_threshold_is_exact() {
+        let mut g = Lcg(31);
+        for (n, l, kind) in [(9000, 1700, 0), (20000, 6000, 1), (12000, 11999, 2), (16384, 5, 0), (10000, 9000, 3), (30000, 30000, 1)] {
+            let dist: Vec<f64> = (0..n)
+                .map(|i| match kind {
+                    0 => g.next(),
+                    1 => (g.next() * 50.0).floor(),        // heavy ties
+                    2 => if i % 3 == 0 { 1.0 } else { g.next() * 1e-3 }, // a dominant tie
+                    _ => (g.next() * 30.0).exp(),          // many binades
+                })
+                .collect();
+            let mut sc = Scratch::new(n, l);
+            sc.dist.copy_from_slice(&dist);
+            select(&mut sc, l, Order::Sorted);
+            let o = rcompat::order(&dist, false);
+            let want: Vec<u32> = o[..l.min(n)].iter().map(|&i| i as u32).collect();
+            assert_eq!(sc.sel, want, "n={n} l={l} kind={kind}");
         }
     }
 
