@@ -5,14 +5,28 @@ version = 4
 [[package]]
 name = "doubletfinder"
 version = "0.1.0"
+dependencies = [
+ "kde",
+ "knn",
+ "rcompat",
+ "scio",
+]
 
 [[package]]
 name = "kde"
 version = "0.1.0"
+dependencies = [
+ "rcompat",
+ "scio",
+]
 
 [[package]]
 name = "knn"
 version = "0.1.0"
+dependencies = [
+ "rcompat",
+ "scio",
+]
 
 [[package]]
 name = "pca"
@@ -31,6 +45,9 @@ name = "scrust"
 version = "0.1.0"
 dependencies = [
  "doubletfinder",
+ "knn",
+ "rcompat",
+ "scio",
 ]
 
 [[package]]

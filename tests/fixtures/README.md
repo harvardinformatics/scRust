@@ -10,7 +10,7 @@ Small fixtures committed to the repository, which `cargo test` checks on every c
 
 ## rcompat/
 
-R 4.5.3's results for the `rcompat` crate (stage S0), made by [`validation/R/rcompat_vectors.R`](../../validation/R/rcompat_vectors.R) and checked by `crates/rcompat/tests/r_vectors.rs`. One tab-separated file per family (`unif`, `random_seed`, `random_seed_after`, `sample`, `rnorm`, `qnorm`, `round`, `pow`, `seq_by`, `seq_len`, `order`, `summary`, `format`); lines starting with `#` name the columns. Doubles are written as their IEEE-754 bit patterns (16 hex digits), so the comparison is bitwise; lists are comma-separated, `-` for an empty one.
+R 4.5.3's results for the `rcompat` crate (stage S0), made by [`validation/R/rcompat_vectors.R`](../../validation/R/rcompat_vectors.R) and checked by `crates/rcompat/tests/r_vectors.rs`. One tab-separated file per family (M1: `unif`, `random_seed`, `random_seed_after`, `sample`, `rnorm`, `qnorm`, `round`, `pow`, `seq_by`, `seq_len`, `order`, `summary`, `format`; M3: `strtod` (`as.numeric()` of strings, R's own parser, including strings it does not round correctly), `fft`, `dnorm`, `approx`); lines starting with `#` name the columns. Doubles are written as their IEEE-754 bit patterns (16 hex digits), so the comparison is bitwise; lists are comma-separated, `-` for an empty one.
 
 ## doubletfinder/
 

@@ -1,9 +1,14 @@
 //! `scrust`, the single command-line entry point to scRust's tools (docs/PLAN.md A1).
 //!
 //! Each tool is a library crate under `crates/` plus a subcommand here, so the repository ships
-//! as one binary. So far `fingerprint` prints the environment fingerprint (A5b), which the R
-//! reference runs record from milestone M2 on; `doubletfinder` is a placeholder.
+//! as one binary: `doubletfinder` (milestone M3: on R's own embeddings), `knn` (the shared
+//! neighbour stage on its own), `validate` (Rust against R, plan A4) and `fingerprint` (the
+//! environment fingerprint of plan A5b, which the R reference runs record too).
 
+mod cli;
+mod cmd_doubletfinder;
+mod cmd_knn;
+mod cmd_validate;
 mod fingerprint;
 
 use std::process::ExitCode;
@@ -12,9 +17,14 @@ const USAGE: &str = "\
 Usage: scrust <COMMAND> [ARGS]...
 
 Commands:
-  doubletfinder  Doublet detection reproducing DoubletFinder (not implemented yet)
+  doubletfinder  Doublet detection reproducing DoubletFinder 2.0.6 (milestone M3: on the
+                 embeddings of an instrumented R run, --from-stages)
+  knn            Exact nearest neighbours as DoubletFinder ranks them
+  validate       Compare a Rust run with an R reference run (validate doubletfinder ...)
   fingerprint    Print the environment fingerprint as JSON: node, CPU, OpenBLAS kernel
                  and threads, glibc (docs/PLAN.md A5b)
+
+Run 'scrust <COMMAND> --help' for a command's options.
 
 Options:
   -h, --help     Print help
@@ -39,13 +49,30 @@ fn main() -> ExitCode {
             print!("{}", fingerprint::json());
             ExitCode::SUCCESS
         }
-        Some("doubletfinder") => {
-            eprintln!(
-                "scrust doubletfinder: not implemented yet; it will reproduce {}. \
-                 See docs/PLAN.md, Part B.",
-                doubletfinder::REFERENCE
-            );
-            ExitCode::FAILURE
+        Some(cmd @ ("doubletfinder" | "knn" | "validate")) => {
+            let rest: Vec<String> = std::env::args().skip(2).collect();
+            let usage = match cmd {
+                "doubletfinder" => cmd_doubletfinder::USAGE,
+                "knn" => cmd_knn::USAGE,
+                _ => cmd_validate::USAGE,
+            };
+            if rest.iter().any(|a| a == "-h" || a == "--help") {
+                print!("{usage}");
+                return ExitCode::SUCCESS;
+            }
+            let result = match cmd {
+                "doubletfinder" => cmd_doubletfinder::main(&rest).map(|_| true),
+                "knn" => cmd_knn::main(&rest).map(|_| true),
+                _ => cmd_validate::main(&rest),
+            };
+            match result {
+                Ok(true) => ExitCode::SUCCESS,
+                Ok(false) => ExitCode::FAILURE,
+                Err(e) => {
+                    eprintln!("scrust {cmd}: {e}\n\n{usage}");
+                    ExitCode::from(2)
+                }
+            }
         }
         _ => {
             eprint!(

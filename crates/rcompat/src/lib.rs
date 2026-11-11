@@ -19,12 +19,18 @@
 //!   glibc's `pow` with R's special cases), and `seq()` by step and by length;
 //! - [`order`]: stable `order()`, ties to the lower index in both directions;
 //! - [`format`]: numbers as `as.character()` and `paste()` write them (15 significant digits,
-//!   fixed or scientific: `5e-04` but `0.001`).
+//!   fixed or scientific: `5e-04` but `0.001`);
+//! - [`strtod`]: R's own decimal parser (`R_strtod`, not correctly rounded) and `as.numeric()`
+//!   of strings;
+//! - [`fft`]: `fft()`, Singleton's mixed-radix transform, as R computes it;
+//! - [`normal::dnorm`] and [`approx`]: `dnorm()`, and `approx()`/`approxfun()` interpolation.
 //!
 //! Indices are 0-based throughout (R's minus one). Functions that call the C math library ([`libm`])
 //! use the system glibc, as R does.
 
+pub mod approx;
 pub mod arith;
+pub mod fft;
 pub mod format;
 pub mod ldouble;
 pub mod libm;
@@ -33,13 +39,15 @@ pub mod order;
 mod powl10;
 pub mod rng;
 pub mod sample;
+pub mod strtod;
 pub mod summary;
 
 pub use arith::{r_pow, round, round_digits, seq_by, seq_length_out};
 pub use format::as_character;
 pub use ldouble::F80;
-pub use normal::{qnorm, rnorm};
+pub use normal::{dnorm, qnorm, rnorm};
 pub use order::order;
 pub use rng::RRng;
 pub use sample::{sample_int, sample_int_weighted};
+pub use strtod::{as_numeric, r_strtod};
 pub use summary::{is_na, mean, sd, sum, var, NA_REAL};

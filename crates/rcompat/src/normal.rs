@@ -178,6 +178,62 @@ pub fn rnorm(rng: &mut RRng, n: usize, mean: f64, sd: f64) -> Vec<f64> {
     (0..n).map(|_| rnorm_one(rng, mean, sd)).collect()
 }
 
+/// `M_1_SQRT_2PI` from Rmath.h: 1/sqrt(2 pi).
+const M_1_SQRT_2PI: f64 = 0.398942280401432677939946059934;
+/// `M_LN_SQRT_2PI` from Rmath.h: log(sqrt(2 pi)).
+const M_LN_SQRT_2PI: f64 = 0.918938533204672741780329736406;
+
+/// `dnorm(x, mu, sigma, log)` (`dnorm4` in `src/nmath/dnorm.c`): `M_1_SQRT_2PI * exp(-x*x/2) /
+/// sigma` for |x| < 5 standard deviations; beyond, x is split into a part with 16 fractional bits
+/// and a remainder, so that `x*x` loses no accuracy (PR#15620).
+///
+/// As R's `dnorm()` calls it (`math3_1` in `src/main/arithmetic.c`): `NA` in any argument gives
+/// `NA`, any other NaN gives `NaN`, before `dnorm4` runs.
+pub fn dnorm(x: f64, mu: f64, sigma: f64, give_log: bool) -> f64 {
+    use crate::summary::{is_na, NA_REAL};
+    if is_na(x) || is_na(mu) || is_na(sigma) {
+        return NA_REAL;
+    }
+    if x.is_nan() || mu.is_nan() || sigma.is_nan() {
+        return f64::from_bits(0x7ff8_0000_0000_0000); // R_NaN
+    }
+    let d0 = if give_log { f64::NEG_INFINITY } else { 0.0 };
+    if sigma < 0.0 {
+        return f64::NAN;
+    }
+    if !sigma.is_finite() {
+        return d0;
+    }
+    if !x.is_finite() && mu == x {
+        return f64::NAN; // x - mu is NaN
+    }
+    if sigma == 0.0 {
+        return if x == mu { f64::INFINITY } else { d0 };
+    }
+    let x = (x - mu) / sigma;
+    if !x.is_finite() {
+        return d0;
+    }
+    let x = x.abs();
+    if x >= 2.0 * f64::MAX.sqrt() {
+        return d0;
+    }
+    if give_log {
+        return -(M_LN_SQRT_2PI + 0.5 * x * x + libm::log(sigma));
+    }
+    if x < 5.0 {
+        return M_1_SQRT_2PI * libm::exp(-0.5 * x * x) / sigma;
+    }
+    // underflow boundary: sqrt(-2 log(2) (DBL_MIN_EXP + 1 - DBL_MANT_DIG)), about 38.59
+    if x > (-2.0 * std::f64::consts::LN_2 * (-1021.0 + 1.0 - 53.0)).sqrt() {
+        return 0.0;
+    }
+    // x1 = ldexp(nearbyint(ldexp(x, 16)), -16): exact scalings by 2^16
+    let x1 = (x * 65536.0).round_ties_even() / 65536.0;
+    let x2 = x - x1;
+    M_1_SQRT_2PI / sigma * (libm::exp(-0.5 * x1 * x1) * libm::exp((-0.5 * x2 - x1) * x2))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,3 +258,4 @@ mod tests {
         assert_eq!(a.unif_rand(), b.unif_rand());
     }
 }
+

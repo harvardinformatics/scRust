@@ -9,3 +9,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+
+[dev-dependencies]
+rcompat.workspace = true
+scio.workspace = true
