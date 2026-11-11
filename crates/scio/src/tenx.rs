@@ -1,6 +1,6 @@
 //! 10x Matrix Market directories (Cell Ranger v3 layout): `matrix.mtx(.gz)`,
-//! `barcodes.tsv(.gz)` and `features.tsv(.gz)`. So far the barcodes, the features and the
-//! matrix's dimensions; the entries follow with SCTransform (milestone M4).
+//! `barcodes.tsv(.gz)` and `features.tsv(.gz)`: the barcodes, the features and the matrix's
+//! dimensions; the entries are read by [`crate::sparse::read_mtx`].
 
 use crate::gz;
 use std::fs;

@@ -333,3 +333,32 @@ fn approxfun_against_r() {
         assert_same_vec(&fun.eval_all(&xout), &fl(&row[6]), &format!("approx case {i}"));
     }
 }
+
+// --- M4 -------------------------------------------------------------------------------------
+
+#[test]
+fn order_statistics_against_r() {
+    use rcompat::quantile::{iqr, mad, median, quantile7};
+    for row in fixture("orderstat.tsv") {
+        let x = fl(&row[0]);
+        let what = format!("n = {}", x.len());
+        assert_same_vec(&quantile7(&x, &[0.25, 0.75]), &fl(&row[1]), &format!("quantile, {what}"));
+        assert_same(median(&x), f(&row[2]), &format!("median, {what}"));
+        assert_same(mad(&x), f(&row[3]), &format!("mad, {what}"));
+        assert_same(iqr(&x), f(&row[4]), &format!("IQR, {what}"));
+    }
+}
+
+#[test]
+fn density_nrd_against_r() {
+    use rcompat::density::{bw_nrd, density_nrd};
+    for row in fixture("density.tsv") {
+        let x = fl(&row[0]);
+        let what = format!("density, n = {}", x.len());
+        assert_same(bw_nrd(&x).unwrap(), f(&row[1]), &format!("bw.nrd, {what}"));
+        let d = density_nrd(&x, 1.0, 512).unwrap();
+        assert_same(d.bw, f(&row[1]), &format!("{what}: bw"));
+        assert_same_vec(&d.x, &fl(&row[2]), &format!("{what}: x"));
+        assert_same_vec(&d.y, &fl(&row[3]), &format!("{what}: y"));
+    }
+}

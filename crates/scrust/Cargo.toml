@@ -13,6 +13,7 @@ doubletfinder.workspace = true
 knn.workspace = true
 rcompat.workspace = true
 scio.workspace = true
+sctransform.workspace = true
 
 [dev-dependencies]
 scio.workspace = true

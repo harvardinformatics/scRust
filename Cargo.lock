@@ -10,6 +10,7 @@ dependencies = [
  "knn",
  "rcompat",
  "scio",
+ "sctransform",
 ]
 
 [[package]]
@@ -48,8 +49,13 @@ dependencies = [
  "knn",
  "rcompat",
  "scio",
+ "sctransform",
 ]
 
 [[package]]
 name = "sctransform"
 version = "0.1.0"
+dependencies = [
+ "rcompat",
+ "scio",
+]

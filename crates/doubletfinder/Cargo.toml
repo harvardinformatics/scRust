@@ -13,3 +13,4 @@ rcompat.workspace = true
 scio.workspace = true
 knn.workspace = true
 kde.workspace = true
+sctransform.workspace = true

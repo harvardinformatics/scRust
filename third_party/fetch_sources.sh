@@ -35,7 +35,10 @@ BIOC=https://bioconductor.org/packages/3.22/bioc
 # name, version, tarball, where to get it. "cran" and "bioc" try the current package index first
 # and then the archive, where CRAN and Bioconductor move a version once a newer one is released;
 # the sha256 makes sure every URL yields the same bytes. The versions are those of the production
-# R env (envs/r-reference/README.md).
+# R env (envs/r-reference/README.md), except where a package's compiled code includes another
+# package's headers: then it is the version the binary was built against (milestone M4:
+# glmGamPoi 1.22.0 and sctransform 0.4.3 were built with RcppArmadillo 15.2.3-1 and Rcpp 1.1.1,
+# per their conda recipes' host requirements; the env has RcppArmadillo 15.6.2-1 installed).
 SOURCES='
 R              4.5.3       R-4.5.3.tar.gz                  https://cran.r-project.org/src/base/R-4/R-4.5.3.tar.gz
 sctransform    0.4.3       sctransform_0.4.3.tar.gz        cran
@@ -47,6 +50,14 @@ irlba          2.4.1       irlba_2.4.1.tar.gz              cran
 KernSmooth     2.23-27     KernSmooth_2.23-27.tar.gz       cran
 fields         17.3        fields_17.3.tar.gz              cran
 DoubletFinder  1b244d8f0d54b4b1cb4365639931bbb16f01e1cd  DoubletFinder-1b244d8f0d54b4b1cb4365639931bbb16f01e1cd.tar.gz  https://github.com/chris-mcginnis-ucsf/DoubletFinder/archive/1b244d8f0d54b4b1cb4365639931bbb16f01e1cd.tar.gz
+Matrix         1.7-6       Matrix_1.7-6.tar.gz             cran
+RcppArmadillo  15.2.3-1    RcppArmadillo_15.2.3-1.tar.gz   cran
+Rcpp           1.1.1       Rcpp_1.1.1.tar.gz               cran
+future         1.82.0      future_1.82.0.tar.gz            cran
+future.apply   1.21.0      future.apply_1.21.0.tar.gz      cran
+parallelly     1.50.0      parallelly_1.50.0.tar.gz        cran
+MatrixGenerics 1.22.0      MatrixGenerics_1.22.0.tar.gz    bioc
+DelayedMatrixStats 1.32.0  DelayedMatrixStats_1.32.0.tar.gz  bioc
 '
 
 die() { echo "fetch_sources.sh: $*" >&2; exit 1; }

@@ -2,7 +2,8 @@
 # Reference vectors for the rcompat crate (docs/PLAN.md A5 and B6, milestones M1 and M3; stage S0
 # in validation/tolerances.toml): R's random-number stream, sampling, rnorm/qnorm, round, ^, seq,
 # order, sum/mean/var/sd and number formatting (M1); as.numeric() of strings, fft, dnorm and
-# approxfun (M3); over many seeds, sizes and edge cases.
+# approxfun (M3); quantile, median, mad, IQR, density (bw = "nrd"), ... (M4); over many seeds,
+# sizes and edge cases.
 #
 # Reads no .rds, so it may run on a login node. Run from the repository root with the production
 # R env and the hermetic flags:
@@ -489,6 +490,37 @@ write_tsv("approx.tsv", "x\ty\txout\tmethod\trule\tf\tapproxfun(x, y, method, ru
               fun <- suppressWarnings(approxfun(cs[[1]], cs[[2]], method = cs[[4]], rule = cs[[5]], f = cs[[6]]))
               paste(hexl(cs[[1]]), hexl(cs[[2]]), hexl(cs[[3]]), cs[[4]], cs[[5]], hex(cs[[6]]),
                     hexl(fun(cs[[3]])), sep = "\t")
+          }))
+
+# =============================================================================================
+# M4: the stats functions SCTransform v2 reaches (sctransform 0.4.3, glmGamPoi 1.22.0)
+# =============================================================================================
+
+# ---------------------------------------------------------------------------------------------
+# quantile(x, c(0.25, 0.75), type = 7), median, mad, IQR: odd and even lengths, ties, negative
+# values; the vectors are written out.
+
+set.seed(41)
+os_cases <- list(c(3, 1, 2), c(4, 1, 3, 2), c(1, 1, 1, 1), c(-2.5, 7, 0, 0, 0.5),
+                 runif(1), runif(2), runif(101, -5, 5), round(rnorm(500), 1), rexp(1000),
+                 log10(1 + rpois(777, 3)), c(rep(0, 50), runif(51)))
+write_tsv("orderstat.tsv", "x\tquantile(x, c(0.25, 0.75), type = 7)\tmedian(x)\tmad(x)\tIQR(x)",
+          lapply(os_cases, function(x)
+              paste(hexl(x), hexl(quantile(x, c(0.25, 0.75), names = FALSE)), hex(median(x)),
+                    hex(mad(x)), hex(IQR(x)), sep = "\t")))
+
+# ---------------------------------------------------------------------------------------------
+# density(x, bw = "nrd", adjust = 1)$x, $y and $bw (512 points; R >= 4.4 coordinates), as
+# sctransform weights its gene sampling: log10 geometric means and other shapes.
+
+set.seed(43)
+de_cases <- list(log10(1 + rexp(800, 2)), rnorm(300), c(runif(200), runif(30, 5, 6)),
+                 log10(1 + rpois(1200, 0.3) + runif(1200)), c(1, 2), seq(0, 1, length.out = 7))
+write_tsv("density.tsv", "x\tbw.nrd(x)\tdensity(x, bw = \"nrd\")$x\t$y",
+          lapply(de_cases, function(x) {
+              d <- density(x, bw = "nrd", adjust = 1)
+              stopifnot(identical(d$bw, bw.nrd(x)))
+              paste(hexl(x), hex(d$bw), hexl(d$x), hexl(d$y), sep = "\t")
           }))
 
 cat("written to", normalizePath(out), "\n")

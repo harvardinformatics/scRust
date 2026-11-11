@@ -3,8 +3,9 @@
 //! Tools read and write plain files, never Seurat objects:
 //!
 //! - [`tenx`]: 10x Matrix Market directories (`matrix.mtx`, `barcodes.tsv`, `features.tsv`,
-//!   optionally gzipped, through [`gz`], a standard-library gzip reader); the matrix entries
-//!   follow with SCTransform (M4);
+//!   optionally gzipped, through [`gz`], a standard-library gzip reader);
+//! - [`sparse`]: the counts matrix in R's `dgCMatrix` layout, read from `matrix.mtx` with every
+//!   stored entry kept, explicit zeros included (M4);
 //! - [`tsv`]: per-cell and per-parameter tables (cluster labels in; `cells.tsv` and the sweep
 //!   tables out);
 //! - [`text`]: doubles as `%.17g` text, as the R reference scripts write them, and back;
@@ -15,12 +16,14 @@
 pub mod gz;
 pub mod json;
 pub mod npy;
+pub mod sparse;
 pub mod tenx;
 pub mod text;
 pub mod tsv;
 
 pub use json::Json;
 pub use npy::Npy;
+pub use sparse::{CscMatrix, CsrMatrix};
 pub use text::{fmt17, parse17};
 pub use tsv::Table;
 
