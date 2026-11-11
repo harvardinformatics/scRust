@@ -13,6 +13,8 @@ mod sys {
         pub fn logb(x: f64) -> f64;
         pub fn exp(x: f64) -> f64;
         pub fn expm1(x: f64) -> f64;
+        pub fn sin(x: f64) -> f64;
+        pub fn cos(x: f64) -> f64;
     }
 }
 
@@ -26,4 +28,4 @@ macro_rules! wrap {
     )*};
 }
 
-wrap!(pow(x, y), log(x), log1p(x), log2(x), log10(x), logb(x), exp(x), expm1(x));
+wrap!(pow(x, y), log(x), log1p(x), log2(x), log10(x), logb(x), exp(x), expm1(x), sin(x), cos(x));

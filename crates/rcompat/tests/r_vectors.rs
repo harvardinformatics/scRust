@@ -263,3 +263,73 @@ fn as_character_against_r() {
     }
     assert!(bad.is_empty(), "{} of {} differ:\n{}", bad.len(), rows.len(), bad.join("\n"));
 }
+
+#[test]
+fn strtod_against_r() {
+    use rcompat::strtod::as_numeric;
+    let rows = fixture("strtod.tsv");
+    assert!(rows.len() > 12_000);
+    let mut misrounded = 0;
+    for row in &rows {
+        let (s, want, want_str) = (&row[0], f(&row[1]), &row[2]);
+        let got = as_numeric(s);
+        assert_same(got, want, &format!("as.numeric({s:?})"));
+        assert_eq!(&as_character(got), want_str, "as.character(as.numeric({s:?}))");
+        if let Ok(correct) = s.trim().parse::<f64>() {
+            if !s.trim().to_ascii_lowercase().contains("inf") && correct.to_bits() != want.to_bits() {
+                misrounded += 1;
+            }
+        }
+    }
+    // R's parser is not correctly rounded; the fixture holds the cases found (plan B1, M3)
+    assert!(misrounded >= 60, "only {misrounded} cases where R differs from correct rounding");
+}
+
+/// `set.seed(n); complex(real = runif(n), imaginary = runif(n) - 0.5)`.
+fn fft_input(n: usize) -> Vec<rcompat::fft::Complex> {
+    let mut rng = RRng::new(n as i32);
+    let re = runif_n(&mut rng, n);
+    let im: Vec<f64> = runif_n(&mut rng, n).into_iter().map(|u| u - 0.5).collect();
+    re.into_iter().zip(im).map(|(r, i)| rcompat::fft::Complex::new(r, i)).collect()
+}
+
+#[test]
+fn fft_against_r() {
+    let rows = fixture("fft.tsv");
+    for row in &rows {
+        let n: usize = row[0].parse().unwrap();
+        let inverse = row[1] == "1";
+        let want = fl(&row[2]);
+        let got: Vec<f64> = rcompat::fft::fft(&fft_input(n), inverse)
+            .unwrap()
+            .iter()
+            .flat_map(|c| [c.re, c.im])
+            .collect();
+        assert_same_vec(&got, &want, &format!("fft(n = {n}, inverse = {inverse})"));
+    }
+    assert!(rows.iter().any(|r| r[0] == "1024") && rows.iter().any(|r| r[0] == "512"));
+}
+
+#[test]
+fn dnorm_against_r() {
+    for row in fixture("dnorm.tsv") {
+        let (x, mu, sigma, log) = (f(&row[0]), f(&row[1]), f(&row[2]), row[3] == "1");
+        assert_same(rcompat::dnorm(x, mu, sigma, log), f(&row[4]), &format!("dnorm({x}, {mu}, {sigma}, {log})"));
+    }
+}
+
+#[test]
+fn approxfun_against_r() {
+    use rcompat::approx::{ApproxFun, Method};
+    for (i, row) in fixture("approx.tsv").iter().enumerate() {
+        let (x, y, xout) = (fl(&row[0]), fl(&row[1]), fl(&row[2]));
+        let method = match row[3].as_str() {
+            "linear" => Method::Linear,
+            "constant" => Method::Constant { f: f(&row[5]) },
+            m => panic!("method {m}"),
+        };
+        let rule: u8 = row[4].parse().unwrap();
+        let fun = ApproxFun::with_rule(&x, &y, method, [rule, rule]).unwrap();
+        assert_same_vec(&fun.eval_all(&xout), &fl(&row[6]), &format!("approx case {i}"));
+    }
+}

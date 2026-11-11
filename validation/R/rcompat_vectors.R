@@ -1,7 +1,8 @@
 #!/usr/bin/env Rscript
-# Reference vectors for the rcompat crate (docs/PLAN.md A5 and B6, milestone M1; stage S0 in
-# validation/tolerances.toml): R's random-number stream, sampling, rnorm/qnorm, round, ^, seq,
-# order, sum/mean/var/sd and number formatting, over many seeds, sizes and edge cases.
+# Reference vectors for the rcompat crate (docs/PLAN.md A5 and B6, milestones M1 and M3; stage S0
+# in validation/tolerances.toml): R's random-number stream, sampling, rnorm/qnorm, round, ^, seq,
+# order, sum/mean/var/sd and number formatting (M1); as.numeric() of strings, fft, dnorm and
+# approxfun (M3); over many seeds, sizes and edge cases.
 #
 # Reads no .rds, so it may run on a login node. Run from the repository root with the production
 # R env and the hermetic flags:
@@ -357,5 +358,137 @@ fmt_powl <- unhex(c(
 ))
 write_tsv("format.tsv", "x\tas.character(x)",
           lapply(c(fmt_named, fmt_rand, fmt_powl), function(x) paste(hex(x), as.character(x), sep = "\t")))
+
+# ---------------------------------------------------------------------------------------------
+# as.numeric() of strings: R's own decimal parser R_strtod (milestone M3). It is not correctly
+# rounded: digits accumulate in a long double, a power of ten is built in long double, and the
+# quotient is rounded to double. DoubletFinder parses pK and pN back from paste()d strings
+# (summarizeSweep, find.pK's as.numeric(as.character(...))). Columns: the string, as.numeric() of
+# it, and as.character() of that value. Strings contain no tab or newline.
+
+set.seed(7)
+pn_grid <- seq(0.05, 0.3, by = 0.05)
+strtod_named <- c(
+    as.character(pk_grid), as.character(pn_grid),             # paste() of paramSweep's grids
+    sprintf("%.17g", pk_grid), sprintf("%.17g", pn_grid),
+    as.character(seq(0.0001, 0.5, by = 0.0001)),              # every 4-decimal label below 0.5
+    "0", "-0", "+0", "00", "0.", ".0", ".5", "5.", "-.5", "+.25e1", "000123.4500", "1e5", "1E+05",
+    "1e-05", "5e-04", "1e-4", "0.0005", "0.1", "0.2", "0.3", "0.7", "0.29", "0.95", "1.05", "3.14159",
+    " 0.25", "0.25 ", "  -1.5  ", "1e", "1e+", "e5", "abc", "1.2.3", "--1", "+-1", "", " ", "0x",
+    "0x1p-2", "0x1.8p1", "0X1A", "0xA.8", "0x.8", "0x1P+10", "0x1p", "0xg", "0x1.fffffffffffffp1023",
+    "0x1p-1074", "0x1.8p-1074", "0x10000000000000000001", "0x1.000000000000000001p0",
+    "Inf", "inf", "-Inf", "infinity", "-INFINITY", "infinit", "NaN", "nan", "-NaN", "NA", "na",
+    "1.7976931348623157e308", "1.7976931348623158e308", "1.797693134862316e308", "1e308", "9e307",
+    "1e309", "-1e400", "1e99999", "1e-99999", "0e99999", "0e-99999", "1e-310", "123e-400",
+    "4.9406564584124654e-324", "2.4703282292062328e-324", "2.4703282292062327e-324", "1e-323",
+    "2.2250738585072014e-308", "2.2250738585072011e-308", "1e-300", "1e-307", "1e-308",
+    paste0("0.", strrep("0", 320), "123"), paste0("1", strrep("0", 30)), paste0(strrep("9", 40), ".5"),
+    "0.1000000000000000055511151231257827021181583404541015625",
+    "9007199254740993", "9007199254740992.5", "18446744073709551617", "123456789012345678901234567890")
+n_s <- 2500
+rand_mag <- function(n) (runif(n) * 9 + 1) * 10^round(runif(n, -330, 310))
+strtod_rand <- c(
+    sprintf("%.*g", sample(1:20, n_s, replace = TRUE), rand_mag(n_s)),  # 1-20 significant digits
+    sprintf("%.17g", runif(1000)),          # round-trip text, as the reference files write it
+    sprintf("%.15g", runif(500)),           # as.character's precision
+    sprintf("%.*g", sample(16:19, 1500, replace = TRUE), runif(1500) * 10^sample(-5:5, 1500, replace = TRUE)),
+    sprintf("%.*f", sample(0:12, 1000, replace = TRUE), runif(1000) * 10^sample(-3:6, 1000, replace = TRUE)),
+    sprintf("%.40f", runif(50)),
+    sprintf("%.*e", sample(0:25, 500, replace = TRUE), rand_mag(500)),
+    as.character(round(runif(500), sample(1:6, 500, replace = TRUE))))
+# Strings R does not round correctly (the long-double power of ten is inexact for exponents
+# beyond 27, and the quotient is rounded twice): found by parsing 1.6 million random strings
+# (set.seed(20261111); "%.17g" of runif(n) and of runif(n) * 10^k for k in -30:30, "%.15g" to
+# "%.20g" of all magnitudes, "%.16e" to "%.22e" of runif(n); n = 4e5 each) and keeping those whose
+# value differs from the correctly rounded double. Within [0, 1] none did.
+strtod_misrounded <- c(
+    "5.25528057198971e+210", "1.71470329165459e+249", "2.242252947296947e+270",
+    "6.860132599016651e-270", "4.510290635284036e-246", "3.502626012312248e+195",
+    "4.92278569051996e+168", "7.34419400524348e-289", "5.62239264859818e-124",
+    "4.65777662117034e+283", "2.085569987306371e+188", "5.118861177237704e+293",
+    "2.086596223525703e+194", "5.65985701070167e+254", "4.698357041692361e+263",
+    "7.87398234778084e-176", "5.019062082748861e+276", "7.473196343984456e-295",
+    "5.522084330441431e-273", "8.70618498325348e-274", "3.83974621864036e+282", "23361.110619735",
+    "5.44503967859782e+298", "1.72871372662485e+120", "5.97657346026972e+65",
+    "7.76994571927935e-186", "3.5953846455086e-176", "7.37715537007898e-121",
+    "2.99026781436987e-258", "1.50350060709752e-307", "7.6716720117256e-152",
+    "7.465276727918535e-283", "7.83056729123928e-259", "6.55742067098618e-298",
+    "1.22114257398061e-297", "3.362189100123942e+127", "6.45266169845127e-304",
+    "7.61927206208929e-272", "1.74368128064089e-255", "4.46175417094491e+21",
+    "6.75499872490764e+202", "5.980723627610132e+184", "9.66649661841802e+228",
+    "1.730707140173763e+172", "7.373004509136082e+248", "3.769152639899403e+213",
+    "4.19709940254688e+284", "6.86438280856237e-143", "8.17883213260211e-143",
+    "2.70772597659379e-244", "1.583063934929669e-154", "2.526549922069535e-253",
+    "4.07147940271534e-219", "5.79826105781831e-211", "1.76951495371759e-282",
+    "2.641541251679882e-252", "5.82878880831413e+269", "4.5610746210441e+241",
+    "4.18201254680753e+173", "8.59632390853949e-266", "3.197703327983618e+44",
+    "4.92872675624676e-304", "7.392714625690132e-202", "3.676960405427962e-98",
+    "5.132704433053732e-90")
+strtod_strings <- c(strtod_named, strtod_rand, strtod_misrounded)
+stopifnot(!any(grepl("[\t\n\r]", strtod_strings)))
+write_tsv("strtod.tsv", "string\tas.numeric(string)\tas.character(as.numeric(string))",
+          lapply(strtod_strings, function(s) {
+              v <- suppressWarnings(as.numeric(s))
+              paste(s, hex(v), as.character(v), sep = "\t")
+          }))
+
+# ---------------------------------------------------------------------------------------------
+# fft(z) and fft(z, inverse = TRUE) (Singleton's mixed-radix algorithm; M3: KernSmooth::bkde
+# convolves through it at lengths 512 and 1024). Input: set.seed(n); complex(real = runif(n),
+# imaginary = runif(n) - 0.5), which Rust regenerates. Output: real and imaginary parts
+# interleaved.
+
+fft_n <- c(1:32, 36, 45, 48, 49, 60, 64, 81, 97, 100, 105, 121, 125, 128, 169, 210, 243, 256, 289,
+           343, 360, 401, 512, 1024, 1155)
+write_tsv("fft.tsv", "n\tinverse\tfft(z, inverse) as re,im,re,im,... (z from set.seed(n))",
+          unlist(lapply(fft_n, function(n) {
+              set.seed(n)
+              z <- complex(real = runif(n), imaginary = runif(n) - 0.5)
+              vapply(c(FALSE, TRUE), function(inv) {
+                  f <- fft(z, inverse = inv)
+                  paste(n, as.integer(inv), hexl(as.vector(rbind(Re(f), Im(f)))), sep = "\t")
+              }, "")
+          })))
+
+# ---------------------------------------------------------------------------------------------
+# dnorm(x, mean, sd, log) (bkde's normal kernel weights; M3)
+
+set.seed(8)
+dn_x <- c(seq(0, 4, by = 1 / 64), runif(300, 0, 5), runif(100, 4.9, 40), -runif(50, 0, 6),
+          0, -0, 5, 4.999999999999999, 38.5, 38.6, 38.58601, 40, 1e-300, 1e300, Inf, -Inf, NaN, NA)
+dn_cases <- c(lapply(dn_x, function(x) list(x, 0, 1, FALSE)),
+              lapply(c(0.5, 3, 7, 50), function(x) list(x, 0, 1, TRUE)),
+              list(list(1, 2, 0.5, FALSE), list(1, 1, 0, FALSE), list(1, 2, 0, FALSE),
+                   list(1, 0, -1, FALSE), list(1, 0, Inf, FALSE), list(Inf, Inf, 1, FALSE),
+                   list(0.3, -1.25, 2.5, FALSE), list(0.3, -1.25, 2.5, TRUE)))
+write_tsv("dnorm.tsv", "x\tmean\tsd\tlog\tdnorm(x, mean, sd, log)",
+          lapply(dn_cases, function(cs) paste(hex(cs[[1]]), hex(cs[[2]]), hex(cs[[3]]), as.integer(cs[[4]]),
+                                               hex(suppressWarnings(dnorm(cs[[1]], cs[[2]], cs[[3]], cs[[4]]))),
+                                               sep = "\t")))
+
+# ---------------------------------------------------------------------------------------------
+# approxfun(x, y, method, rule, f)(xout): the grid of bkde (seq(a, b, length.out = 401)) and
+# irregular, unsorted and tied abscissae (M3). x, y and xout are written out.
+
+set.seed(9)
+ap_cases <- list()
+add_ap <- function(x, y, xout, method = "linear", rule = 1, f = 0)
+    ap_cases[[length(ap_cases) + 1]] <<- list(x, y, xout, method, rule, f)
+g <- seq(-0.123, 1.456, length.out = 401)
+add_ap(g, dnorm(g, 0.6, 0.2), seq(min(g) + 0.5, max(g) - 0.3, length.out = 777))
+add_ap(g, runif(401), c(g[c(1, 2, 200, 401)], seq(min(g), max(g), length.out = 300), min(g) - 1, max(g) + 1, NA, NaN))
+xi <- sort(runif(50, -3, 3))
+add_ap(xi, runif(50), runif(200, -3.5, 3.5))
+add_ap(xi, runif(50), runif(200, -3.5, 3.5), rule = 2)
+add_ap(xi, runif(50), runif(200, -3.5, 3.5), method = "constant", f = 0.25)
+add_ap(xi, runif(50), runif(200, -3.5, 3.5), method = "constant", f = 1, rule = 2)
+add_ap(c(3, 1, 2, 2, 5, 3, 3), c(1, 2, 3, 4, 5, 6, 7.5), seq(0.5, 5.5, by = 0.25))
+add_ap(c(1, NA, 2, 4), c(1, 5, NaN, 2), seq(0, 5, by = 0.5))
+write_tsv("approx.tsv", "x\ty\txout\tmethod\trule\tf\tapproxfun(x, y, method, rule = rule, f = f)(xout)",
+          lapply(ap_cases, function(cs) {
+              fun <- suppressWarnings(approxfun(cs[[1]], cs[[2]], method = cs[[4]], rule = cs[[5]], f = cs[[6]]))
+              paste(hexl(cs[[1]]), hexl(cs[[2]]), hexl(cs[[3]]), cs[[4]], cs[[5]], hex(cs[[6]]),
+                    hexl(fun(cs[[3]])), sep = "\t")
+          }))
 
 cat("written to", normalizePath(out), "\n")
