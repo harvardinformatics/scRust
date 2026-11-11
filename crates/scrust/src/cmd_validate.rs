@@ -57,7 +57,8 @@ fn sctransform_report(argv: &[String]) -> Result<(doubletfinder::validate::Repor
     let stages = args.path("stages")?;
     let only: Option<Vec<String>> = args.get("contexts").map(|s| s.split(',').map(String::from).collect());
     let params = sctransform::SctParams::default();
-    let report = doubletfinder::sct::validate(&input, &stages, &params, doubletfinder::sct::Which::ALL, only.as_deref()).map_err(|e| e.to_string())?;
+    let threads = cli::threads(&args)?;
+    let report = doubletfinder::sct::validate(&input, &stages, &params, doubletfinder::sct::Which::ALL, only.as_deref(), threads).map_err(|e| e.to_string())?;
     Ok((report, args))
 }
 

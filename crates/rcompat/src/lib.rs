@@ -27,7 +27,11 @@
 //! - [`blas`]: the conda env's OpenBLAS through FFI (`dgemm`, `dgemv`, `ddot`, `dnrm2`) and R's
 //!   `tcrossprod`, so products round exactly as R's do on the same kernel (M4);
 //! - [`quantile`]: `quantile(type = 7)`, `IQR`, `median`, `mad` (M4);
-//! - [`density`]: `density()` with `bw = "nrd"` and its binning (M4).
+//! - [`density`]: `density()` with `bw = "nrd"` and its binning (M4);
+//! - [`gamma`]: R's `lgammafn`, `digamma`, `trigamma`, and glibc's `lgamma` (M4);
+//! - [`port`]: `nlminb()`, R's PORT library (`DRMNHB` and its call tree) (M4);
+//! - [`matrixstats`]: matrixStats' `rowMeans2`, `colMeans2`, `rowVars`, `weightedMedian`, and
+//!   R's `R_qsort_I` (M4).
 //!
 //! Indices are 0-based throughout (R's minus one). Functions that call the C math library ([`libm`])
 //! use the system glibc, as R does.
@@ -38,10 +42,15 @@ pub mod blas;
 pub mod density;
 pub mod fft;
 pub mod format;
+pub mod gamma;
 pub mod ldouble;
 pub mod libm;
+pub mod matrixstats;
+pub mod nbinom;
 pub mod normal;
+pub mod optimize;
 pub mod order;
+pub mod port;
 mod powl10;
 pub mod quantile;
 pub mod rng;

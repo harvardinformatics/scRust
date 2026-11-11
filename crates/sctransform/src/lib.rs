@@ -18,10 +18,13 @@
 //!
 //! Shared by DoubletFinder (7 calls per object) and, later, the clustering crate.
 
+pub mod fit;
+pub mod glm;
 pub mod matrix;
 pub mod params;
 pub mod setup;
 
+pub use fit::{fit, FitInput, Fits};
 pub use matrix::GeneRows;
 pub use params::{MinVariance, SctParams};
 pub use setup::{setup, CellAttr, Setup};

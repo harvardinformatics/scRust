@@ -256,20 +256,117 @@ pub fn check_s2a(stages: &StageDir, rng: &RngCheckpoints, c: &Context, params: &
     Ok((setup, rows, checks))
 }
 
+/// R's S2a outputs of a context, which teacher-force the later sub-stages.
+pub struct RS2a {
+    /// kept genes (input rows), fitting genes (positions in them), fitting cells
+    pub genes: Vec<usize>,
+    pub genes_step1: Vec<usize>,
+    pub cells_step1: Vec<usize>,
+    /// umi, log_umi of every cell
+    pub umi: Vec<f64>,
+    pub log_umi: Vec<f64>,
+    /// per kept gene: log10 gmean, amean, var
+    pub log_gmean: Vec<f64>,
+    pub amean: Vec<f64>,
+    pub var: Vec<f64>,
+    pub log_gmean_step1: Vec<f64>,
+}
+
+fn need<T>(v: Option<T>, what: &str, ctx: &str) -> Result<T, DfError> {
+    v.ok_or_else(|| DfError::Input(format!("{ctx}: R's {what} is not in the stage dumps")))
+}
+
+impl RS2a {
+    pub fn read(stages: &StageDir, ctx: &str) -> Result<RS2a, DfError> {
+        let idx = |c: Vec<Vec<i32>>| c[0].iter().map(|&v| v as usize).collect::<Vec<usize>>();
+        let genes = idx(need(block_i32(stages, "S2a_genes.npy", ctx)?, "S2a_genes", ctx)?.0);
+        let genes_step1 = idx(need(block_i32(stages, "S2a_genes_step1.npy", ctx)?, "S2a_genes_step1", ctx)?.0);
+        let cells_step1 = idx(need(block_i32(stages, "S2a_cells_step1.npy", ctx)?, "S2a_cells_step1", ctx)?.0);
+        let mut cells = need(block_f64(stages, "S2a_cells.npy", ctx)?, "S2a_cells", ctx)?.0;
+        let mut gs = need(block_f64(stages, "S2a_gene_stats.npy", ctx)?, "S2a_gene_stats", ctx)?.0;
+        let log_gmean_step1 = need(block_f64(stages, "S2a_log_gmean_step1.npy", ctx)?, "S2a_log_gmean_step1", ctx)?.0.remove(0);
+        let log_umi = cells.remove(1);
+        let umi = cells.remove(0);
+        let var = gs.remove(2);
+        let amean = gs.remove(1);
+        let log_gmean = gs.remove(0);
+        Ok(RS2a { genes, genes_step1, cells_step1, umi, log_umi, log_gmean, amean, var, log_gmean_step1 })
+    }
+
+    pub fn fit_input(&self) -> sctransform::FitInput {
+        sctransform::FitInput {
+            genes_step1: self.genes_step1.clone(),
+            cells_step1: self.cells_step1.clone(),
+            log_umi: self.log_umi.clone(),
+            amean_step1: self.genes_step1.iter().map(|&k| self.amean[k]).collect(),
+            var_step1: self.genes_step1.iter().map(|&k| self.var[k]).collect(),
+        }
+    }
+}
+
+/// S2b on one context, teacher-forced: R's fitting genes and cells, cell attributes and gene
+/// moments (S2a) and R's RNG state at the fits' entry. Compared with S2b_glm (every step of
+/// every gene's fit), S2b_model_pars_raw and S2b_model_pars, and the RNG checkpoints at every
+/// bin and at the fits' exit.
+pub fn check_s2b(stages: &StageDir, rng: &RngCheckpoints, c: &Context, r: &RS2a, params: &sctransform::SctParams, threads: usize) -> Result<(sctransform::Fits, Vec<Check>), DfError> {
+    let ctx = &c.ctx;
+    let mut checks = Vec::new();
+    let rows = sctransform::GeneRows::from_csc(&c.input, &r.genes);
+    let mut g = rng.rng(ctx, "fits_entry")?;
+    let fits = sctransform::fit(&rows, &r.fit_input(), params, &mut g, threads).map_err(|e| DfError::Input(format!("{ctx}: {e}")))?;
+    for (k, s) in fits.rng_bins.iter().enumerate() {
+        checks.push(cmp_rng("S2b", &format!("{ctx}: RNG at bin {}", k + 1), s, rng.state(ctx, &format!("bin{}_entry", k + 1))));
+    }
+    checks.push(cmp_rng("S2b", &format!("{ctx}: RNG at the fits' exit"), &fits.rng_exit, rng.state(ctx, "fits_exit")));
+    match block_f64(stages, "S2b_glm.npy", ctx)? {
+        Some((cols, _)) => {
+            let names = ["disp_init", "beta_init", "beta1", "iter1", "disp_mle", "disp_trend", "beta2", "iter2", "deviance2"];
+            let got: [Vec<f64>; 9] = [
+                fits.glm.iter().map(|x| x.disp_init).collect(),
+                fits.glm.iter().map(|x| x.beta_init).collect(),
+                fits.glm.iter().map(|x| x.beta1).collect(),
+                fits.glm.iter().map(|x| x.iter1 as f64).collect(),
+                fits.glm.iter().map(|x| x.disp_mle).collect(),
+                fits.glm.iter().map(|x| x.disp_trend).collect(),
+                fits.glm.iter().map(|x| x.beta2).collect(),
+                fits.glm.iter().map(|x| x.iter2 as f64).collect(),
+                fits.glm.iter().map(|x| x.deviance2).collect(),
+            ];
+            for (k, name) in names.iter().enumerate() {
+                checks.push(cmp_f64("S2b", &format!("{ctx}: glm {name}"), &got[k], &cols[k]));
+            }
+        }
+        None => checks.push(missing("S2b", &format!("{ctx}: S2b_glm"))),
+    }
+    for (file, which) in [("S2b_model_pars_raw.npy", &fits.model_pars_raw), ("S2b_model_pars.npy", &fits.model_pars)] {
+        match block_f64(stages, file, ctx)? {
+            Some((cols, _)) => {
+                for (k, name) in ["theta", "(Intercept)", "log_umi"].iter().enumerate() {
+                    let got: Vec<f64> = which.iter().map(|p| p[k]).collect();
+                    checks.push(cmp_f64("S2b", &format!("{ctx}: {} {name}", file.trim_end_matches(".npy")), &got, &cols[k]));
+                }
+            }
+            None => checks.push(missing("S2b", &format!("{ctx}: {file}"))),
+        }
+    }
+    Ok((fits, checks))
+}
+
 /// Which SCTransform sub-stages to check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Which {
     pub s2a: bool,
+    pub s2b: bool,
 }
 
 impl Which {
-    pub const ALL: Which = Which { s2a: true };
+    pub const ALL: Which = Which { s2a: true, s2b: true };
 }
 
 /// Stage S2 of an instrumented R run against Rust's SCTransform, in every context (or the
 /// contexts listed): the SCT input rebuilt from the counts in `input` (a 10x directory) and R's
 /// S1 draws, each sub-stage teacher-forced on R's own inputs.
-pub fn validate(input: &std::path::Path, stages_dir: &std::path::Path, params: &sctransform::SctParams, which: Which, only: Option<&[String]>) -> Result<crate::validate::Report, DfError> {
+pub fn validate(input: &std::path::Path, stages_dir: &std::path::Path, params: &sctransform::SctParams, which: Which, only: Option<&[String]>, threads: usize) -> Result<crate::validate::Report, DfError> {
     let counts = scio::sparse::read_mtx(input).map_err(DfError::Io)?;
     let stages = StageDir::open(stages_dir)?;
     let rng = RngCheckpoints::open(&stages)?;
@@ -281,6 +378,11 @@ pub fn validate(input: &std::path::Path, stages_dir: &std::path::Path, params: &
         let c = context(&stages, &rng, &counts, &ctx)?;
         if which.s2a {
             let (_, _, ch) = check_s2a(&stages, &rng, &c, params)?;
+            checks.extend(ch);
+        }
+        if which.s2b {
+            let r = RS2a::read(&stages, &ctx)?;
+            let (_, ch) = check_s2b(&stages, &rng, &c, &r, params, threads)?;
             checks.extend(ch);
         }
     }
