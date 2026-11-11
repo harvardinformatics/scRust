@@ -10,3 +10,9 @@ publish.workspace = true
 
 [dependencies]
 doubletfinder.workspace = true
+knn.workspace = true
+rcompat.workspace = true
+scio.workspace = true
+
+[dev-dependencies]
+scio.workspace = true
