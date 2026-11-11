@@ -14,7 +14,7 @@
 //!   the Cox-Reid adjustment, `loc_median_fit`, the theta rules;
 //! - [`reg`] (S2c): the Poisson genes, outlier removal and `ksmooth` against the genes'
 //!   geometric means;
-//! - S2d residuals: clipped Pearson residuals, residual variance, the variable features and
+//! - [`residuals`] (S2d): clipped Pearson residuals, residual variance, the variable features and
 //!   `scale.data`.
 //!
 //! Shared by DoubletFinder (7 calls per object) and, later, the clustering crate.
@@ -24,12 +24,14 @@ pub mod glm;
 pub mod matrix;
 pub mod params;
 pub mod reg;
+pub mod residuals;
 pub mod setup;
 
 pub use fit::{fit, FitInput, Fits};
 pub use matrix::GeneRows;
 pub use params::{MinVariance, SctParams};
 pub use reg::{regularize, Reg, RegInput};
+pub use residuals::{residuals, ResidualInput, Residuals};
 pub use setup::{setup, CellAttr, Setup};
 
 use std::fmt;

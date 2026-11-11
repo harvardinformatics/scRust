@@ -53,6 +53,34 @@ pub fn row_means2(x: &[f64], nrow: usize, ncol: usize, cols: Option<&[usize]>) -
     (0..nrow).map(|i| mean_refined(cols.iter().map(move |&j| x[i + j * nrow]))).collect()
 }
 
+/// `rowMeans2(x, na.rm = TRUE)` of one row's values (in column order), as Seurat's
+/// `FastRowScale` centres: NaN values are skipped in the sum, the count and the refinement.
+pub fn mean2_na_rm(values: &[f64]) -> f64 {
+    let mut sum = 0.0f64;
+    let mut count: u64 = 0;
+    for &v in values {
+        if !v.is_nan() {
+            sum += v;
+            count += 1;
+        }
+    }
+    if sum > f64::MAX {
+        return f64::INFINITY;
+    }
+    if sum < -f64::MAX {
+        return f64::NEG_INFINITY;
+    }
+    let n = count as f64;
+    let avg = sum / n;
+    let mut s = 0.0f64;
+    for &v in values {
+        if !v.is_nan() {
+            s += v - avg;
+        }
+    }
+    avg + s / n
+}
+
 /// `colMeans2(x)`.
 pub fn col_means2(x: &[f64], nrow: usize, ncol: usize) -> Vec<f64> {
     assert_eq!(x.len(), nrow * ncol);

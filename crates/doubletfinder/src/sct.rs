@@ -188,6 +188,14 @@ impl Scalars {
     pub fn get(&self, ctx: &str, name: &str) -> Option<f64> {
         self.json.get("scalars")?.get(ctx)?.get(name)?.as_f64()
     }
+
+    /// Element `k` of an array scalar.
+    pub fn get_at(&self, ctx: &str, name: &str, k: usize) -> Option<f64> {
+        match self.json.get("scalars")?.get(ctx)?.get(name)? {
+            scio::json::Json::Vector(v) | scio::json::Json::List(v) => v.get(k)?.as_f64(),
+            _ => None,
+        }
+    }
 }
 
 fn missing(stage: &str, name: &str) -> Check {
@@ -433,16 +441,89 @@ pub fn check_s2c(stages: &StageDir, scalars: &Scalars, c: &Context, r: &RS2a, pa
     Ok((reg, checks))
 }
 
+/// R's S2c `model_pars_fit` of a context.
+pub fn r_model_pars_fit(stages: &StageDir, ctx: &str) -> Result<Vec<[f64; 3]>, DfError> {
+    let mp = need(block_f64(stages, "S2c_model_pars_fit.npy", ctx)?, "S2c_model_pars_fit", ctx)?.0;
+    Ok((0..mp[0].len()).map(|k| [mp[0][k], mp[1][k], mp[2][k]]).collect())
+}
+
+/// A row-major `nrow x ncol` matrix against R's dump of it (columns).
+fn cmp_matrix(stage: &str, name: &str, got: &[f64], nrow: usize, ncol: usize, want: &[Vec<f64>]) -> Check {
+    if want.len() != ncol || want.iter().any(|c| c.len() != nrow) {
+        let wr = want.first().map_or(0, |c| c.len());
+        return Check { stage: stage.into(), name: name.into(), status: Status::Differ, n: 0, n_differ: 0, detail: format!("{nrow} x {ncol} against R's {wr} x {}", want.len()) };
+    }
+    let mut got_cm = Vec::with_capacity(nrow * ncol);
+    let mut want_cm = Vec::with_capacity(nrow * ncol);
+    for (c, col) in want.iter().enumerate() {
+        for r in 0..nrow {
+            got_cm.push(got[r * ncol + c]);
+        }
+        want_cm.extend_from_slice(col);
+    }
+    cmp_f64(stage, name, &got_cm, &want_cm)
+}
+
+/// S2d on one context, teacher-forced: R's S2c `model_pars_fit` and the cells' `log_umi` (S2a).
+/// Compared with S2d_residual_stats (every kept gene), S2d_top_features, S2d_variable_features,
+/// S2d_pca_features, the scalars `min_variance`, `res_clip_range` and `clip_range`, and, where R
+/// dumped them, the full residuals (S2d_y) and `scale.data` (S2d_scale_data). The products go
+/// through OpenBLAS, so the run's BLAS profile must be the reference run's.
+pub fn check_s2d(stages: &StageDir, scalars: &Scalars, c: &Context, r: &RS2a, params: &sctransform::SctParams, threads: usize) -> Result<(sctransform::Residuals, Vec<Check>), DfError> {
+    let ctx = &c.ctx;
+    let mut checks = Vec::new();
+    let mpf = r_model_pars_fit(stages, ctx)?;
+    let rows = sctransform::GeneRows::from_csc(&c.input, &r.genes);
+    // the residual-sized dumps are indexed but not copied into the tier-T fixtures
+    let present = |file: &str| stages.block(file, ctx).is_some() && stages.dir.join(file).is_file();
+    let y_file = format!("S2d_y.{ctx}.npy");
+    let keep_y = present(&y_file);
+    let input = sctransform::ResidualInput { model_pars_fit: &mpf, log_umi: &r.log_umi };
+    let res = sctransform::residuals(&rows, &input, params, keep_y, threads).map_err(|e| DfError::Input(format!("{ctx}: {e}")))?;
+    checks.push(cmp_scalar("S2d", &format!("{ctx}: min_variance"), res.min_var, scalars.get(ctx, "min_variance")));
+    checks.push(cmp_scalar("S2d", &format!("{ctx}: res_clip_range[1]"), res.res_clip.0, scalars.get_at(ctx, "res_clip_range", 0)));
+    checks.push(cmp_scalar("S2d", &format!("{ctx}: res_clip_range[2]"), res.res_clip.1, scalars.get_at(ctx, "res_clip_range", 1)));
+    checks.push(cmp_scalar("S2d", &format!("{ctx}: clip_range"), res.clip.1, scalars.get(ctx, "clip_range")));
+    match block_f64(stages, "S2d_residual_stats.npy", ctx)? {
+        Some((cols, _)) => {
+            checks.push(cmp_f64("S2d", &format!("{ctx}: residual_mean"), &res.residual_mean, &cols[0]));
+            checks.push(cmp_f64("S2d", &format!("{ctx}: residual_variance"), &res.residual_variance, &cols[1]));
+        }
+        None => checks.push(missing("S2d", &format!("{ctx}: S2d_residual_stats"))),
+    }
+    let top_rows: Vec<usize> = res.top_features.iter().map(|&k| r.genes[k]).collect();
+    for file in ["S2d_top_features.npy", "S2d_variable_features.npy", "S2d_pca_features.npy"] {
+        let name = format!("{ctx}: {}", file.trim_end_matches(".npy"));
+        match block_i32(stages, file, ctx)? {
+            Some((cols, _)) => checks.push(cmp_idx("S2d", &name, &top_rows, &cols[0])),
+            None => checks.push(missing("S2d", &name)),
+        }
+    }
+    let sd_file = format!("S2d_scale_data.{ctx}.npy");
+    if present(&sd_file) {
+        if let Some((cols, _)) = block_f64(stages, &sd_file, ctx)? {
+            checks.push(cmp_matrix("S2d", &format!("{ctx}: scale.data"), &res.scale_data, res.top_features.len(), res.ncells, &cols));
+        }
+    }
+    if let Some(y) = res.y.as_ref() {
+        if let Some((cols, _)) = block_f64(stages, &y_file, ctx)? {
+            checks.push(cmp_matrix("S2d", &format!("{ctx}: residuals y"), y, rows.nrow(), res.ncells, &cols));
+        }
+    }
+    Ok((res, checks))
+}
+
 /// Which SCTransform sub-stages to check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Which {
     pub s2a: bool,
     pub s2b: bool,
     pub s2c: bool,
+    pub s2d: bool,
 }
 
 impl Which {
-    pub const ALL: Which = Which { s2a: true, s2b: true, s2c: true };
+    pub const ALL: Which = Which { s2a: true, s2b: true, s2c: true, s2d: true };
 }
 
 /// Stage S2 of an instrumented R run against Rust's SCTransform, in every context (or the
@@ -463,7 +544,7 @@ pub fn validate(input: &std::path::Path, stages_dir: &std::path::Path, params: &
             let (_, _, ch) = check_s2a(&stages, &rng, &c, params)?;
             checks.extend(ch);
         }
-        if which.s2b || which.s2c {
+        if which.s2b || which.s2c || which.s2d {
             let r = RS2a::read(&stages, &ctx)?;
             if which.s2b {
                 let (_, ch) = check_s2b(&stages, &rng, &c, &r, params, threads)?;
@@ -471,6 +552,10 @@ pub fn validate(input: &std::path::Path, stages_dir: &std::path::Path, params: &
             }
             if which.s2c {
                 let (_, ch) = check_s2c(&stages, &scalars, &c, &r, params)?;
+                checks.extend(ch);
+            }
+            if which.s2d {
+                let (_, ch) = check_s2d(&stages, &scalars, &c, &r, params, threads)?;
                 checks.extend(ch);
             }
         }

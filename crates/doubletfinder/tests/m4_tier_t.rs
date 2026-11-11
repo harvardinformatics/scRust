@@ -143,3 +143,31 @@ fn s2c_regularisation_is_exact() {
     }
     assert_eq!(failures, 0, "S2c checks differ (see stderr)");
 }
+
+#[test]
+fn s2d_residuals_are_exact() {
+    // the residuals' products are OpenBLAS calls: the fixtures are the portable runs (Haswell)
+    if std::env::var("OPENBLAS_CORETYPE").ok().as_deref() != Some("Haswell") {
+        eprintln!("skipped: S2d needs OPENBLAS_CORETYPE=Haswell (source env.sh)");
+        return;
+    }
+    use doubletfinder::sct::{check_s2d, Scalars, RS2a};
+    let params = sctransform::SctParams::default();
+    let mut failures = 0;
+    for object in OBJECTS {
+        let dir = fixture(object);
+        let counts = read_mtx(&dir.join("input")).unwrap();
+        let stages = StageDir::open(&dir.join("stages")).unwrap();
+        let rng = RngCheckpoints::open(&stages).unwrap();
+        let scalars = Scalars::open(&stages).unwrap();
+        let mut checks = Vec::new();
+        for ctx in sct_contexts(&stages) {
+            let c = context(&stages, &rng, &counts, &ctx).unwrap();
+            let r = RS2a::read(&stages, &ctx).unwrap();
+            let (_, ch) = check_s2d(&stages, &scalars, &c, &r, &params, 4).unwrap();
+            checks.extend(ch);
+        }
+        failures += report(object, &checks);
+    }
+    assert_eq!(failures, 0, "S2d checks differ (see stderr)");
+}
