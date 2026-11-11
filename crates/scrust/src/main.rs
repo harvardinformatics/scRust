@@ -1,8 +1,10 @@
 //! `scrust`, the single command-line entry point to scRust's tools (docs/PLAN.md A1).
 //!
 //! Each tool is a library crate under `crates/` plus a subcommand here, so the repository ships
-//! as one binary. At milestone M0 only `--version` and `--help` work; `doubletfinder` is a
-//! placeholder.
+//! as one binary. So far `fingerprint` prints the environment fingerprint (A5b), which the R
+//! reference runs record from milestone M2 on; `doubletfinder` is a placeholder.
+
+mod fingerprint;
 
 use std::process::ExitCode;
 
@@ -11,6 +13,8 @@ Usage: scrust <COMMAND> [ARGS]...
 
 Commands:
   doubletfinder  Doublet detection reproducing DoubletFinder (not implemented yet)
+  fingerprint    Print the environment fingerprint as JSON: node, CPU, OpenBLAS kernel
+                 and threads, glibc (docs/PLAN.md A5b)
 
 Options:
   -h, --help     Print help
@@ -29,6 +33,10 @@ fn main() -> ExitCode {
         }
         Some("-h" | "--help" | "help") => {
             print!("{USAGE}");
+            ExitCode::SUCCESS
+        }
+        Some("fingerprint") => {
+            print!("{}", fingerprint::json());
             ExitCode::SUCCESS
         }
         Some("doubletfinder") => {
