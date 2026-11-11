@@ -16,5 +16,12 @@
 //!   the routines and arguments R uses.
 
 pub mod ldouble;
+pub mod libm;
+pub mod normal;
+pub mod rng;
+pub mod sample;
 
 pub use ldouble::F80;
+pub use normal::{qnorm, rnorm};
+pub use rng::RRng;
+pub use sample::{sample_int, sample_int_weighted};
