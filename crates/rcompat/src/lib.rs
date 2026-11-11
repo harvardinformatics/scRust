@@ -38,6 +38,7 @@
 
 pub mod approx;
 pub mod arith;
+pub mod bandwidth;
 pub mod blas;
 pub mod density;
 pub mod fft;
@@ -55,8 +56,10 @@ mod powl10;
 pub mod quantile;
 pub mod rng;
 pub mod sample;
+pub mod smooth;
 pub mod strtod;
 pub mod summary;
+pub mod zeroin;
 
 pub use arith::{r_pow, round, round_digits, seq_by, seq_length_out};
 pub use format::as_character;

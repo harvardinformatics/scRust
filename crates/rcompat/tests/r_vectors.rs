@@ -577,3 +577,102 @@ fn optimize_against_r() {
         assert_same(res, f(&row[5]), &what);
     }
 }
+
+#[test]
+fn uniroot_against_r() {
+    use rcompat::libm::{cos, exp, log};
+    use rcompat::zeroin::uniroot;
+    let rows = fixture("uniroot.tsv");
+    assert_eq!(rows.len(), 9);
+    for row in rows {
+        let name = row[0].as_str();
+        let (lower, upper, tol) = (f(&row[1]), f(&row[2]), f(&row[3]));
+        let maxiter: i32 = row[4].parse().unwrap();
+        // R's arithmetic: x^3 is pow(x, 3), x^2 would be x * x; log(0) is -Inf
+        let fun = |x: f64| -> f64 {
+            match name {
+                "cubic" | "cubic_default_tol" | "few_iter" => r_pow(x, 3.0) - 2.0 * x - 5.0,
+                "cos" => cos(x) - x,
+                "exp" => exp(x) - 10.0,
+                "log" => {
+                    if x > 0.0 {
+                        log(x)
+                    } else if x == 0.0 {
+                        f64::NEG_INFINITY
+                    } else {
+                        f64::NAN
+                    }
+                }
+                "step" => {
+                    if x < 0.3 {
+                        -1.0
+                    } else {
+                        2.0
+                    }
+                }
+                "flat" => r_pow(x - 0.25, 3.0),
+                "root_at_end" => x - 1.0,
+                _ => panic!("unknown function {name}"),
+            }
+        };
+        let mut xs = Vec::new();
+        let r = uniroot(
+            &mut |x| {
+                xs.push(x);
+                fun(x)
+            },
+            lower,
+            upper,
+            tol,
+            maxiter,
+        )
+        .unwrap();
+        let what = format!("uniroot({name})");
+        assert_same_vec(&xs, &fl(&row[5]), &format!("{what}: evaluation points"));
+        assert_same(r.root, f(&row[6]), &format!("{what}: root"));
+        assert_eq!(r.iter, row[7].parse::<i32>().unwrap(), "{what}: iterations");
+        assert_same(r.estim_prec, f(&row[8]), &format!("{what}: estim.prec"));
+    }
+}
+
+#[test]
+fn bw_sj_against_r() {
+    use rcompat::bandwidth::bw_sj;
+    let rows = fixture("bw_sj.tsv");
+    assert_eq!(rows.len(), 19);
+    for (k, row) in rows.iter().enumerate() {
+        let x = fl(&row[0]);
+        let what = format!("bw.SJ case {} (n = {})", k + 1, x.len());
+        match (bw_sj(&x), row[1].as_str()) {
+            (Err(_), "error") => {}
+            (Ok(v), w) if w != "error" => assert_same(v, f(w), &what),
+            (got, w) => panic!("{what}: got {got:?}, R gives {w}"),
+        }
+    }
+}
+
+#[test]
+fn ksmooth_against_r() {
+    use rcompat::smooth::{ksmooth, Kernel};
+    let rows = fixture("ksmooth.tsv");
+    assert_eq!(rows.len(), 12);
+    for (k, row) in rows.iter().enumerate() {
+        let kernel = if row[0] == "box" { Kernel::Box } else { Kernel::Normal };
+        let (xp, yp) = ksmooth(&fl(&row[2]), &fl(&row[3]), kernel, f(&row[1]), &fl(&row[4]));
+        let what = format!("ksmooth case {} ({})", k + 1, row[0]);
+        assert_same_vec(&xp, &fl(&row[5]), &format!("{what}: x"));
+        assert_same_vec(&yp, &fl(&row[6]), &format!("{what}: y"));
+    }
+}
+
+#[test]
+fn bincode_against_r() {
+    use rcompat::smooth::bincode;
+    let rows = fixture("bincode.tsv");
+    assert_eq!(rows.len(), 32);
+    for row in rows {
+        let codes = bincode(&fl(&row[3]), &fl(&row[0]), row[1] == "1", row[2] == "1");
+        let got: Vec<u64> = codes.iter().map(|c| c.map_or(0, |v| v as u64)).collect();
+        assert_eq!(got, il(&row[4]), "bincode(right = {}, include.lowest = {})", row[1], row[2]);
+    }
+}

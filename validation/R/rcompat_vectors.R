@@ -3,7 +3,8 @@
 # in validation/tolerances.toml): R's random-number stream, sampling, rnorm/qnorm, round, ^, seq,
 # order, sum/mean/var/sd and number formatting (M1); as.numeric() of strings, fft, dnorm and
 # approxfun (M3); quantile, median, mad, IQR, density (bw = "nrd"), nlminb, gamma functions,
-# matrixStats, dnbinom (mu form) and optimize (M4); over many seeds,
+# matrixStats, dnbinom (mu form), optimize, uniroot, bw.SJ, ksmooth and .bincode (M4); over
+# many seeds,
 # sizes and edge cases.
 #
 # Reads no .rds, so it may run on a login node. Run from the repository root with the production
@@ -718,5 +719,86 @@ for (fn in opt_fns) for (maximum in c(FALSE, TRUE)) {
                                               hexl(xs[-length(xs)]), hex(res), sep = "\t")
 }
 write_tsv("optimize.tsv", "function\tmaximum\tlower\tupper\tevaluated at\tresult", opt_rows)
+
+# ---------------------------------------------------------------------------------------------
+# uniroot() (R_zeroin2; fcn2 turns -Inf into -DBL_MAX, NaN and Inf into DBL_MAX; extendInt =
+# "no"): every point evaluated, in order (the two end points first, then zeroin's; without the
+# value at the root that uniroot() adds), and the root, iterations and estimated precision.
+
+ur_fns <- list(
+    list("cubic", function(x) x^3 - 2 * x - 5, 2, 3, 1e-10, 1000L),
+    list("cubic_default_tol", function(x) x^3 - 2 * x - 5, 2, 3, .Machine$double.eps^0.25, 1000L),
+    list("cos", function(x) cos(x) - x, 0, 1, 1e-12, 1000L),
+    list("exp", function(x) exp(x) - 10, 0, 5, 1e-6, 1000L),
+    list("log", function(x) log(x), 0, 2, 1e-9, 1000L),
+    list("step", function(x) if (x < 0.3) -1 else 2, -1, 1, 1e-8, 1000L),
+    list("flat", function(x) (x - 0.25)^3, -2, 3, 1e-14, 1000L),
+    list("few_iter", function(x) x^3 - 2 * x - 5, 2, 3, 1e-15, 3L),
+    list("root_at_end", function(x) x - 1, 1, 2, 1e-8, 1000L))
+ur_rows <- list()
+for (fn in ur_fns) {
+    xs <- numeric(0)
+    g <- function(x) { xs <<- c(xs, x); fn[[2]](x) }
+    r <- suppressWarnings(uniroot(g, c(fn[[3]], fn[[4]]), tol = fn[[5]], maxiter = fn[[6]]))
+    stopifnot(identical(xs[length(xs)], r$root))
+    ur_rows[[length(ur_rows) + 1]] <- paste(fn[[1]], hex(fn[[3]]), hex(fn[[4]]), hex(fn[[5]]), fn[[6]],
+                                            hexl(xs[-length(xs)]), hex(r$root), r$iter, hex(r$estim.prec), sep = "\t")
+}
+write_tsv("uniroot.tsv", "function\tlower\tupper\ttol\tmaxiter\tevaluated at\troot\titer\testim.prec", ur_rows)
+
+# ---------------------------------------------------------------------------------------------
+# bw.SJ(x) (method "ste", nb = 1000): pairwise distance counts from all pairs for n <= 500
+# (bw_den), from bin counts above (bw_pair_cnts' tabulate and bw_den_binned); bw_phi4/bw_phi6;
+# the search interval widened while fSD has one sign; uniroot with tol = 0.1 * lower. Samples
+# like sctransform's (log10 geometric means of genes) and others; "error" where R stops.
+
+set.seed(81)
+sj_cases <- list(rnorm(2), rnorm(10), rnorm(100), runif(499), rnorm(500), rnorm(501), runif(2000),
+                 log10(rgamma(2000, 0.3, 0.1) + 1e-3), log10(rgamma(1700, 0.5, 1) + 0.01),
+                 round(rnorm(800), 1), c(rnorm(300), rnorm(300, 6)), rexp(3000), rt(1000, 2),
+                 log10(exp(rnorm(1500, -1, 1.5))), c(rep(0, 50), rnorm(30)), rnorm(600) * 1e-8 + 5,
+                 c(-3, rnorm(200, 0, 0.01), 4), seq(-1, 1, length.out = 777), c(1, 1, 1, 2))
+sj_rows <- lapply(sj_cases, function(x) {
+    r <- tryCatch(hex(bw.SJ(x)), error = function(e) "error")
+    paste(hexl(x), r, sep = "\t")
+})
+write_tsv("bw_sj.tsv", "x\tbw.SJ(x)", sj_rows)
+
+# ---------------------------------------------------------------------------------------------
+# ksmooth(x, y, kernel, bandwidth, x.points = xp) (BDRksmooth): x with ties, unsorted x.points
+# inside and outside range(x); the result at sort(x.points), NA where the kernel reaches no x.
+
+set.seed(82)
+ks_rows <- list()
+for (k in 1:12) {
+    n <- sample(c(5, 50, 400, 2000), 1)
+    x <- if (k %% 3 == 0) round(rnorm(n), 1) else rnorm(n)
+    y <- rnorm(n) * 3 + x
+    xp <- c(runif(sample(c(1, 20, 300), 1), min(x) - 1, max(x) + 1), x[1:min(3, n)])
+    kernel <- if (k %% 4 == 1) "box" else "normal"
+    bw <- c(0.05, 0.3, 1, 3)[(k %% 4) + 1]
+    r <- ksmooth(x, y, kernel = kernel, bandwidth = bw, x.points = xp)
+    ks_rows[[k]] <- paste(kernel, hex(bw), hexl(x), hexl(y), hexl(xp), hexl(r$x), hexl(r$y), sep = "\t")
+}
+write_tsv("ksmooth.tsv", "kernel\tbandwidth\tx\ty\tx.points\tsort(x.points)\ty", ks_rows)
+
+# ---------------------------------------------------------------------------------------------
+# .bincode(x, breaks, right, include.lowest), the codes cut() makes: points on the breaks and
+# outside them; 0 for NA.
+
+set.seed(83)
+bc_rows <- list()
+for (k in 1:8) {
+    breaks <- sort(unique(round(runif(sample(c(2, 5, 30), 1) + 1, -2, 2), 2)))
+    if (length(breaks) < 2) breaks <- c(-1, 1)
+    x <- c(runif(40, -2.5, 2.5), breaks, NaN)
+    for (right in c(TRUE, FALSE)) for (lowest in c(FALSE, TRUE)) {
+        codes <- .bincode(x, breaks, right, lowest)
+        codes[is.na(codes)] <- 0L
+        bc_rows[[length(bc_rows) + 1]] <- paste(hexl(breaks), as.integer(right), as.integer(lowest),
+                                                hexl(x), lst(codes), sep = "\t")
+    }
+}
+write_tsv("bincode.tsv", "breaks\tright\tinclude.lowest\tx\tcodes (0 = NA)", bc_rows)
 
 cat("written to", normalizePath(out), "\n")

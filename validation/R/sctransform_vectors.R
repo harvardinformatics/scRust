@@ -171,4 +171,21 @@ fb_rows[[length(fb_rows) + 1]] <- fit_beta_case(c(0, 1.5, 1, 9, 0.5, 0, 40, 0, 2
 write_tsv("fit_beta.tsv",
           "2 * y\toffset\ttheta\tstart\tNewton falls back\tbeta\titer\tdeviance", fb_rows)
 
+# ---------------------------------------------------------------------------------------------
+# sctransform's is_outlier(y, x) (bw.SJ, two grids of bins, robust z-scores by median and mad
+# within each bin through cut() and aggregate()): x like log10 geometric means, y with planted
+# outliers, ties, constant stretches and bins holding one value.
+
+set.seed(91)
+io_rows <- list()
+for (k in 1:10) {
+    n <- sample(c(30L, 200L, 2000L), 1)
+    x <- log10(rgamma(n, 0.4, 0.2) + 1e-3)
+    y <- if (k %% 3 == 0) round(rnorm(n) * 2) / 2 else 0.5 * x + rnorm(n, 0, 0.3)
+    y[sample(n, max(1L, n %/% 40L))] <- rnorm(max(1L, n %/% 40L), 0, 30)
+    if (k %% 4 == 0) y[1:5] <- y[1]
+    io_rows[[k]] <- paste(hexl(x), hexl(y), lst(as.integer(sctransform:::is_outlier(y, x))), sep = "\t")
+}
+write_tsv("is_outlier.tsv", "x\ty\tis_outlier(y, x)", io_rows)
+
 cat("written to", normalizePath(out), "\n")

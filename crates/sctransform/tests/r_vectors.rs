@@ -44,3 +44,19 @@ fn fit_beta_one_group_against_glmgampoi() {
     }
     assert_eq!(fallbacks, 14);
 }
+
+#[test]
+fn is_outlier_against_sctransform() {
+    use sctransform::reg::is_outlier;
+    let rows = fixture("is_outlier.tsv");
+    assert_eq!(rows.len(), 10);
+    let mut flagged = 0;
+    for (k, row) in rows.iter().enumerate() {
+        let (x, y) = (fl(&row[0]), fl(&row[1]));
+        let want: Vec<bool> = row[2].split(',').map(|v| v == "1").collect();
+        let got = is_outlier(&y, &x).unwrap_or_else(|e| panic!("case {}: {e}", k + 1));
+        assert_eq!(got, want, "is_outlier case {} (n = {})", k + 1, x.len());
+        flagged += want.iter().filter(|&&b| b).count();
+    }
+    assert!(flagged > 50);
+}

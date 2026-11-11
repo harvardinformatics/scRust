@@ -362,6 +362,62 @@ milestone = "M4"
 note = "optimize() (Brent_fmin, fcn1's handling of non-finite values): every evaluation point and the result"
 
 [[file]]
+path = "tests/fixtures/rcompat/uniroot.tsv"
+sha256 = "ccaadaaa869f7d5cbb7741b7b640e13cd60ac02fb0ae4a238a946a52ede05281"
+bytes = 4057
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "uniroot() (R_zeroin2, fcn2's handling of non-finite values): every evaluation point, the root, iterations and precision"
+
+[[file]]
+path = "tests/fixtures/rcompat/bw_sj.tsv"
+sha256 = "6d406f8bdc25019cb3c5faa50bbc008f98e6c6c77742790c0903fed6a9d82b96"
+bytes = 270200
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "bw.SJ(x), method ste: unbinned (n <= 500) and binned pair counts, phi4/phi6, the widened search interval, uniroot"
+
+[[file]]
+path = "tests/fixtures/rcompat/ksmooth.tsv"
+sha256 = "bbfe1ec91ae12078063476a8f55ec36c0a4e3ebb1ae19c65f2e4c00a038a8827"
+bytes = 399539
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "ksmooth() (BDRksmooth), box and normal kernels, ties, x.points outside the data"
+
+[[file]]
+path = "tests/fixtures/rcompat/bincode.tsv"
+sha256 = "d809bfcb2d1dab92cd9ea703e0883b2a5501a4525f93c157d1ad2315c46bee0c"
+bytes = 42126
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = ".bincode() (cut()'s codes), right and left closed, include.lowest, points on the breaks"
+
+[[file]]
 path = "tests/fixtures/sctransform/sct_input.tsv"
 sha256 = "801420b8a9165d705f833062fc875a845710cdd0adee9a58feff73ccd249eac6"
 bytes = 111304
@@ -387,6 +443,20 @@ env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
 milestone = "M4"
 note = "glmGamPoi fitBeta_one_group: Newton fits and the optimize() fallback (NaN steps, half-integer counts, theta = 0, all-zero genes)"
+
+[[file]]
+path = "tests/fixtures/sctransform/is_outlier.tsv"
+sha256 = "645e313934908cd6dc27ecf19447b67bf9954a6dc0276703aa4fa5e19e2527e2"
+bytes = 177143
+tool = "sctransform"
+role = "reference"
+stage = "S2c"
+profile = "none (no BLAS)"
+recipe = "validation/R/sctransform_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "sctransform is_outlier(y, x): bw.SJ bins on two grids, median/mad robust scores, planted outliers and ties"
 
 # DoubletFinder (plan B4) ---------------------------------------------------------------------
 #

@@ -10,9 +10,10 @@
 //!
 //! - [`setup`] (S2a): cell attributes, the gene filter, geometric means, the fitting cells and
 //!   genes (density-weighted sampling), the bins;
-//! - S2b fits: glmGamPoi's Newton fits, the overdispersion MLE through R's `nlminb` with the
-//!   Cox-Reid adjustment, `loc_median_fit`, the theta rules;
-//! - S2c regularisation: outlier removal and `ksmooth` against the genes' geometric means;
+//! - [`fit`] (S2b): glmGamPoi's Newton fits, the overdispersion MLE through R's `nlminb` with
+//!   the Cox-Reid adjustment, `loc_median_fit`, the theta rules;
+//! - [`reg`] (S2c): the Poisson genes, outlier removal and `ksmooth` against the genes'
+//!   geometric means;
 //! - S2d residuals: clipped Pearson residuals, residual variance, the variable features and
 //!   `scale.data`.
 //!
@@ -22,11 +23,13 @@ pub mod fit;
 pub mod glm;
 pub mod matrix;
 pub mod params;
+pub mod reg;
 pub mod setup;
 
 pub use fit::{fit, FitInput, Fits};
 pub use matrix::GeneRows;
 pub use params::{MinVariance, SctParams};
+pub use reg::{regularize, Reg, RegInput};
 pub use setup::{setup, CellAttr, Setup};
 
 use std::fmt;

@@ -160,6 +160,36 @@ pub fn cmp_rng(stage: &str, name: &str, got: &[i32], want: Option<Vec<i32>>) -> 
     }
 }
 
+/// Bitwise comparison of a scalar with R's (from `stages.json`, written with `%.17g`).
+pub fn cmp_scalar(stage: &str, name: &str, got: f64, want: Option<f64>) -> Check {
+    match want {
+        None => Check { stage: stage.into(), name: name.into(), status: Status::Missing, n: 0, n_differ: 0, detail: "no scalar".into() },
+        Some(w) => {
+            let same = bits_equal(got, w);
+            let detail = if same { String::new() } else { format!("{got:e} against R's {w:e}") };
+            Check { stage: stage.into(), name: name.into(), status: if same { Status::Identical } else { Status::Differ }, n: 1, n_differ: (!same) as usize, detail }
+        }
+    }
+}
+
+/// The per-context scalars R's hooks wrote to `stages.json`.
+pub struct Scalars {
+    json: scio::json::Json,
+}
+
+impl Scalars {
+    pub fn open(stages: &StageDir) -> Result<Scalars, DfError> {
+        let path = stages.dir.join("stages.json");
+        let text = std::fs::read_to_string(&path).map_err(DfError::Io)?;
+        let json = scio::json::Json::parse(&text).map_err(|e| DfError::Input(format!("{}: {e}", path.display())))?;
+        Ok(Scalars { json })
+    }
+
+    pub fn get(&self, ctx: &str, name: &str) -> Option<f64> {
+        self.json.get("scalars")?.get(ctx)?.get(name)?.as_f64()
+    }
+}
+
 fn missing(stage: &str, name: &str) -> Check {
     Check { stage: stage.into(), name: name.into(), status: Status::Missing, n: 0, n_differ: 0, detail: "not dumped".into() }
 }
@@ -352,15 +382,67 @@ pub fn check_s2b(stages: &StageDir, rng: &RngCheckpoints, c: &Context, r: &RS2a,
     Ok((fits, checks))
 }
 
+/// R's S2b `model_pars` (after the 1e-7 floor) of a context.
+pub fn r_model_pars(stages: &StageDir, ctx: &str) -> Result<Vec<[f64; 3]>, DfError> {
+    let mp = need(block_f64(stages, "S2b_model_pars.npy", ctx)?, "S2b_model_pars", ctx)?.0;
+    Ok((0..mp[0].len()).map(|k| [mp[0][k], mp[1][k], mp[2][k]]).collect())
+}
+
+/// S2c on one context, teacher-forced: R's S2b `model_pars` and S2a gene statistics. Compared with
+/// S2c_model_pars_fit, S2c_outliers, S2c_poisson_genes, S2c_smoothing_genes and the scalars
+/// `mean_cell_sum`, `reg_bw` and the gene counts.
+pub fn check_s2c(stages: &StageDir, scalars: &Scalars, c: &Context, r: &RS2a, params: &sctransform::SctParams) -> Result<(sctransform::Reg, Vec<Check>), DfError> {
+    let ctx = &c.ctx;
+    let mut checks = Vec::new();
+    let model_pars = r_model_pars(stages, ctx)?;
+    let rows = sctransform::GeneRows::from_csc(&c.input, &r.genes);
+    let mcs = sctransform::reg::mean_cell_sum(&rows);
+    checks.push(cmp_scalar("S2c", &format!("{ctx}: mean_cell_sum"), mcs, scalars.get(ctx, "mean_cell_sum")));
+    let input = sctransform::RegInput {
+        model_pars: &model_pars,
+        genes_step1: &r.genes_step1,
+        log_gmean_step1: &r.log_gmean_step1,
+        log_gmean: &r.log_gmean,
+        amean: &r.amean,
+        var: &r.var,
+        mean_cell_sum: mcs,
+    };
+    let reg = sctransform::regularize(&input, params).map_err(|e| DfError::Input(format!("{ctx}: {e}")))?;
+    checks.push(cmp_scalar("S2c", &format!("{ctx}: reg_bw"), reg.bw, scalars.get(ctx, "reg_bw")));
+    let n_out = reg.outliers.iter().filter(|&&o| o).count();
+    for (name, v) in [("n_outliers", n_out), ("n_all_poisson_genes", reg.poisson_genes.len()), ("n_smoothing_genes", reg.smoothing_genes.len())] {
+        checks.push(cmp_scalar("S2c", &format!("{ctx}: {name}"), v as f64, scalars.get(ctx, name)));
+    }
+    let outl: Vec<usize> = reg.outliers.iter().map(|&o| o as usize).collect();
+    for (file, got) in [("S2c_outliers.npy", &outl), ("S2c_poisson_genes.npy", &reg.poisson_genes), ("S2c_smoothing_genes.npy", &reg.smoothing_genes)] {
+        let name = format!("{ctx}: {}", file.trim_end_matches(".npy"));
+        match block_i32(stages, file, ctx)? {
+            Some((cols, _)) => checks.push(cmp_idx("S2c", &name, got, &cols[0])),
+            None => checks.push(missing("S2c", &name)),
+        }
+    }
+    match block_f64(stages, "S2c_model_pars_fit.npy", ctx)? {
+        Some((cols, _)) => {
+            for (k, name) in ["theta", "(Intercept)", "log_umi"].iter().enumerate() {
+                let got: Vec<f64> = reg.model_pars_fit.iter().map(|p| p[k]).collect();
+                checks.push(cmp_f64("S2c", &format!("{ctx}: model_pars_fit {name}"), &got, &cols[k]));
+            }
+        }
+        None => checks.push(missing("S2c", &format!("{ctx}: S2c_model_pars_fit"))),
+    }
+    Ok((reg, checks))
+}
+
 /// Which SCTransform sub-stages to check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Which {
     pub s2a: bool,
     pub s2b: bool,
+    pub s2c: bool,
 }
 
 impl Which {
-    pub const ALL: Which = Which { s2a: true, s2b: true };
+    pub const ALL: Which = Which { s2a: true, s2b: true, s2c: true };
 }
 
 /// Stage S2 of an instrumented R run against Rust's SCTransform, in every context (or the
@@ -370,6 +452,7 @@ pub fn validate(input: &std::path::Path, stages_dir: &std::path::Path, params: &
     let counts = scio::sparse::read_mtx(input).map_err(DfError::Io)?;
     let stages = StageDir::open(stages_dir)?;
     let rng = RngCheckpoints::open(&stages)?;
+    let scalars = Scalars::open(&stages)?;
     let mut checks = Vec::new();
     for ctx in sct_contexts(&stages) {
         if only.is_some_and(|o| !o.iter().any(|c| c == &ctx)) {
@@ -380,10 +463,16 @@ pub fn validate(input: &std::path::Path, stages_dir: &std::path::Path, params: &
             let (_, _, ch) = check_s2a(&stages, &rng, &c, params)?;
             checks.extend(ch);
         }
-        if which.s2b {
+        if which.s2b || which.s2c {
             let r = RS2a::read(&stages, &ctx)?;
-            let (_, ch) = check_s2b(&stages, &rng, &c, &r, params, threads)?;
-            checks.extend(ch);
+            if which.s2b {
+                let (_, ch) = check_s2b(&stages, &rng, &c, &r, params, threads)?;
+                checks.extend(ch);
+            }
+            if which.s2c {
+                let (_, ch) = check_s2c(&stages, &scalars, &c, &r, params)?;
+                checks.extend(ch);
+            }
         }
     }
     Ok(crate::validate::Report { reference: stages_dir.to_path_buf(), candidate: input.to_path_buf(), checks })
