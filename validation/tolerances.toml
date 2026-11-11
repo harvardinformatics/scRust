@@ -6,14 +6,15 @@
 # reference's; otherwise the harness switches to tolerance mode (the R-vs-R floor, measured at
 # M2) and says so in its report (A5b).
 #
-# Stub (milestone M0): the criteria are the plan's (B5) and the key names only a proposal; no
-# code reads this file yet. Uncomment and settle each stage when its milestone lands.
+# The criteria are the plan's (B5) and the key names a proposal; no code reads this file yet.
+# Each stage is uncommented and settled when its milestone lands (S0: M1).
 
 # DoubletFinder -------------------------------------------------------------------------------
 
-# S0 RNG and R semantics: vectors and checkpoints against R (M1)
-# [doubletfinder.S0]
-# criterion = "exact"
+# S0 RNG and R semantics: vectors and checkpoints against R (M1). Settled: every double bitwise,
+# NaN payloads included (crates/rcompat/tests/r_vectors.rs, tests/fixtures/rcompat/).
+[doubletfinder.S0]
+criterion = "exact"
 
 # S1 sampling: subsample and doublet index pairs, RNG state after each step (M3)
 # [doubletfinder.S1]

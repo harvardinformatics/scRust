@@ -3,9 +3,8 @@
 # another cluster, regenerate them with the recorded script in the pinned env and compare
 # checksums before running any Rust test.
 #
-# Stub (milestone M0): no entries yet, and no code reads this file. Entries arrive with M1 (R
-# vectors for rcompat) and M2 (exports and direct reference runs). Proposed layout, one table
-# per file:
+# Entries so far: the R vectors for rcompat (M1). Exports and direct reference runs arrive with M2.
+# No code reads this file yet. Layout, one table per file:
 #
 # [[file]]
 # path = "tests/fixtures/doubletfinder/soupx_tenx_test/..."   # or data/... (large, gitignored)
@@ -21,6 +20,170 @@
 # recipe = "validation/R/export_doubletfinder.R"
 # env = "envs/r-reference"
 # fingerprint = "..."          # CPU model, OpenBLAS core name, threads, glibc of the run
+
+# rcompat (M1) --------------------------------------------------------------------------------
+#
+# Stage S0: R reference vectors for the rcompat crate, checked bit for bit by
+# crates/rcompat/tests/r_vectors.rs. Made on a login node (no .rds is read) with the production
+# R env (R 4.5.3) and the hermetic flags; regenerating gives identical files. No BLAS is
+# involved, so they do not depend on the reference profile; they do depend on glibc's libm
+# (pow, log, exp, ...), here glibc 2.28.
+
+[[file]]
+path = "tests/fixtures/rcompat/format.tsv"
+sha256 = "01683b1be7f4199d3bde03086b827b04b6d2be65f6783ffdb6b8988373701c3e"
+bytes = 107292
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+
+[[file]]
+path = "tests/fixtures/rcompat/order.tsv"
+sha256 = "a132808b3b0517a415a5b6e4b624d2699dfae3d08a58d8e39e6043c45a391209"
+bytes = 317207
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+
+[[file]]
+path = "tests/fixtures/rcompat/pow.tsv"
+sha256 = "0174b81e0c93478f9abdddfb89b3a19c71bd9d7dafad7257171f1c7d038b4173"
+bytes = 50602
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+
+[[file]]
+path = "tests/fixtures/rcompat/qnorm.tsv"
+sha256 = "07feebca91eabb16bc8afeeac01db8ee58fcce816e1aa777af3bdfc494a5d84c"
+bytes = 122755
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+
+[[file]]
+path = "tests/fixtures/rcompat/random_seed_after.tsv"
+sha256 = "bb7d4a4fcc67b95273e8216039d9745901d1fb1cde58e673296e1d5c2386067e"
+bytes = 48537
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+
+[[file]]
+path = "tests/fixtures/rcompat/random_seed.tsv"
+sha256 = "664a0e3249039f8860c7f5b4735a5a632981b2c01c637294b4a124fb2edba66b"
+bytes = 55059
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+
+[[file]]
+path = "tests/fixtures/rcompat/rnorm.tsv"
+sha256 = "bb3c038e014a3cd4fb3e43d143a38a9aa4928621d48cc28aad5278171f97cbd3"
+bytes = 66034
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+
+[[file]]
+path = "tests/fixtures/rcompat/round.tsv"
+sha256 = "06c4511e47677b8b7f8c848152f809ed943a58438d7a647e14d2ee4d26452f63"
+bytes = 66226
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+
+[[file]]
+path = "tests/fixtures/rcompat/sample.tsv"
+sha256 = "24e1c1b44cafd1f0c755ad3228701acc295c4b0f833ecd202a7ec487aa651029"
+bytes = 100442
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+
+[[file]]
+path = "tests/fixtures/rcompat/seq_by.tsv"
+sha256 = "f4b2ede3cb524f7cf2290834adc6fb6387aeaf8c9865686260739f21537ffaea"
+bytes = 18685
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+
+[[file]]
+path = "tests/fixtures/rcompat/seq_len.tsv"
+sha256 = "5599aa1c224ab478998552fa5e81c1972f0b928063e3d8a2216a13ed9166b943"
+bytes = 182931
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+
+[[file]]
+path = "tests/fixtures/rcompat/summary.tsv"
+sha256 = "5acc3d3355e295435ac3a8f5e426fd6eb04a00495f202481210cda11b673769d"
+bytes = 100173
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+
+[[file]]
+path = "tests/fixtures/rcompat/unif.tsv"
+sha256 = "394a411c5d524d2998f13cd920b44ef025b5911db37c5042a31df6e9d725d284"
+bytes = 107370
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
 
 # DoubletFinder (plan B4) ---------------------------------------------------------------------
 #
@@ -38,7 +201,8 @@
 # Reference files, by stage (direct and instrumented R runs, per dataset and profile)
 
 # S0 RNG and R semantics: R-generated vectors (Mersenne-Twister streams, sampling, rnorm,
-#    round, seq, order, sum and mean, number formatting, fft) and .Random.seed checkpoints
+#    round, seq, order, sum and mean, number formatting) and .Random.seed checkpoints: the
+#    rcompat files above (M1); fft arrives with the kde crate
 
 # S1 sampling: the sweep subsample (n > 10,000), doublet index pairs for each pN and for the
 #    final run, and the RNG state after each step
