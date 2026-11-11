@@ -14,9 +14,9 @@
 //!    `ScaleData` (`FastRowScale`: `mat - rowMeans2(mat, na.rm = TRUE)`).
 //!
 //! R holds the full residual matrix (genes x cells); here bins are processed in parallel and only
-//! the rows of the current best `variable_features_n` genes are kept, so memory stays near
-//! `(variable_features_n + threads * bin_size) * ncells` doubles. Results do not depend on the
-//! number of threads.
+//! the rows of the current best `variable_features_n` genes are kept (a worker drops a row whose
+//! variance is already below the k-th best so far), so memory stays near `(variable_features_n +
+//! threads * bin_size) * ncells` doubles. Results do not depend on the number of threads.
 
 use crate::matrix::GeneRows;
 use crate::params::{MinVariance, SctParams};
@@ -28,7 +28,7 @@ use rcompat::matrixstats::{mean2_na_rm, var_refined};
 use rcompat::F80;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
-use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering as AtomicOrdering};
 use std::sync::mpsc;
 
 /// What S2d reads.
@@ -113,16 +113,29 @@ impl Ord for Cand {
     }
 }
 
-/// One bin's results.
+/// One bin's results: every gene's statistics, and the clipped residual rows that may still
+/// enter the variable features (all of them when the full matrix is kept).
 struct BinOut {
     first: usize,
     mean: Vec<f64>,
     var: Vec<f64>,
-    /// clipped residual rows, row-major
-    y: Vec<f64>,
+    rows: Vec<(usize, Vec<f64>)>,
 }
 
-fn residual_bin(rows: &GeneRows, input: &ResidualInput, genes: std::ops::Range<usize>, xreg: &[f64], min_var: f64, clip: (f64, f64)) -> BinOut {
+/// The current entry bar of the variable features: a row whose residual variance is below it
+/// can no longer be selected (the bar only rises), so the workers drop it.
+struct Bar(AtomicU64);
+
+impl Bar {
+    fn get(&self) -> f64 {
+        f64::from_bits(self.0.load(AtomicOrdering::Relaxed))
+    }
+    fn set(&self, v: f64) {
+        self.0.store(v.to_bits(), AtomicOrdering::Relaxed);
+    }
+}
+
+fn residual_bin(rows: &GeneRows, input: &ResidualInput, genes: std::ops::Range<usize>, xreg: &[f64], min_var: f64, clip: (f64, f64), keep_all: bool, bar: &Bar) -> BinOut {
     let nc = rows.ncol;
     let nb = genes.len();
     // model_pars_final[genes_bin, -1]: (Intercept) and log_umi, column-major nb x 2
@@ -133,15 +146,15 @@ fn residual_bin(rows: &GeneRows, input: &ResidualInput, genes: std::ops::Range<u
     }
     // tcrossprod(nb x 2, ncells x 2): nb x ncells, column-major
     let eta = tcrossprod(&p, nb, 2, xreg, nc, 2);
-    let mut y = vec![0.0f64; nb * nc];
+    let mut row = vec![0.0f64; nc];
     let mut counts = vec![0.0f64; nc];
     let mut mean = Vec::with_capacity(nb);
     let mut var = Vec::with_capacity(nb);
+    let mut kept = Vec::new();
     let nf = F80::from_u64(nc as u64);
     for (r, g) in genes.enumerate() {
         rows.dense_row(g, &mut counts);
         let theta = input.model_pars_fit[g][0];
-        let row = &mut y[r * nc..(r + 1) * nc];
         for c in 0..nc {
             let mu = exp(eta[r + c * nb]);
             // pearson_residual(): model_var <- mu + mu^2 / theta; floored at min_var
@@ -165,9 +178,13 @@ fn residual_bin(rows: &GeneRows, input: &ResidualInput, genes: std::ops::Range<u
             s = s.add_f64(v);
         }
         mean.push((s / nf).to_f64());
-        var.push(var_refined(row));
+        let v = var_refined(&row);
+        var.push(v);
+        if keep_all || v >= bar.get() {
+            kept.push((g, row.clone()));
+        }
     }
-    BinOut { first: 0, mean, var, y }
+    BinOut { first: 0, mean, var, rows: kept }
 }
 
 /// Stage S2d. `rows` are the kept genes' counts, `threads` the number of bins computed at once.
@@ -196,17 +213,19 @@ pub fn residuals(rows: &GeneRows, input: &ResidualInput, params: &SctParams, kee
     let mut all_y = if keep_y { Some(vec![0.0f64; ng * nc]) } else { None };
     let threads = threads.max(1).min(bin_list.len().max(1));
     let next = AtomicUsize::new(0);
+    // rows below the bar cannot be selected: the threshold, or the k-th best variance so far
+    let bar = Bar(AtomicU64::new(threshold.to_bits()));
     let (tx, rx) = mpsc::sync_channel::<BinOut>(threads);
     std::thread::scope(|scope| {
         for _ in 0..threads {
             let tx = tx.clone();
-            let (next, bin_list, xreg) = (&next, &bin_list, &xreg);
+            let (next, bin_list, xreg, bar) = (&next, &bin_list, &xreg, &bar);
             scope.spawn(move || loop {
                 let b = next.fetch_add(1, AtomicOrdering::Relaxed);
                 if b >= bin_list.len() {
                     break;
                 }
-                let mut out = residual_bin(rows, input, bin_list[b].clone(), xreg, min_var, res_clip);
+                let mut out = residual_bin(rows, input, bin_list[b].clone(), xreg, min_var, res_clip, keep_y, bar);
                 out.first = bin_list[b].start;
                 if tx.send(out).is_err() {
                     break;
@@ -216,11 +235,13 @@ pub fn residuals(rows: &GeneRows, input: &ResidualInput, params: &SctParams, kee
         drop(tx);
         for out in rx {
             for (r, (&m, &v)) in out.mean.iter().zip(&out.var).enumerate() {
-                let g = out.first + r;
-                residual_mean[g] = m;
-                residual_variance[g] = v;
+                residual_mean[out.first + r] = m;
+                residual_variance[out.first + r] = v;
+            }
+            for (g, row) in out.rows {
+                let v = residual_variance[g];
                 if let Some(all) = all_y.as_mut() {
-                    all[g * nc..(g + 1) * nc].copy_from_slice(&out.y[r * nc..(r + 1) * nc]);
+                    all[g * nc..(g + 1) * nc].copy_from_slice(&row);
                 }
                 if v.is_nan() || k_top == 0 || !(v >= threshold) {
                     continue; // sort() drops NA
@@ -228,12 +249,15 @@ pub fn residuals(rows: &GeneRows, input: &ResidualInput, params: &SctParams, kee
                 let cand = Cand { var: v, gene: g };
                 if heap.len() < k_top {
                     heap.push(cand);
-                    kept.insert(g, out.y[r * nc..(r + 1) * nc].to_vec());
+                    kept.insert(g, row);
                 } else if cand.better(heap.peek().unwrap()) == Ordering::Greater {
                     let worst = heap.pop().unwrap();
                     kept.remove(&worst.gene);
                     heap.push(cand);
-                    kept.insert(g, out.y[r * nc..(r + 1) * nc].to_vec());
+                    kept.insert(g, row);
+                }
+                if heap.len() == k_top {
+                    bar.set(heap.peek().unwrap().var);
                 }
             }
         }

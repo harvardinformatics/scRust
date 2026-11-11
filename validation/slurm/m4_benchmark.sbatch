@@ -12,7 +12,7 @@
 # Defaults: run instrumented-portable-sapphirerapids, context final. OpenBLAS runs under the
 # run's profile (portable: OPENBLAS_CORETYPE=Haswell), so the Rust and R outputs compare byte for
 # byte (compare them with cmp once both jobs are done). Outputs, never overwritten:
-#   data/doubletfinder/<object>/rust/m4-benchmark/<context>/{rust_t1,rust_t<N>,r}/
+#   data/doubletfinder/<object>/rust/<BENCH_LABEL, default m4-benchmark>/<context>/{rust_t1,rust_t<N>,r}/
 #     the scrust sctransform (or R) outputs, time_v.txt; R adds timing.json (SCTransform alone)
 #
 #SBATCH --job-name=scrust-m4-bench
@@ -44,7 +44,7 @@ case $run in
     instrumented-production-*) unset OPENBLAS_CORETYPE ;;
     *) echo "unknown profile in $run" >&2; exit 1 ;;
 esac
-out=$base/rust/m4-benchmark/$ctx
+out=$base/rust/${BENCH_LABEL:-m4-benchmark}/$ctx
 mkdir -p "$out"
 n=${SLURM_CPUS_PER_TASK:-1}
 
