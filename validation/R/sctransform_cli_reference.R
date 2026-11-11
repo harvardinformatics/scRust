@@ -27,6 +27,7 @@ suppressPackageStartupMessages({
 stopifnot(packageVersion("Seurat") == "5.5.1", packageVersion("sctransform") == "0.4.3",
           packageVersion("glmGamPoi") == "1.22.0")
 source(file.path("validation", "R", "lib", "io.R"))
+source(file.path("validation", "R", "lib", "sct_outputs.R"))
 out <- args[[2]]
 dir.create(out, recursive = TRUE, showWarnings = FALSE)
 
@@ -36,34 +37,10 @@ features <- read.delim(gzfile(list.files(args[[1]], "^features\\.tsv(\\.gz)?$", 
 stopifnot(identical(make.unique(features[[2]]), rownames(counts)))
 id_of <- setNames(features[[1]], rownames(counts))
 
-captured <- new.env()
-suppressMessages(trace("SCTransform.default", where = asNamespace("Seurat"), print = FALSE,
-                       exit = bquote(assign("vst_out", returnValue(), envir = .(captured)))))
+captured <- sct_capture()
 seu <- CreateSeuratObject(counts = counts)
 seu <- SCTransform(seu)
 v <- captured$vst_out
 stopifnot(!is.null(v), identical(v$variable_features, VariableFeatures(seu)))
-
-tsv <- function(name, header, cols) {
-    lines <- do.call(paste, c(cols, sep = "\t"))
-    writeLines(c(paste(header, collapse = "\t"), lines), file.path(out, name), useBytes = TRUE)
-}
-ca <- v$cell_attr
-tsv("cell_attr.tsv", c("barcode", "umi", "log_umi"), list(rownames(ca), fmt17(ca$umi), fmt17(ca$log_umi)))
-ga <- v$gene_attr
-tsv("gene_attr.tsv", c("id", "name", "detection_rate", "gmean", "amean", "variance", "residual_mean", "residual_variance"),
-    list(id_of[rownames(ga)], rownames(ga), fmt17(ga$detection_rate), fmt17(ga$gmean), fmt17(ga$amean),
-         fmt17(ga$variance), fmt17(ga$residual_mean), fmt17(ga$residual_variance)))
-pars <- function(name, m) {
-    tsv(name, c("id", "name", "theta", "(Intercept)", "log_umi"),
-        list(id_of[rownames(m)], rownames(m), fmt17(m[, "theta"]), fmt17(m[, "(Intercept)"]), fmt17(m[, "log_umi"])))
-}
-pars("model_pars.tsv", v$model_pars)
-pars("model_pars_fit.tsv", v$model_pars_fit)
-vf <- v$variable_features
-tsv("variable_features.tsv", c("id", "name"), list(id_of[vf], vf))
-stopifnot(identical(rownames(v$y), vf))
-npy_write(file.path(out, "scale_data.npy"), unname(v$y))
-# the fixture keeps the digest of the (large) scale.data file rather than the file
-writeLines(unname(tools::sha256sum(file.path(out, "scale_data.npy"))), file.path(out, "scale_data.npy.sha256"))
+sct_write_outputs(v, out, id_of)
 cat("written to", normalizePath(out), "\n")
