@@ -2,7 +2,7 @@
 
 R scripts that make scRust's reference data (docs/PLAN.md A4). They run in the R reference env ([`envs/r-reference/`](../../envs/r-reference/README.md)). Scripts that read `.rds` files run only through sbatch wrappers in [`validation/slurm/`](../slurm/README.md), never on a login node.
 
-[`rcompat_vectors.R`](rcompat_vectors.R) makes the R vectors for the `rcompat` crate (stage S0, milestone M1): R's random-number stream and `.Random.seed` checkpoints, `sample`, `rnorm`/`qnorm`, `round`, `^`, `seq`, `order`, `sum`/`mean`/`var`/`sd` and number formatting, over many seeds, sizes and edge cases. It reads no `.rds`, so it may run on a login node:
+[`rcompat_vectors.R`](rcompat_vectors.R) makes the R vectors for the `rcompat` crate (stage S0): R's random-number stream and `.Random.seed` checkpoints, `sample`, `rnorm`/`qnorm`, `round`, `^`, `seq`, `order`, `sum`/`mean`/`var`/`sd` and number formatting (M1); `as.numeric()` of strings (R's own parser, `R_strtod`, including strings it does not round correctly), `fft`, `dnorm` and `approxfun` (M3); over many seeds, sizes and edge cases. It reads no `.rds`, so it may run on a login node:
 
 ```bash
 R_ENV=/n/holylfs05/LABS/informatics/Users/afreedman/smk-conda-envs/d3ca7f730a70e6f748bb65a12a5ed3f9_
@@ -35,3 +35,9 @@ Rules:
 - OpenBLAS's kernel and thread count come from `env.sh` (portable profile by default, see the profiles in [`validation/slurm/README.md`](../slurm/README.md)).
 - Seeds and parameters are the workflow's, as written in its scripts (for DoubletFinder, `workflow/scripts/doubletfinder.R` with seed 12345).
 - Outputs go to `data/` (large, gitignored) or `tests/fixtures/` (small, committed), and every file is listed in `validation/manifest.toml` with its sha256.
+
+## DoubletFinder core (milestone M3)
+
+The Rust core runs on the instrumented runs' own embeddings and is compared with them by `scrust validate doubletfinder` ([`../slurm/m3_doubletfinder.sbatch`](../slurm/m3_doubletfinder.sbatch)); no new R run was needed beyond the `rcompat` vectors. Results: [`docs/validation/doubletfinder_m3.md`](../../docs/validation/doubletfinder_m3.md).
+
+- [`report_doubletfinder_m3.R`](report_doubletfinder_m3.R): the report's tables from the M3 outputs (the `validate.json` of every Rust run, the direct R runs, the saved workflow outputs and the benchmark's `/usr/bin/time -v`). Reads only plain files.

@@ -6,8 +6,10 @@
 # reference's; otherwise the harness switches to tolerance mode (the R-vs-R floor, measured at
 # M2) and says so in its report (A5b).
 #
-# The criteria are the plan's (B5) and the key names a proposal; no code reads this file yet.
-# Each stage is uncommented and settled when its milestone lands (S0: M1).
+# The criteria are the plan's (B5) and the key names a proposal. Each stage is uncommented and
+# settled when its milestone lands (S0: M1; S1 and S4-S7: M3). `scrust validate doubletfinder`
+# (crates/doubletfinder/src/validate.rs) applies the settled S1 and S4-S7 criteria: everything
+# it compares must be identical.
 
 # DoubletFinder -------------------------------------------------------------------------------
 
@@ -41,9 +43,16 @@ S3_sdev = { max_rel = 7.3e-15 }
 S3_embeddings = { max_abs = 3.6e-11, max_scaled = 2.5e-13 }
 S3_loadings = { max_abs = 8.1e-14, max_scaled = 3.0e-13 }
 
-# S1 sampling: subsample and doublet index pairs, RNG state after each step (M3)
-# [doubletfinder.S1]
-# criterion = "exact"
+# S1 sampling: subsample and doublet index pairs, RNG state after each step. Settled (M3):
+# exact. From R's own .Random.seed before each draw, rcompat redraws the sweep subsample
+# (sample(1:n, 10000), when n > 10,000) and both sample(real.cells, n_doublets, replace = TRUE)
+# draws of every sweep iteration and of the final run: identical to R's S1_subsample and
+# S1_doublets, and R's .Random.seed afterwards identical, in all 24 instrumented runs of the 10
+# objects (docs/validation/doubletfinder_m3.md). The Rust runs of M3 take the draws from R
+# (teacher forcing); M6 makes them.
+[doubletfinder.S1]
+criterion = "exact"
+compare = ["S1_subsample", "S1_doublets", "rng_state_after"]
 
 # S2a SCTransform setup: log_umi, filtered genes, gmeans, fitting cells and genes, bins,
 # RNG state (M4a)
@@ -82,31 +91,43 @@ S3_loadings = { max_abs = 8.1e-14, max_scaled = 3.0e-13 }
 # otherwise = { criterion = "numeric", rel = 1e-10 }
 # rng_state = "exact"
 
-# S4 neighbours: the first `ind` order positions for each real cell (M3). Identical for
-# >= 99.99% of cells, each difference explained by a near-tie.
+# S4 neighbours: the first `ind` (sweep) or k + 1 (final) order positions of every real cell.
+# Plan floor: identical for >= 99.99% of cells, each difference explained by a near-tie.
 # Floor (M2): identical across kernels and CPU types on every object (the S3 differences above
 # move no neighbour), so S5-S7 are identical too.
-# [doubletfinder.S4]
-# criterion = "agreement"
-# min_identical_fraction = 0.9999
+# Settled (M3): exact. On R's own S3 embeddings, every cell's S4 digest is identical in all 24
+# instrumented runs of the 10 objects, and on tier T the full order positions (15 runs,
+# 3.1 million positions), including the lower-index twins of cellbender_fromraw_ghirsutum2 that
+# come before the cell itself. No near-tie needed explaining.
+[doubletfinder.S4]
+criterion = "exact"
+compare = ["S4_digest", "S4_positions"]
 
-# S5 pANN, sweep and final, per cell (M3). Identical for >= 99.9% of cells; otherwise
+# S5 pANN, sweep and final, per cell. Plan floor: identical for >= 99.9% of cells; otherwise
 # |difference| <= 2/k.
-# [doubletfinder.S5]
-# criterion = "agreement"
-# min_identical_fraction = 0.999
-# max_abs_diff = "2/k"
+# Settled (M3): exact, bit for bit, for every pK of every sweep iteration and the final run, in
+# all 24 instrumented runs (and cells.tsv byte-identical to every direct R run's).
+[doubletfinder.S5]
+criterion = "exact"
+compare = ["S5_pann_sweep", "S5_pann_final"]
 
-# S6 sweep: BCreal relative <= 1e-6; the chosen pK identical (M3)
-# [doubletfinder.S6]
-# bc_real = { criterion = "numeric", rel = 1e-6 }
-# pk = { criterion = "exact" }
+# S6 sweep: BCreal and the chosen pK. Plan floor: BCreal relative <= 1e-6; pK identical.
+# Settled (M3): exact. bkde's grid and density, the values passed to bimodality_coefficient and
+# BCreal are bit-identical for every (pN, pK) (teacher-forced on R's S5 and chained from Rust's
+# S5); sweep_stats.tsv and bcmvn.tsv byte-identical; pK, its label and the column names
+# identical, in all 24 instrumented runs.
+[doubletfinder.S6]
+criterion = "exact"
+compare = ["S6_bkde", "S6_gkde", "BCreal", "bcmvn", "pK", "pK_label"]
 
-# S7 calls: nExp identical; the Doublet/Singlet set identical as the target, with a floor of
-# >= 99.9% agreement where every difference sits at the pANN cutoff (M3)
-# [doubletfinder.S7]
-# nexp = { criterion = "exact" }
-# calls = { criterion = "agreement", min_identical_fraction = 0.999 }
+# S7 calls: nExp and the Doublet/Singlet set. Plan floor: nExp identical; >= 99.9% agreement,
+# every difference at the pANN cutoff.
+# Settled (M3): exact. nExp_poi, the homotypic proportion and nExp identical; the calls
+# identical (also teacher-forced on R's final pANN), in all 24 instrumented runs, including the
+# ties at the cutoff (stable descending order).
+[doubletfinder.S7]
+criterion = "exact"
+compare = ["nExp_poi", "homotypic_prop", "nExp", "S7_doublet"]
 
 # Against the saved workflow outputs (tiers T and P, full panel): doublet set as in S7, singlet
 # pANN as in S5, pK and nExp identical (M6, M7)
