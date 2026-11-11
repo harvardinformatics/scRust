@@ -1,0 +1,64 @@
+# Reference datasets for validation (docs/PLAN.md A1, A4 and A5b): for every file, where it
+# lives, its sha256 and size, how it was made, and what it is for. Fixtures are recipes: on
+# another cluster, regenerate them with the recorded script in the pinned env and compare
+# checksums before running any Rust test.
+#
+# Stub (milestone M0): no entries yet, and no code reads this file. Entries arrive with M1 (R
+# vectors for rcompat) and M2 (exports and direct reference runs). Proposed layout, one table
+# per file:
+#
+# [[file]]
+# path = "tests/fixtures/doubletfinder/soupx_tenx_test/..."   # or data/... (large, gitignored)
+# sha256 = "..."
+# bytes = 0
+# tool = "doubletfinder"
+# dataset = "soupx_tenx_test"
+# tier = "T"                   # T (workflow test data), P (production samples) or full-panel
+# role = "input"               # input, reference (direct R run) or saved-output (workflow's)
+# stage = "S2a"                # for references: the stage it checks (tolerances.toml)
+# profile = "portable"         # portable (OPENBLAS_CORETYPE=Haswell) or production (auto-detected)
+# source = "..."               # the workflow artifact it was exported from, if any
+# recipe = "validation/R/export_doubletfinder.R"
+# env = "envs/r-reference"
+# fingerprint = "..."          # CPU model, OpenBLAS core name, threads, glibc of the run
+
+# DoubletFinder (plan B4) ---------------------------------------------------------------------
+#
+# Datasets
+# - Tier T: the five workflow test objects DoubletFinder reads,
+#   tests/reference_outputs/testdata/results/<arm>/seurat_<arm>_test.rds in the pipeline repo:
+#   soupx_tenx_test, decontx_raw_tenx_test, soupx_emptydrops_test, decontx_raw_emptydrops_test,
+#   cellbender_fromraw_test. Inputs: counts and seurat_clusters.
+# - Tier P: soupx_tenx_SRR18256555 (small), soupx_tenx_10xmousebrain (medium),
+#   soupx_emptydrops_4500871lane (medium 2), soupx_emptydrops_sscovelli (large),
+#   cellbender_fromraw_ghirsutum2 (memory outlier); saved outputs in
+#   results/doubletfinder/seurat_doubletfinder_<object>.rds.
+# - Full panel: all 150 production DoubletFinder runs; inputs and saved-output fields only.
+#
+# Reference files, by stage (direct and instrumented R runs, per dataset and profile)
+
+# S0 RNG and R semantics: R-generated vectors (Mersenne-Twister streams, sampling, rnorm,
+#    round, seq, order, sum and mean, number formatting, fft) and .Random.seed checkpoints
+
+# S1 sampling: the sweep subsample (n > 10,000), doublet index pairs for each pN and for the
+#    final run, and the RNG state after each step
+
+# S2a SCTransform setup: log_umi, filtered genes, geometric means, fitting cells and genes,
+#     500-gene bins, RNG state
+
+# S2b SCTransform fits: per-gene Beta and theta
+
+# S2c SCTransform regularisation: regularised parameters
+
+# S2d SCTransform residuals: residual variance, the 3,000 variable features (ordered),
+#     scale.data (small and medium objects only)
+
+# S3 PCA: standard deviations, embeddings, RNG state afterwards
+
+# S4 neighbours: the first `ind` order positions for each real cell
+
+# S5 pANN: per cell, for every (pN, pK) of the sweep and for the final run
+
+# S6 sweep: BCreal for each (pN, pK), bcmvn, the chosen pK
+
+# S7 calls: nExp, the Doublet/Singlet classification, the column names R writes

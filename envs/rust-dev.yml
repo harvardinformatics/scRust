@@ -1,0 +1,29 @@
+# Rust toolchain for building, testing and validating scRust (docs/PLAN.md A2).
+#
+# Create it as a project-local env inside the repo (gitignored), never under the home
+# directory, then source env.sh to use it:
+#   module load python
+#   conda env create -p .envs/rust-dev -f envs/rust-dev.yml
+#   source env.sh
+# rust-dev.linux-64.pin.txt next to this file records the exact solve; to rebuild exactly that:
+#   conda create -p .envs/rust-dev --file envs/rust-dev.linux-64.pin.txt
+#
+# The BLAS and LAPACK builds are exactly those of the R reference env
+# (envs/r-reference/scrnaseq_r.linux-64.pin.txt), so FFI calls from Rust run the same OpenBLAS
+# machine code as R (plan A5 and A5b). Change them only together with the R env.
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  # Its activation script makes cargo link with the conda GCC (x86_64-conda-linux-gnu-cc), not
+  # the system compiler.
+  - rust=1.99
+  # CC and CFLAGS for C code built by build scripts: the same GCC 16.2.0 build, binutils and
+  # sysroot as the R reference env.
+  - gcc_linux-64=16.2.0
+  - pkg-config
+  # BLAS/LAPACK, pinned to the R reference env's exact builds.
+  - libopenblas=0.3.34=pthreads_hf13c14d_2
+  - libblas=3.11.0=12_h4a7cf45_openblas
+  - libcblas=3.11.0=12_h0358290_openblas
+  - liblapack=3.11.0=12_h47877c9_openblas

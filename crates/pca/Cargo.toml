@@ -1,0 +1,11 @@
+[package]
+name = "pca"
+description = "Truncated PCA, a port of irlba 2.4.1 as Seurat's RunPCA calls it"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]

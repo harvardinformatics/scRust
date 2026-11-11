@@ -1,0 +1,11 @@
+[package]
+name = "sctransform"
+description = "SCTransform v2, ported from sctransform 0.4.3 with glmGamPoi 1.22.0's fitting"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]

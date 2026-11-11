@@ -1,0 +1,83 @@
+# Match criteria for each tool, stage and output (docs/PLAN.md A4 and B5). Three kinds:
+#   exact      bitwise or integer equality
+#   numeric    relative and/or absolute tolerance
+#   agreement  fraction identical, correlation
+# Exact checks run only when the BLAS-relevant fields of the environment fingerprint match the
+# reference's; otherwise the harness switches to tolerance mode (the R-vs-R floor, measured at
+# M2) and says so in its report (A5b).
+#
+# Stub (milestone M0): the criteria are the plan's (B5) and the key names only a proposal; no
+# code reads this file yet. Uncomment and settle each stage when its milestone lands.
+
+# DoubletFinder -------------------------------------------------------------------------------
+
+# S0 RNG and R semantics: vectors and checkpoints against R (M1)
+# [doubletfinder.S0]
+# criterion = "exact"
+
+# S1 sampling: subsample and doublet index pairs, RNG state after each step (M3)
+# [doubletfinder.S1]
+# criterion = "exact"
+
+# S2a SCTransform setup: log_umi, filtered genes, gmeans, fitting cells and genes, bins,
+# RNG state (M4a)
+# [doubletfinder.S2a]
+# criterion = "exact"
+
+# S2b SCTransform fits: per-gene Beta and theta, given R's fitting cells and genes (M4b).
+# Target exact; fallback relative <= 1e-6 if nlminb can't be made bit-exact (decision point).
+# [doubletfinder.S2b]
+# criterion = "exact"
+# fallback = { criterion = "numeric", rel = 1e-6 }
+
+# S2c SCTransform regularisation: regularised parameters, given R's fit outputs (M4c)
+# [doubletfinder.S2c]
+# criterion = "exact"
+
+# S2d SCTransform residuals: residual variance, the 3,000 variable features (ordered) and
+# scale.data, given R's parameters (M4d). Exact when the BLAS kernel matches; otherwise a
+# numeric tolerance set from the R-vs-R floor.
+# [doubletfinder.S2d]
+# criterion = "exact"
+# blas_dependent = true
+
+# S3 PCA: standard deviations, embeddings (up to sign per component), RNG state afterwards (M5).
+# Identical when the BLAS kernel matches the fixture; otherwise relative <= 1e-10. The RNG state
+# must always match exactly.
+# [doubletfinder.S3]
+# criterion = "exact"
+# blas_dependent = true
+# otherwise = { criterion = "numeric", rel = 1e-10 }
+# rng_state = "exact"
+
+# S4 neighbours: the first `ind` order positions for each real cell (M3). Identical for
+# >= 99.99% of cells, each difference explained by a near-tie.
+# [doubletfinder.S4]
+# criterion = "agreement"
+# min_identical_fraction = 0.9999
+
+# S5 pANN, sweep and final, per cell (M3). Identical for >= 99.9% of cells; otherwise
+# |difference| <= 2/k.
+# [doubletfinder.S5]
+# criterion = "agreement"
+# min_identical_fraction = 0.999
+# max_abs_diff = "2/k"
+
+# S6 sweep: BCreal relative <= 1e-6; the chosen pK identical (M3)
+# [doubletfinder.S6]
+# bc_real = { criterion = "numeric", rel = 1e-6 }
+# pk = { criterion = "exact" }
+
+# S7 calls: nExp identical; the Doublet/Singlet set identical as the target, with a floor of
+# >= 99.9% agreement where every difference sits at the pANN cutoff (M3)
+# [doubletfinder.S7]
+# nexp = { criterion = "exact" }
+# calls = { criterion = "agreement", min_identical_fraction = 0.999 }
+
+# Against the saved workflow outputs (tiers T and P, full panel): doublet set as in S7, singlet
+# pANN as in S5, pK and nExp identical (M6, M7)
+# [doubletfinder.saved_outputs]
+
+# Performance: peak RSS and wall time below the direct R DoubletFinder run on the same input;
+# soupx_emptydrops_sscovelli <= 10 GiB (M6)
+# [doubletfinder.performance]

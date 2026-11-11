@@ -1,0 +1,36 @@
+# scRust: Rust reimplementations of scRNA-seq tools (docs/PLAN.md).
+# Build and test with the project env active: `source env.sh && cargo build && cargo test`.
+
+[workspace]
+# Resolver 3 picks dependency versions that support `rust-version`, the toolchain pinned in
+# envs/rust-dev.yml.
+resolver = "3"
+members = [
+    "crates/rcompat",
+    "crates/scio",
+    "crates/sctransform",
+    "crates/pca",
+    "crates/knn",
+    "crates/kde",
+    "crates/doubletfinder",
+    "crates/scrust",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-only"
+repository = "https://github.com/harvardinformatics/scRust"
+rust-version = "1.99"
+publish = false
+
+# Shared stages are library crates linked into every tool that needs them, never copied
+# (plan A1). Members depend on each other with `<name>.workspace = true`.
+[workspace.dependencies]
+rcompat = { path = "crates/rcompat" }
+scio = { path = "crates/scio" }
+sctransform = { path = "crates/sctransform" }
+pca = { path = "crates/pca" }
+knn = { path = "crates/knn" }
+kde = { path = "crates/kde" }
+doubletfinder = { path = "crates/doubletfinder" }

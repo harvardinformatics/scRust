@@ -1,0 +1,11 @@
+[package]
+name = "rcompat"
+description = "R-compatible random numbers and R arithmetic semantics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
