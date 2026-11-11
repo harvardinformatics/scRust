@@ -230,33 +230,40 @@ pub fn reseed(rng: &mut RRng, params: &sctransform::SctParams) {
 /// entry.
 pub fn check_s2a(stages: &StageDir, rng: &RngCheckpoints, c: &Context, params: &sctransform::SctParams) -> Result<(sctransform::Setup, sctransform::GeneRows, Vec<Check>), DfError> {
     let ctx = &c.ctx;
-    let mut checks = Vec::new();
     let mut g = c.rng_entry.clone();
     reseed(&mut g, params);
-    checks.push(cmp_rng("S2a", &format!("{ctx}: RNG at vst entry"), &g.random_seed(), rng.state(ctx, "vst_entry")));
+    let vst_entry = g.random_seed();
     let (setup, rows) = sctransform::setup(&c.input, params, &mut g).map_err(|e| DfError::Input(format!("{ctx}: {e}")))?;
-    checks.push(cmp_rng("S2a", &format!("{ctx}: RNG after cell sampling"), &setup.rng_after_cells, rng.state(ctx, "after_cell_sampling")));
-    checks.push(cmp_rng("S2a", &format!("{ctx}: RNG at the fits' entry"), &setup.rng_after_genes, rng.state(ctx, "fits_entry")));
+    let checks = compare_s2a(stages, rng, ctx, "S2a", &vst_entry, &setup)?;
+    Ok((setup, rows, checks))
+}
+
+/// Rust's S2a results (and its RNG state at vst's entry) against R's dumps, under `stage`.
+pub fn compare_s2a(stages: &StageDir, rng: &RngCheckpoints, ctx: &str, stage: &str, vst_entry: &[i32], setup: &sctransform::Setup) -> Result<Vec<Check>, DfError> {
+    let mut checks = Vec::new();
+    checks.push(cmp_rng(stage, &format!("{ctx}: RNG at vst entry"), vst_entry, rng.state(ctx, "vst_entry")));
+    checks.push(cmp_rng(stage, &format!("{ctx}: RNG after cell sampling"), &setup.rng_after_cells, rng.state(ctx, "after_cell_sampling")));
+    checks.push(cmp_rng(stage, &format!("{ctx}: RNG at the fits' entry"), &setup.rng_after_genes, rng.state(ctx, "fits_entry")));
     match block_f64(stages, "S2a_cells.npy", ctx)? {
         Some((cols, _)) => {
-            checks.push(cmp_f64("S2a", &format!("{ctx}: umi"), &setup.cell_attr.umi, &cols[0]));
-            checks.push(cmp_f64("S2a", &format!("{ctx}: log_umi"), &setup.cell_attr.log_umi, &cols[1]));
+            checks.push(cmp_f64(stage, &format!("{ctx}: umi"), &setup.cell_attr.umi, &cols[0]));
+            checks.push(cmp_f64(stage, &format!("{ctx}: log_umi"), &setup.cell_attr.log_umi, &cols[1]));
         }
-        None => checks.push(missing("S2a", &format!("{ctx}: S2a_cells"))),
+        None => checks.push(missing(stage, &format!("{ctx}: S2a_cells"))),
     }
     match block_i32(stages, "S2a_genes.npy", ctx)? {
-        Some((cols, _)) => checks.push(cmp_idx("S2a", &format!("{ctx}: genes"), &setup.genes, &cols[0])),
-        None => checks.push(missing("S2a", &format!("{ctx}: S2a_genes"))),
+        Some((cols, _)) => checks.push(cmp_idx(stage, &format!("{ctx}: genes"), &setup.genes, &cols[0])),
+        None => checks.push(missing(stage, &format!("{ctx}: S2a_genes"))),
     }
     match block_f64(stages, "S2a_gene_stats.npy", ctx)? {
         Some((cols, _)) => {
-            checks.push(cmp_f64("S2a", &format!("{ctx}: log_gmean"), &setup.log_gmean, &cols[0]));
-            checks.push(cmp_f64("S2a", &format!("{ctx}: amean"), &setup.amean, &cols[1]));
-            checks.push(cmp_f64("S2a", &format!("{ctx}: var"), &setup.var, &cols[2]));
-            checks.push(cmp_f64("S2a", &format!("{ctx}: detection_rate"), &setup.detection_rate(), &cols[3]));
-            checks.push(cmp_f64("S2a", &format!("{ctx}: gmean"), &setup.gmean(), &cols[4]));
+            checks.push(cmp_f64(stage, &format!("{ctx}: log_gmean"), &setup.log_gmean, &cols[0]));
+            checks.push(cmp_f64(stage, &format!("{ctx}: amean"), &setup.amean, &cols[1]));
+            checks.push(cmp_f64(stage, &format!("{ctx}: var"), &setup.var, &cols[2]));
+            checks.push(cmp_f64(stage, &format!("{ctx}: detection_rate"), &setup.detection_rate(), &cols[3]));
+            checks.push(cmp_f64(stage, &format!("{ctx}: gmean"), &setup.gmean(), &cols[4]));
         }
-        None => checks.push(missing("S2a", &format!("{ctx}: S2a_gene_stats"))),
+        None => checks.push(missing(stage, &format!("{ctx}: S2a_gene_stats"))),
     }
     let idx_checks = [
         ("S2a_cells_step1.npy", "cells_step1", &setup.cells_step1),
@@ -265,25 +272,25 @@ pub fn check_s2a(stages: &StageDir, rng: &RngCheckpoints, c: &Context, params: &
     ];
     for (file, name, got) in idx_checks {
         match block_i32(stages, file, ctx)? {
-            Some((cols, _)) => checks.push(cmp_idx("S2a", &format!("{ctx}: {name}"), got, &cols[0])),
-            None => checks.push(missing("S2a", &format!("{ctx}: {name}"))),
+            Some((cols, _)) => checks.push(cmp_idx(stage, &format!("{ctx}: {name}"), got, &cols[0])),
+            None => checks.push(missing(stage, &format!("{ctx}: {name}"))),
         }
     }
     match block_f64(stages, "S2a_log_gmean_step1.npy", ctx)? {
-        Some((cols, _)) => checks.push(cmp_f64("S2a", &format!("{ctx}: log_gmean_step1"), &setup.log_gmean_step1, &cols[0])),
-        None => checks.push(missing("S2a", &format!("{ctx}: log_gmean_step1"))),
+        Some((cols, _)) => checks.push(cmp_f64(stage, &format!("{ctx}: log_gmean_step1"), &setup.log_gmean_step1, &cols[0])),
+        None => checks.push(missing(stage, &format!("{ctx}: log_gmean_step1"))),
     }
     let r_prob = block_f64(stages, "S2a_sampling_prob.npy", ctx)?;
     let r_dens = block_f64(stages, "S2a_density.npy", ctx)?;
     match (&setup.sampling, r_prob, r_dens) {
         (Some(s), Some((p, _)), Some((d, _))) => {
-            checks.push(cmp_f64("S2a", &format!("{ctx}: density x"), &s.density_x, &d[0]));
-            checks.push(cmp_f64("S2a", &format!("{ctx}: density y"), &s.density_y, &d[1]));
-            checks.push(cmp_f64("S2a", &format!("{ctx}: sampling_prob"), &s.sampling_prob, &p[0]));
+            checks.push(cmp_f64(stage, &format!("{ctx}: density x"), &s.density_x, &d[0]));
+            checks.push(cmp_f64(stage, &format!("{ctx}: density y"), &s.density_y, &d[1]));
+            checks.push(cmp_f64(stage, &format!("{ctx}: sampling_prob"), &s.sampling_prob, &p[0]));
         }
         (None, None, None) => {}
         (s, p, _) => checks.push(Check {
-            stage: "S2a".into(),
+            stage: stage.into(),
             name: format!("{ctx}: gene sampling"),
             status: Status::Differ,
             n: 1,
@@ -291,7 +298,7 @@ pub fn check_s2a(stages: &StageDir, rng: &RngCheckpoints, c: &Context, params: &
             detail: format!("Rust sampled genes: {}; R: {}", s.is_some(), p.is_some()),
         }),
     }
-    Ok((setup, rows, checks))
+    Ok(checks)
 }
 
 /// R's S2a outputs of a context, which teacher-force the later sub-stages.
@@ -348,14 +355,20 @@ impl RS2a {
 /// bin and at the fits' exit.
 pub fn check_s2b(stages: &StageDir, rng: &RngCheckpoints, c: &Context, r: &RS2a, params: &sctransform::SctParams, threads: usize) -> Result<(sctransform::Fits, Vec<Check>), DfError> {
     let ctx = &c.ctx;
-    let mut checks = Vec::new();
     let rows = sctransform::GeneRows::from_csc(&c.input, &r.genes);
     let mut g = rng.rng(ctx, "fits_entry")?;
     let fits = sctransform::fit(&rows, &r.fit_input(), params, &mut g, threads).map_err(|e| DfError::Input(format!("{ctx}: {e}")))?;
+    let checks = compare_s2b(stages, rng, ctx, "S2b", &fits)?;
+    Ok((fits, checks))
+}
+
+/// Rust's S2b results against R's dumps, under `stage`.
+pub fn compare_s2b(stages: &StageDir, rng: &RngCheckpoints, ctx: &str, stage: &str, fits: &sctransform::Fits) -> Result<Vec<Check>, DfError> {
+    let mut checks = Vec::new();
     for (k, s) in fits.rng_bins.iter().enumerate() {
-        checks.push(cmp_rng("S2b", &format!("{ctx}: RNG at bin {}", k + 1), s, rng.state(ctx, &format!("bin{}_entry", k + 1))));
+        checks.push(cmp_rng(stage, &format!("{ctx}: RNG at bin {}", k + 1), s, rng.state(ctx, &format!("bin{}_entry", k + 1))));
     }
-    checks.push(cmp_rng("S2b", &format!("{ctx}: RNG at the fits' exit"), &fits.rng_exit, rng.state(ctx, "fits_exit")));
+    checks.push(cmp_rng(stage, &format!("{ctx}: RNG at the fits' exit"), &fits.rng_exit, rng.state(ctx, "fits_exit")));
     match block_f64(stages, "S2b_glm.npy", ctx)? {
         Some((cols, _)) => {
             let names = ["disp_init", "beta_init", "beta1", "iter1", "disp_mle", "disp_trend", "beta2", "iter2", "deviance2"];
@@ -371,23 +384,23 @@ pub fn check_s2b(stages: &StageDir, rng: &RngCheckpoints, c: &Context, r: &RS2a,
                 fits.glm.iter().map(|x| x.deviance2).collect(),
             ];
             for (k, name) in names.iter().enumerate() {
-                checks.push(cmp_f64("S2b", &format!("{ctx}: glm {name}"), &got[k], &cols[k]));
+                checks.push(cmp_f64(stage, &format!("{ctx}: glm {name}"), &got[k], &cols[k]));
             }
         }
-        None => checks.push(missing("S2b", &format!("{ctx}: S2b_glm"))),
+        None => checks.push(missing(stage, &format!("{ctx}: S2b_glm"))),
     }
     for (file, which) in [("S2b_model_pars_raw.npy", &fits.model_pars_raw), ("S2b_model_pars.npy", &fits.model_pars)] {
         match block_f64(stages, file, ctx)? {
             Some((cols, _)) => {
                 for (k, name) in ["theta", "(Intercept)", "log_umi"].iter().enumerate() {
                     let got: Vec<f64> = which.iter().map(|p| p[k]).collect();
-                    checks.push(cmp_f64("S2b", &format!("{ctx}: {} {name}", file.trim_end_matches(".npy")), &got, &cols[k]));
+                    checks.push(cmp_f64(stage, &format!("{ctx}: {} {name}", file.trim_end_matches(".npy")), &got, &cols[k]));
                 }
             }
-            None => checks.push(missing("S2b", &format!("{ctx}: {file}"))),
+            None => checks.push(missing(stage, &format!("{ctx}: {file}"))),
         }
     }
-    Ok((fits, checks))
+    Ok(checks)
 }
 
 /// R's S2b `model_pars` (after the 1e-7 floor) of a context.
@@ -416,29 +429,36 @@ pub fn check_s2c(stages: &StageDir, scalars: &Scalars, c: &Context, r: &RS2a, pa
         mean_cell_sum: mcs,
     };
     let reg = sctransform::regularize(&input, params).map_err(|e| DfError::Input(format!("{ctx}: {e}")))?;
-    checks.push(cmp_scalar("S2c", &format!("{ctx}: reg_bw"), reg.bw, scalars.get(ctx, "reg_bw")));
+    checks.extend(compare_s2c(stages, scalars, ctx, "S2c", &reg)?);
+    Ok((reg, checks))
+}
+
+/// Rust's S2c results (without `mean_cell_sum`) against R's dumps, under `stage`.
+pub fn compare_s2c(stages: &StageDir, scalars: &Scalars, ctx: &str, stage: &str, reg: &sctransform::Reg) -> Result<Vec<Check>, DfError> {
+    let mut checks = Vec::new();
+    checks.push(cmp_scalar(stage, &format!("{ctx}: reg_bw"), reg.bw, scalars.get(ctx, "reg_bw")));
     let n_out = reg.outliers.iter().filter(|&&o| o).count();
     for (name, v) in [("n_outliers", n_out), ("n_all_poisson_genes", reg.poisson_genes.len()), ("n_smoothing_genes", reg.smoothing_genes.len())] {
-        checks.push(cmp_scalar("S2c", &format!("{ctx}: {name}"), v as f64, scalars.get(ctx, name)));
+        checks.push(cmp_scalar(stage, &format!("{ctx}: {name}"), v as f64, scalars.get(ctx, name)));
     }
     let outl: Vec<usize> = reg.outliers.iter().map(|&o| o as usize).collect();
     for (file, got) in [("S2c_outliers.npy", &outl), ("S2c_poisson_genes.npy", &reg.poisson_genes), ("S2c_smoothing_genes.npy", &reg.smoothing_genes)] {
         let name = format!("{ctx}: {}", file.trim_end_matches(".npy"));
         match block_i32(stages, file, ctx)? {
-            Some((cols, _)) => checks.push(cmp_idx("S2c", &name, got, &cols[0])),
-            None => checks.push(missing("S2c", &name)),
+            Some((cols, _)) => checks.push(cmp_idx(stage, &name, got, &cols[0])),
+            None => checks.push(missing(stage, &name)),
         }
     }
     match block_f64(stages, "S2c_model_pars_fit.npy", ctx)? {
         Some((cols, _)) => {
             for (k, name) in ["theta", "(Intercept)", "log_umi"].iter().enumerate() {
                 let got: Vec<f64> = reg.model_pars_fit.iter().map(|p| p[k]).collect();
-                checks.push(cmp_f64("S2c", &format!("{ctx}: model_pars_fit {name}"), &got, &cols[k]));
+                checks.push(cmp_f64(stage, &format!("{ctx}: model_pars_fit {name}"), &got, &cols[k]));
             }
         }
-        None => checks.push(missing("S2c", &format!("{ctx}: S2c_model_pars_fit"))),
+        None => checks.push(missing(stage, &format!("{ctx}: S2c_model_pars_fit"))),
     }
-    Ok((reg, checks))
+    Ok(checks)
 }
 
 /// R's S2c `model_pars_fit` of a context.
@@ -475,55 +495,93 @@ pub fn check_s2d(stages: &StageDir, scalars: &Scalars, c: &Context, r: &RS2a, pa
     let mpf = r_model_pars_fit(stages, ctx)?;
     let rows = sctransform::GeneRows::from_csc(&c.input, &r.genes);
     // the residual-sized dumps are indexed but not copied into the tier-T fixtures
-    let present = |file: &str| stages.block(file, ctx).is_some() && stages.dir.join(file).is_file();
-    let y_file = format!("S2d_y.{ctx}.npy");
-    let keep_y = present(&y_file);
+    let keep_y = has_y_dump(stages, ctx);
     let input = sctransform::ResidualInput { model_pars_fit: &mpf, log_umi: &r.log_umi };
     let res = sctransform::residuals(&rows, &input, params, keep_y, threads).map_err(|e| DfError::Input(format!("{ctx}: {e}")))?;
-    checks.push(cmp_scalar("S2d", &format!("{ctx}: min_variance"), res.min_var, scalars.get(ctx, "min_variance")));
-    checks.push(cmp_scalar("S2d", &format!("{ctx}: res_clip_range[1]"), res.res_clip.0, scalars.get_at(ctx, "res_clip_range", 0)));
-    checks.push(cmp_scalar("S2d", &format!("{ctx}: res_clip_range[2]"), res.res_clip.1, scalars.get_at(ctx, "res_clip_range", 1)));
-    checks.push(cmp_scalar("S2d", &format!("{ctx}: clip_range"), res.clip.1, scalars.get(ctx, "clip_range")));
+    checks.extend(compare_s2d(stages, scalars, ctx, "S2d", &r.genes, &res)?);
+    Ok((res, checks))
+}
+
+/// Whether R dumped the full residual matrix of a context (and the file is there).
+pub fn has_y_dump(stages: &StageDir, ctx: &str) -> bool {
+    let f = format!("S2d_y.{ctx}.npy");
+    stages.block(&f, ctx).is_some() && stages.dir.join(&f).is_file()
+}
+
+/// Rust's S2d results against R's dumps, under `stage`; `genes` are the kept genes' input rows.
+pub fn compare_s2d(stages: &StageDir, scalars: &Scalars, ctx: &str, stage: &str, genes: &[usize], res: &sctransform::Residuals) -> Result<Vec<Check>, DfError> {
+    let mut checks = Vec::new();
+    let present = |file: &str| stages.block(file, ctx).is_some() && stages.dir.join(file).is_file();
+    let y_file = format!("S2d_y.{ctx}.npy");
+    checks.push(cmp_scalar(stage, &format!("{ctx}: min_variance"), res.min_var, scalars.get(ctx, "min_variance")));
+    checks.push(cmp_scalar(stage, &format!("{ctx}: res_clip_range[1]"), res.res_clip.0, scalars.get_at(ctx, "res_clip_range", 0)));
+    checks.push(cmp_scalar(stage, &format!("{ctx}: res_clip_range[2]"), res.res_clip.1, scalars.get_at(ctx, "res_clip_range", 1)));
+    checks.push(cmp_scalar(stage, &format!("{ctx}: clip_range"), res.clip.1, scalars.get(ctx, "clip_range")));
     match block_f64(stages, "S2d_residual_stats.npy", ctx)? {
         Some((cols, _)) => {
-            checks.push(cmp_f64("S2d", &format!("{ctx}: residual_mean"), &res.residual_mean, &cols[0]));
-            checks.push(cmp_f64("S2d", &format!("{ctx}: residual_variance"), &res.residual_variance, &cols[1]));
+            checks.push(cmp_f64(stage, &format!("{ctx}: residual_mean"), &res.residual_mean, &cols[0]));
+            checks.push(cmp_f64(stage, &format!("{ctx}: residual_variance"), &res.residual_variance, &cols[1]));
         }
-        None => checks.push(missing("S2d", &format!("{ctx}: S2d_residual_stats"))),
+        None => checks.push(missing(stage, &format!("{ctx}: S2d_residual_stats"))),
     }
-    let top_rows: Vec<usize> = res.top_features.iter().map(|&k| r.genes[k]).collect();
+    let top_rows: Vec<usize> = res.top_features.iter().map(|&k| genes[k]).collect();
     for file in ["S2d_top_features.npy", "S2d_variable_features.npy", "S2d_pca_features.npy"] {
         let name = format!("{ctx}: {}", file.trim_end_matches(".npy"));
         match block_i32(stages, file, ctx)? {
-            Some((cols, _)) => checks.push(cmp_idx("S2d", &name, &top_rows, &cols[0])),
-            None => checks.push(missing("S2d", &name)),
+            Some((cols, _)) => checks.push(cmp_idx(stage, &name, &top_rows, &cols[0])),
+            None => checks.push(missing(stage, &name)),
         }
     }
     let sd_file = format!("S2d_scale_data.{ctx}.npy");
     if present(&sd_file) {
         if let Some((cols, _)) = block_f64(stages, &sd_file, ctx)? {
-            checks.push(cmp_matrix("S2d", &format!("{ctx}: scale.data"), &res.scale_data, res.top_features.len(), res.ncells, &cols));
+            checks.push(cmp_matrix(stage, &format!("{ctx}: scale.data"), &res.scale_data, res.top_features.len(), res.ncells, &cols));
         }
     }
     if let Some(y) = res.y.as_ref() {
         if let Some((cols, _)) = block_f64(stages, &y_file, ctx)? {
-            checks.push(cmp_matrix("S2d", &format!("{ctx}: residuals y"), y, rows.nrow(), res.ncells, &cols));
+            checks.push(cmp_matrix(stage, &format!("{ctx}: residuals y"), y, genes.len(), res.ncells, &cols));
         }
     }
-    Ok((res, checks))
+    Ok(checks)
 }
 
-/// Which SCTransform sub-stages to check.
+/// The chained run of one context: Rust's whole `SCTransform` from the context's SCT input and
+/// R's RNG state at `SCTransform`'s entry, each stage on the previous stage's Rust results,
+/// against every S2 dump, scalar and RNG checkpoint of R's run (stage "S2-chain"), including the
+/// states at `vst`'s and `SCTransform`'s exits.
+pub fn check_chained(stages: &StageDir, rng: &RngCheckpoints, scalars: &Scalars, c: &Context, params: &sctransform::SctParams, threads: usize) -> Result<Vec<Check>, DfError> {
+    const STAGE: &str = "S2-chain";
+    let ctx = &c.ctx;
+    let mut g0 = c.rng_entry.clone();
+    reseed(&mut g0, params);
+    let vst_entry = g0.random_seed();
+    let mut g = c.rng_entry.clone();
+    let sct = sctransform::sctransform(&c.input, params, &mut g, has_y_dump(stages, ctx), threads).map_err(|e| DfError::Input(format!("{ctx}: {e}")))?;
+    let mut checks = compare_s2a(stages, rng, ctx, STAGE, &vst_entry, &sct.setup)?;
+    checks.extend(compare_s2b(stages, rng, ctx, STAGE, &sct.fits)?);
+    checks.push(cmp_scalar(STAGE, &format!("{ctx}: mean_cell_sum"), sct.mean_cell_sum, scalars.get(ctx, "mean_cell_sum")));
+    checks.extend(compare_s2c(stages, scalars, ctx, STAGE, &sct.reg)?);
+    checks.extend(compare_s2d(stages, scalars, ctx, STAGE, &sct.setup.genes, &sct.residuals)?);
+    checks.push(cmp_rng(STAGE, &format!("{ctx}: RNG at vst's exit"), &sct.rng_exit, rng.state(ctx, "vst_exit")));
+    checks.push(cmp_rng(STAGE, &format!("{ctx}: RNG at SCTransform's exit"), &sct.rng_exit, rng.state(ctx, "sctransform_exit")));
+    Ok(checks)
+}
+
+/// Which SCTransform checks to run: the teacher-forced sub-stages, and the chained run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Which {
     pub s2a: bool,
     pub s2b: bool,
     pub s2c: bool,
     pub s2d: bool,
+    pub chain: bool,
 }
 
 impl Which {
-    pub const ALL: Which = Which { s2a: true, s2b: true, s2c: true, s2d: true };
+    pub const ALL: Which = Which { s2a: true, s2b: true, s2c: true, s2d: true, chain: true };
+    pub const TEACHER: Which = Which { s2a: true, s2b: true, s2c: true, s2d: true, chain: false };
+    pub const CHAIN: Which = Which { s2a: false, s2b: false, s2c: false, s2d: false, chain: true };
 }
 
 /// Stage S2 of an instrumented R run against Rust's SCTransform, in every context (or the
@@ -558,6 +616,9 @@ pub fn validate(input: &std::path::Path, stages_dir: &std::path::Path, params: &
                 let (_, ch) = check_s2d(&stages, &scalars, &c, &r, params, threads)?;
                 checks.extend(ch);
             }
+        }
+        if which.chain {
+            checks.extend(check_chained(&stages, &rng, &scalars, &c, params, threads)?);
         }
     }
     Ok(crate::validate::Report { reference: stages_dir.to_path_buf(), candidate: input.to_path_buf(), checks })

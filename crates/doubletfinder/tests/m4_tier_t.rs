@@ -171,3 +171,29 @@ fn s2d_residuals_are_exact() {
     }
     assert_eq!(failures, 0, "S2d checks differ (see stderr)");
 }
+
+#[test]
+fn s2_chained_run_is_exact() {
+    if std::env::var("OPENBLAS_CORETYPE").ok().as_deref() != Some("Haswell") {
+        eprintln!("skipped: the chained run needs OPENBLAS_CORETYPE=Haswell (source env.sh)");
+        return;
+    }
+    use doubletfinder::sct::{check_chained, Scalars};
+    let params = sctransform::SctParams::default();
+    let mut failures = 0;
+    for object in OBJECTS {
+        let dir = fixture(object);
+        let counts = read_mtx(&dir.join("input")).unwrap();
+        let stages = StageDir::open(&dir.join("stages")).unwrap();
+        let rng = RngCheckpoints::open(&stages).unwrap();
+        let scalars = Scalars::open(&stages).unwrap();
+        let mut checks = Vec::new();
+        for ctx in sct_contexts(&stages) {
+            let c = context(&stages, &rng, &counts, &ctx).unwrap();
+            checks.extend(check_chained(&stages, &rng, &scalars, &c, &params, 4).unwrap());
+        }
+        assert!(checks.len() > 50 * 7, "{object}: {} checks", checks.len());
+        failures += report(object, &checks);
+    }
+    assert_eq!(failures, 0, "chained S2 checks differ (see stderr)");
+}

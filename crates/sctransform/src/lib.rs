@@ -26,6 +26,7 @@ pub mod params;
 pub mod reg;
 pub mod residuals;
 pub mod setup;
+pub mod vst;
 
 pub use fit::{fit, FitInput, Fits};
 pub use matrix::GeneRows;
@@ -33,6 +34,7 @@ pub use params::{MinVariance, SctParams};
 pub use reg::{regularize, Reg, RegInput};
 pub use residuals::{residuals, ResidualInput, Residuals};
 pub use setup::{setup, CellAttr, Setup};
+pub use vst::{sctransform, Sct};
 
 use std::fmt;
 

@@ -12,6 +12,9 @@
 # An existing output directory is never overwritten: its run is skipped. Work in progress goes
 # to <dir>.partial.<job id>, renamed when complete. Exit status 1 if any comparison differs.
 #
+# SCT_MODE (environment) selects the checks: both (default), teacher (each sub-stage on R's own
+# inputs) or chained (the whole SCTransform on Rust's own results), passed to --mode.
+#
 # BLAS profile per run (A5b): each validation runs under the profile of the R run it checks:
 # portable runs with OPENBLAS_CORETYPE=Haswell, production runs with the variable unset, so that
 # OpenBLAS detects SapphireRapids (this job must run on a `sapphire` node). The fingerprint is
@@ -36,7 +39,7 @@ source ./env.sh
 
 # Environment fingerprint, for the log (A5b)
 echo "host=$(hostname) cpu='$(lscpu | sed -n 's/^Model name: *//p')' $(ldd --version | head -n 1)"
-echo "OPENBLAS_CORETYPE=${OPENBLAS_CORETYPE:-auto} OPENBLAS_NUM_THREADS=$OPENBLAS_NUM_THREADS" \
+echo "OPENBLAS_CORETYPE=${OPENBLAS_CORETYPE:-auto} OPENBLAS_NUM_THREADS=$OPENBLAS_NUM_THREADS SCT_MODE=${SCT_MODE:-both}" \
      "$(rustc --version) commit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 
 bin=target/release/scrust
@@ -45,6 +48,7 @@ bin=target/release/scrust
 label=$1
 shift
 threads=${SLURM_CPUS_PER_TASK:-1}
+mode=${SCT_MODE:-both}
 status=0
 
 for obj in "$@"; do
@@ -76,7 +80,7 @@ for obj in "$@"; do
         fi
         echo "== $obj $run ($core)"
         if ! "${envset[@]}" /usr/bin/time -v -o "$tmp/time_v.txt" "$bin" validate sctransform \
-                --input "$base/input" --stages "$r/stages" \
+                --input "$base/input" --stages "$r/stages" --mode "$mode" \
                 --json "$tmp/validate.json" --markdown "$tmp/validate.md" --threads "$threads"; then
             status=1
         fi

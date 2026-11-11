@@ -9,8 +9,8 @@ Usage: scrust validate doubletfinder --reference <R run dir> --candidate <Rust o
                                      [--reference-stages <dir>] [--json <file>]
                                      [--markdown <file>] [--threads N]
        scrust validate sctransform --input <10x dir> --stages <R stage dir>
-                                   [--contexts <ctx,ctx,...>] [--json <file>]
-                                   [--markdown <file>] [--threads N]
+                                   [--mode both|teacher|chained] [--contexts <ctx,ctx,...>]
+                                   [--json <file>] [--markdown <file>] [--threads N]
 
 doubletfinder: compares cells.tsv, sweep_stats.tsv and bcmvn.tsv byte for byte, the result
 section of summary.json field by field, every stage array block (S4-S7) the two runs both dumped
@@ -18,8 +18,10 @@ bit for bit, and S6 and S7 recomputed from R's own S5 (teacher forcing).
 
 sctransform: runs Rust's SCTransform on the SCT input of every context of an instrumented
 DoubletFinder run (the counts in --input, R's S1 draws from --stages) and compares stage S2
-with R's dumps bit for bit, each sub-stage teacher-forced on R's own inputs, plus the RNG
-checkpoints.
+with R's dumps bit for bit, plus the RNG checkpoints and scalars: each sub-stage teacher-forced
+on R's own inputs (S2a-S2d; --mode teacher), and the whole chain on Rust's own results
+(S2-chain; --mode chained); both by default. S2d's products are OpenBLAS calls: run under the
+reference run's OpenBLAS kernel (OPENBLAS_CORETYPE).
 
 Exit status 0 when nothing differs, 1 otherwise.
 ";
@@ -52,13 +54,20 @@ pub fn main(argv: &[String]) -> Result<bool, String> {
 
 fn sctransform_report(argv: &[String]) -> Result<(doubletfinder::validate::Report, Args), String> {
     let args = Args::parse(argv)?;
-    args.only(&["input", "stages", "contexts", "json", "markdown", "threads"])?;
+    args.only(&["input", "stages", "mode", "contexts", "json", "markdown", "threads"])?;
     let input = args.path("input")?;
     let stages = args.path("stages")?;
     let only: Option<Vec<String>> = args.get("contexts").map(|s| s.split(',').map(String::from).collect());
+    use doubletfinder::sct::Which;
+    let which = match args.get("mode").unwrap_or("both") {
+        "both" => Which::ALL,
+        "teacher" => Which::TEACHER,
+        "chained" => Which::CHAIN,
+        m => return Err(format!("--mode: expected both, teacher or chained, not {m}")),
+    };
     let params = sctransform::SctParams::default();
     let threads = cli::threads(&args)?;
-    let report = doubletfinder::sct::validate(&input, &stages, &params, doubletfinder::sct::Which::ALL, only.as_deref(), threads).map_err(|e| e.to_string())?;
+    let report = doubletfinder::sct::validate(&input, &stages, &params, which, only.as_deref(), threads).map_err(|e| e.to_string())?;
     Ok((report, args))
 }
 
