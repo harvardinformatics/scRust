@@ -22,4 +22,18 @@ Start each wrapper from [`template.sbatch`](template.sbatch), which:
 
 Use one CPU per job for anything that calls BLAS (`--cpus-per-task=1`), as the production jobs did.
 
+The production profile must leave `OPENBLAS_CORETYPE` unset: env.sh unsets it when it is `auto`. Passing a value to OpenBLAS does not reproduce detection: on Sapphire Rapids, `OPENBLAS_CORETYPE=SapphireRapids` and a literal `OPENBLAS_CORETYPE=auto` both select `Cooperlake` (measured with `scrust fingerprint`, M2).
+
+[`scrust fingerprint`](../../crates/scrust/src/fingerprint.rs) prints the fingerprint as JSON: node, SLURM job, CPU model and flags, the OpenBLAS core, configuration and thread count actually in use, the OpenBLAS library loaded, and glibc. Build it once with `cargo build --release -p scrust`; the R reference scripts record its output in their `summary.json`.
+
+## DoubletFinder (M2)
+
+Submit from the repository's top directory. Objects and their pipeline paths are in [`../doubletfinder_datasets.tsv`](../doubletfinder_datasets.tsv); outputs go to `data/doubletfinder/<object>/` and are never overwritten.
+
+- [`export_doubletfinder.sbatch`](export_doubletfinder.sbatch) `<object>...`: exports inputs and saved-output fields (reads `.rds`).
+- [`reference_doubletfinder.sbatch`](reference_doubletfinder.sbatch) `<portable|production> <direct|instrumented> <object>...`: reference runs into `runs/<mode>-<profile>-<cpu arch>/`, under `/usr/bin/time -v`. The job stops if OpenBLAS does not report the profile's core (`Haswell`, or `SapphireRapids`). Other CPU types for the portable profile: `--partition=shared` (Cascade Lake), `--partition=serial_requeue --constraint=genoa` (AMD Genoa).
+- [`compare_doubletfinder.sbatch`](compare_doubletfinder.sbatch) `<object>...`: the M2 checks (cross-check against the saved workflow output, instrumented against direct, CPU types, portable against production); small objects can run it with `bash`.
+
+Memory used for the reference runs (`--mem`): tier T 4 GB; soupx_tenx_SRR18256555 16 GB; soupx_tenx_10xmousebrain 40–48 GB; soupx_emptydrops_4500871lane 64–72 GB; soupx_emptydrops_sscovelli 200 GB; cellbender_fromraw_ghirsutum2 250 GB (the measured peaks are in docs/validation/doubletfinder_m2.md).
+
 Logs go to `<job name>-<job id>.sbatch.log` in the submit directory, which `.gitignore` excludes.
