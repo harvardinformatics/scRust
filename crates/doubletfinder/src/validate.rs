@@ -582,6 +582,23 @@ fn s1_from_rng(rs: &StageDir, n_cells: Option<usize>, checks: &mut Vec<Check>) -
     Ok(())
 }
 
+/// The OpenBLAS kernel each run recorded (`run.fingerprint.openblas_corename` in `summary.json`):
+/// the BLAS-relevant field of the environment fingerprint (plan A5b). The exact criteria for
+/// SCTransform's residuals and the PCA hold under the same kernel only.
+fn compare_kernel(reference: &Path, candidate: &Path, checks: &mut Vec<Check>) {
+    let core = |p: &Path| -> Option<String> {
+        let j = Json::parse(&std::fs::read_to_string(p.join("summary.json")).ok()?).ok()?;
+        j.get("run")?.get("fingerprint")?.get("openblas_corename")?.as_str().map(String::from)
+    };
+    match (core(reference), core(candidate)) {
+        (Some(r), Some(c)) => {
+            let same = r == c;
+            checks.push(check("environment", "OpenBLAS kernel", if same { Status::Identical } else { Status::Differ }, 1, (!same) as usize, format!("R {r}, Rust {c}")));
+        }
+        _ => checks.push(check("environment", "OpenBLAS kernel", Status::Missing, 0, 0, "not recorded by one of the runs")),
+    }
+}
+
 /// Compares the candidate (a Rust output directory: the final files, `summary.json` and
 /// `stages/`) with an R reference run: its directory (the final files and `summary.json`) and,
 /// for an instrumented run, its stage directory (usually `<reference>/stages`). A direct run has
@@ -590,6 +607,7 @@ pub fn compare(reference: &Path, reference_stages: &Path, candidate: &Path, thre
     let mut checks = Vec::new();
     compare_files(reference, candidate, &mut checks);
     let result = compare_results(reference, candidate, &mut checks);
+    compare_kernel(reference, candidate, &mut checks);
     let (rsd, csd) = (reference_stages.to_path_buf(), candidate.join("stages"));
     if !rsd.join("index.tsv").exists() {
         checks.push(check("stages", "stage dumps", Status::NotApplicable, 0, 0, "the reference has none (a direct run)"));

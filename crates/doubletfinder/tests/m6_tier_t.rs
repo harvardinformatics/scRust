@@ -95,7 +95,9 @@ fn every_stage_from_the_counts_is_r_s() {
         let dir = out_dir(object);
         let (out, state) = run_object(object, 3, Some(&dir));
         out.write_tables(&dir).unwrap();
-        let summary = Json::obj(vec![("result", out.result_json(Some(rng_digest(&state))))]);
+        // the run's OpenBLAS kernel, as `scrust doubletfinder` records it in its fingerprint
+        let run_info = Json::obj(vec![("fingerprint", Json::obj(vec![("openblas_corename", Json::Str(rcompat::blas::corename()))]))]);
+        let summary = Json::obj(vec![("result", out.result_json(Some(rng_digest(&state)))), ("run", run_info)]);
         std::fs::write(dir.join("summary.json"), scio::json::to_file_text(&summary)).unwrap();
 
         let f = fixture(object);
@@ -108,6 +110,7 @@ fn every_stage_from_the_counts_is_r_s() {
         let identical = |stage: &str| report.checks.iter().filter(|c| c.stage == stage && c.status == Status::Identical).count();
         // every result field, the final RNG state's digest included
         assert_eq!(identical("result"), 20, "{object}: result fields");
+        assert_eq!(identical("environment"), 1, "{object}: the OpenBLAS kernel");
         // every RNG checkpoint of R's run, in R's order
         let rng_rows = Table::read(&f.join("stages/rng.tsv")).unwrap().rows.len();
         let rng_same = report.checks.iter().filter(|c| c.name.contains(": RNG ") && c.status == Status::Identical).count();
