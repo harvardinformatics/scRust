@@ -13,10 +13,42 @@ Each reimplementation is validated against the original tool's outputs, exactly 
 6. SoupX
 7. CellBender
 
-**Status:** milestone M5. The Cargo workspace, environments and validation skeleton are in place (M0); the upstream sources can be fetched (M1b, [`third_party/`](third_party/README.md)); `rcompat`, R's random numbers and arithmetic semantics, matches R 4.5.3 bit for bit on its reference vectors (M1); DoubletFinder's R reference data are built (M2: exports of the five workflow test objects and five production objects, direct and instrumented reference runs that reproduce every saved workflow output, stage dumps S1–S7, the R-vs-R floor; [docs/validation/doubletfinder_m2.md](docs/validation/doubletfinder_m2.md)); the DoubletFinder core after PCA is ported (M3): on R's own embeddings, `scrust doubletfinder --from-stages` reproduces every instrumented reference run of all ten objects exactly, stage by stage and file for file, using 32 MiB where R's distance matrix needs 89.7 GB ([docs/validation/doubletfinder_m3.md](docs/validation/doubletfinder_m3.md)); and SCTransform v2 is ported (M4): Seurat 5.5.1's `SCTransform()` with sctransform 0.4.3 and glmGamPoi 1.22.0, every sub-stage (setup, fits with R's `nlminb`, regularisation, residuals) bit-identical to R in all seven SCTransform calls of all 24 instrumented runs, teacher-forced and chained, and `scrust sctransform` byte-identical to R's outputs on the largest objects, 2.3-2.5 times faster than R on one thread and 29-35 times on 32, in a ninth to an eighteenth of its memory at either thread count ([docs/validation/doubletfinder_m4.md](docs/validation/doubletfinder_m4.md)); and PCA is ported (M5): Seurat 5.5.1's `RunPCA` with irlba 2.4.1, every product the OpenBLAS or LAPACK call R makes, bit-identical to R (signs included, and R's random-number state afterwards) in all seven PCA calls of all 24 instrumented runs, on R's own input and after Rust's SCTransform, and `scrust pca` byte-identical to R's outputs on the largest objects, 1.4-1.6 times faster than R on one thread and 10-11 times on 32, in under a third of its memory ([docs/validation/doubletfinder_m5.md](docs/validation/doubletfinder_m5.md)). The full `scrust doubletfinder` (M6) comes next; no tool runs end to end yet.
+**Status:** Step 1, DoubletFinder, is complete through milestone M6. `scrust doubletfinder` runs DoubletFinder 2.0.6 as the workflow calls it, from a 10x counts directory and the cluster labels, every stage in Rust. It reproduces R bit for bit, under R's OpenBLAS kernel ([docs/validation/doubletfinder.md](docs/validation/doubletfinder.md)):
+
+- **Instrumented R runs (24):** every stage, every random-number checkpoint and every scalar identical.
+- **Direct R runs (23):** every output file identical.
+- **Saved workflow outputs:** identical for all ten objects (the five test objects and five production objects): the doublet set, the kept cells' pANN, pK and nExp.
+
+On the largest object, soupx_emptydrops_sscovelli (79,409 cells), it takes 6 minutes 21 s on one thread and 44 s on 32, in 4.4–4.5 GiB. R's direct run takes 36 minutes and 127 GiB.
+
+The steps:
+
+- **M0:** the Cargo workspace, environments and validation skeleton.
+- **M1b:** the upstream sources ([`third_party/`](third_party/README.md)).
+- **M1:** `rcompat`, R's random numbers and arithmetic semantics, bit for bit.
+- **M2:** the R reference data: exports, direct and instrumented reference runs, the R-vs-R floor ([doubletfinder_m2.md](docs/validation/doubletfinder_m2.md)).
+- **M3:** the DoubletFinder core after PCA, without the N x N distance matrix ([doubletfinder_m3.md](docs/validation/doubletfinder_m3.md)).
+- **M4:** SCTransform v2 ([doubletfinder_m4.md](docs/validation/doubletfinder_m4.md)).
+- **M5:** RunPCA with irlba ([doubletfinder_m5.md](docs/validation/doubletfinder_m5.md)).
+- **M6:** the whole tool ([doubletfinder.md](docs/validation/doubletfinder.md)).
+
+Next: M7, the comparison with the saved outputs of all 150 production objects. Substituting `scrust` into the preprocessing workflow is a separate, later change.
 
 - Plan and validation framework: [docs/PLAN.md](docs/PLAN.md)
 - License: GPL-3.0 ([LICENSE](LICENSE)). Acknowledgements and upstream licenses: [NOTICE](NOTICE)
+
+## Running DoubletFinder
+
+```bash
+source env.sh                     # portable profile: OPENBLAS_CORETYPE=Haswell
+cargo build --release -p scrust
+target/release/scrust doubletfinder --counts <10x dir> --clusters <seurat_clusters.tsv> --out <dir> --threads 8
+```
+
+- **Inputs.** `--counts` is a 10x Matrix Market directory. `--clusters` is a TSV with a header and each cell's barcode and cluster label, in the matrix's column order. The factor's level order is read from `--cluster-levels`, or `seurat_clusters_levels.txt` next to the clusters file.
+- **Outputs.** `cells.tsv` (barcode, pANN and classification of every cell), `sweep_stats.tsv`, `bcmvn.tsv` and `summary.json` (pK, nExp, the column names R writes, timings and peak memory). `scrust doubletfinder --help` lists the options: seed, PCs, pN, nExp rate, a fixed pK, threads, stage dumps.
+- **Thread count.** The results do not depend on it.
+- **The OpenBLAS kernel matters.** To reproduce the workflow's saved outputs, which were made on Sapphire Rapids nodes with the kernel OpenBLAS detects, run there with `OPENBLAS_CORETYPE=auto source env.sh` (which leaves the variable unset).
 
 ## Development
 
@@ -47,5 +79,5 @@ To rebuild the env exactly as solved, use `conda create -p .envs/rust-dev --file
 | `pca` | Seurat's `RunPCA` with irlba 2.4.1 (PrepDR's filter with Seurat's `RowVar`, the Lanczos bidiagonalisation with its restarts and rare branches), its two large products split across threads only where OpenBLAS's kernels keep R's bits |
 | `knn` | exact nearest neighbours, memory-bounded |
 | `kde` | `KernSmooth::bkde`, `approxfun` and moments |
-| `doubletfinder` | DoubletFinder |
-| `scrust` | the command-line binary, `scrust <tool> ...`: `doubletfinder` (so far on an instrumented R run's embeddings, `--from-stages`), `sctransform`, `pca`, `knn`, `validate doubletfinder`, `validate sctransform` and `validate pca` (Rust against R), and `fingerprint` (CPU, OpenBLAS kernel and threads, glibc) |
+| `doubletfinder` | DoubletFinder 2.0.6: the whole tool from the counts (the doublets drawn from R's random-number stream, SCTransform, PCA), the sweep, `summarizeSweep`, `find.pK`, nExp and the calls; stage dumps in the instrumented R runs' layout and the comparison with R runs and saved workflow outputs |
+| `scrust` | the command-line binary, `scrust <tool> ...`: `doubletfinder` (the whole tool; `--from-stages` runs it on an instrumented R run's embeddings), `sctransform`, `pca`, `knn`, `validate doubletfinder`, `validate sctransform` and `validate pca` (Rust against R), and `fingerprint` (CPU, OpenBLAS kernel and threads, glibc) |

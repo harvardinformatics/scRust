@@ -21,4 +21,6 @@ The five tier-T objects (the workflow's test data, plan B4), one directory each:
 - `reference/`: the direct run's `cells.tsv` (barcode, pANN, classification for every cell), `sweep_stats.tsv`, `bcmvn.tsv` and `summary.json` (compare its `result` section; the `run` section holds timings, node and job).
 - `stages/`: the instrumented run's stage arrays S1–S7 (`.npy`), `index.tsv` (which rows of which file belong to which context and stage), `rng.npy`/`rng.tsv` (`.Random.seed` checkpoints) and `stages.json`. Conventions: [`validation/R/lib/doubletfinder_hooks.R`](../../validation/R/lib/doubletfinder_hooks.R). Not copied, to stay within the size budget (they remain in `data/` and in `index.tsv`): the per-context matrices `S2d_y.<ctx>.npy`, `S2d_scale_data.<ctx>.npy` and `S4_positions.<ctx>.npy`, and `S6_bkde.npy`.
 
+The whole tool is checked on them end to end (milestone M6, `crates/doubletfinder/tests/m6_tier_t.rs` and `crates/scrust/tests/cli.rs`): `scrust doubletfinder` from `input/` must reproduce `reference/` byte for byte (the digest of the final `.Random.seed` included), every array, RNG checkpoint and scalar in `stages/`, and `saved/`.
+
 Doubles in the TSV and JSON files have 17 significant digits, so Rust's `str::parse::<f64>` gives back the exact value; `crates/doubletfinder/tests/m2_fixtures.rs` checks this against the `.npy` copies.

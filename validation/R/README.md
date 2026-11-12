@@ -41,3 +41,9 @@ Rules:
 The Rust core runs on the instrumented runs' own embeddings and is compared with them by `scrust validate doubletfinder` ([`../slurm/m3_doubletfinder.sbatch`](../slurm/m3_doubletfinder.sbatch)); no new R run was needed beyond the `rcompat` vectors. Results: [`docs/validation/doubletfinder_m3.md`](../../docs/validation/doubletfinder_m3.md).
 
 - [`report_doubletfinder_m3.R`](report_doubletfinder_m3.R): the report's tables from the M3 outputs (the `validate.json` of every Rust run, the direct R runs, the saved workflow outputs and the benchmark's `/usr/bin/time -v`). Reads only plain files.
+
+## The whole tool (milestone M6)
+
+`scrust doubletfinder` runs from the counts, the cluster labels and the seed; it is compared with every direct and instrumented reference run of M2 and with the saved workflow outputs by `scrust validate doubletfinder` ([`../slurm/m6_doubletfinder.sbatch`](../slurm/m6_doubletfinder.sbatch)), and benchmarked against M2's direct production runs ([`../slurm/m6_benchmark.sbatch`](../slurm/m6_benchmark.sbatch)). No new R run was needed. Results: [`docs/validation/doubletfinder.md`](../../docs/validation/doubletfinder.md).
+
+- [`report_doubletfinder_m6.R`](report_doubletfinder_m6.R) `<label> <bench label>`: the report's tables from the M6 outputs (each Rust run's `vs_<R run>.json` and `vs_saved.json`, its `summary.json` and `time_v.txt`; the benchmark's runs and the direct R runs' `time_v.txt` and `summary.json`). Reads only plain files.
