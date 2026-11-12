@@ -5,7 +5,8 @@
 # OPENBLAS_CORETYPE unset on a Sapphire Rapids node, as the direct R run of M2
 # (runs/direct-production-sapphirerapids, whose time_v.txt holds R's wall time and peak RSS).
 # Each run's cells.tsv, sweep_stats.tsv, bcmvn.tsv and summary.json result are compared with that
-# R run's (`scrust validate doubletfinder`), and the runs with each other byte for byte. From the
+# R run's (`scrust validate doubletfinder`), and the runs with each other byte for byte (from M6b
+# on, singlets/ too). From the
 # repository's top directory, with a pinned copy of the binary (as for m6_doubletfinder.sbatch):
 #   SCRUST_BIN=<copy> sbatch --cpus-per-task=32 --mem=32G validation/slurm/m6_benchmark.sbatch <label> <object> <threads> [<threads> ...]
 # Output, never overwritten: data/doubletfinder/<object>/rust/<label>/t<threads>/
@@ -86,7 +87,8 @@ done
 # the runs against each other, byte for byte
 first=${done_runs[0]:-}
 for d in "${done_runs[@]:1}"; do
-    for f in cells.tsv sweep_stats.tsv bcmvn.tsv; do
+    for f in cells.tsv sweep_stats.tsv bcmvn.tsv singlets/matrix.mtx.gz singlets/barcodes.tsv.gz singlets/features.tsv.gz; do
+        [ -e "$first/run/$f" ] || continue   # singlets/ from M6b on
         cmp "$first/run/$f" "$d/run/$f" && echo "${first##*/} and ${d##*/}: $f identical" || status=1
     done
 done

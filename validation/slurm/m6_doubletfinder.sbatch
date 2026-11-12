@@ -13,10 +13,11 @@
 #     profile, Cascade Lake: the kernel, not the CPU, sets the bits): the final files, the
 #     result section, every stage array block S1-S7, every RNG checkpoint, every scalar;
 #   - against each direct R run of the profile: the final files and the result section;
-#   - against the saved workflow output: the doublet set, the kept cells' pANN, the columns.
+#   - against the saved workflow output: the doublet set, the kept cells' pANN, the columns,
+#     and (M6b, where saved/singlets/ was exported) the singlets' counts.
 # Output, data/doubletfinder/<object>/rust/<label>/<profile>/:
 #   run/                      the Rust run: cells.tsv, sweep_stats.tsv, bcmvn.tsv, summary.json,
-#                             stages/
+#                             singlets/, stages/
 #   vs_<R run>.json, .md      each comparison (`scrust validate doubletfinder`)
 #   vs_saved.json, .md        the saved workflow output
 #   fingerprint.json          scrust fingerprint under the profile

@@ -176,8 +176,10 @@ json_write <- function(x, path) {
 # entries in column-major order exactly as stored, explicit zeros included), barcodes.tsv.gz
 # and features.tsv.gz (id, name, type). The header says "integer" when every value is
 # integer-valued, "real" otherwise. Values use fmt17, so integer-valued doubles print as
-# integers. Written in chunks of columns to bound memory on large objects.
-mtx_write_10x <- function(m, dir, feature_ids = rownames(m), chunk_nnz = 5e6) {
+# integers. Written in chunks of columns to bound memory on large objects. `software` goes in
+# the metadata comment line.
+mtx_write_10x <- function(m, dir, feature_ids = rownames(m), chunk_nnz = 5e6,
+                          software = "scRust validation/R/export_doubletfinder.R") {
   stopifnot(inherits(m, "dgCMatrix"))
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
   x <- m@x
@@ -186,7 +188,7 @@ mtx_write_10x <- function(m, dir, feature_ids = rownames(m), chunk_nnz = 5e6) {
   field <- if (all(x == round(x))) "integer" else "real"
   con <- gzfile(file.path(dir, "matrix.mtx.gz"), "w")
   writeLines(c(sprintf("%%%%MatrixMarket matrix coordinate %s general", field),
-               "%metadata_json: {\"software_version\": \"scRust validation/R/export_doubletfinder.R\", \"format_version\": 2}",
+               sprintf("%%metadata_json: {\"software_version\": \"%s\", \"format_version\": 2}", software),
                sprintf("%d %d %d", nrow(m), ncol(m), length(x))), con)
   p <- m@p
   ncol <- ncol(m)
