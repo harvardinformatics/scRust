@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "kde",
  "knn",
+ "pca",
  "rcompat",
  "scio",
  "sctransform",
@@ -32,6 +33,9 @@ dependencies = [
 [[package]]
 name = "pca"
 version = "0.1.0"
+dependencies = [
+ "rcompat",
+]
 
 [[package]]
 name = "rcompat"
@@ -47,6 +51,7 @@ version = "0.1.0"
 dependencies = [
  "doubletfinder",
  "knn",
+ "pca",
  "rcompat",
  "scio",
  "sctransform",

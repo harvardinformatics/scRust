@@ -11,6 +11,9 @@ Usage: scrust validate doubletfinder --reference <R run dir> --candidate <Rust o
        scrust validate sctransform --input <10x dir> --stages <R stage dir>
                                    [--mode both|teacher|chained] [--contexts <ctx,ctx,...>]
                                    [--json <file>] [--markdown <file>] [--threads N]
+       scrust validate pca --input <10x dir> --stages <R stage dir>
+                           [--mode both|teacher|chained] [--contexts <ctx,ctx,...>]
+                           [--json <file>] [--markdown <file>] [--threads N]
 
 doubletfinder: compares cells.tsv, sweep_stats.tsv and bcmvn.tsv byte for byte, the result
 section of summary.json field by field, every stage array block (S4-S7) the two runs both dumped
@@ -23,16 +26,24 @@ on R's own inputs (S2a-S2d; --mode teacher), and the whole chain on Rust's own r
 (S2-chain; --mode chained); both by default. S2d's products are OpenBLAS calls: run under the
 reference run's OpenBLAS kernel (OPENBLAS_CORETYPE).
 
+pca: runs Rust's RunPCA (npcs = 10) in every context of an instrumented DoubletFinder run and
+compares stage S3 with R's dumps bit for bit (irlba's d, sdev, embeddings, loadings, the PCA
+features, irlba's iterations and products, total.variance) and the RNG checkpoints around it:
+teacher-forced on R's PCA input (or, where R did not dump it, Rust's S2d on R's S2c
+parameters; --mode teacher), and after Rust's own SCTransform (S3-chain; --mode chained); both
+by default. Run under the reference run's OpenBLAS kernel.
+
 Exit status 0 when nothing differs, 1 otherwise.
 ";
 
 pub fn main(argv: &[String]) -> Result<bool, String> {
     let Some(tool) = argv.first() else {
-        return Err("which tool? (doubletfinder, sctransform)".into());
+        return Err("which tool? (doubletfinder, sctransform, pca)".into());
     };
     let report = match tool.as_str() {
         "doubletfinder" => doubletfinder_report(&argv[1..])?,
         "sctransform" => sctransform_report(&argv[1..])?,
+        "pca" => pca_report(&argv[1..])?,
         _ => return Err(format!("no validation for '{tool}' yet")),
     };
     let (report, args) = report;
@@ -68,6 +79,27 @@ fn sctransform_report(argv: &[String]) -> Result<(doubletfinder::validate::Repor
     let params = sctransform::SctParams::default();
     let threads = cli::threads(&args)?;
     let report = doubletfinder::sct::validate(&input, &stages, &params, which, only.as_deref(), threads).map_err(|e| e.to_string())?;
+    Ok((report, args))
+}
+
+fn pca_report(argv: &[String]) -> Result<(doubletfinder::validate::Report, Args), String> {
+    let args = Args::parse(argv)?;
+    args.only(&["input", "stages", "mode", "contexts", "json", "markdown", "threads"])?;
+    let input = args.path("input")?;
+    let stages = args.path("stages")?;
+    let only: Option<Vec<String>> = args.get("contexts").map(|s| s.split(',').map(String::from).collect());
+    use doubletfinder::pca::Which;
+    let which = match args.get("mode").unwrap_or("both") {
+        "both" => Which::ALL,
+        "teacher" => Which::TEACHER,
+        "chained" => Which::CHAIN,
+        m => return Err(format!("--mode: expected both, teacher or chained, not {m}")),
+    };
+    let threads = cli::threads(&args)?;
+    let (report, sources) = doubletfinder::pca::validate(&input, &stages, which, only.as_deref(), threads).map_err(|e| e.to_string())?;
+    for (ctx, source) in &sources {
+        eprintln!("{ctx}: teacher-forced PCA input from {source}");
+    }
     Ok((report, args))
 }
 
