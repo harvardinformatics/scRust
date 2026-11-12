@@ -34,7 +34,7 @@ pub use params::{MinVariance, SctParams};
 pub use reg::{regularize, Reg, RegInput};
 pub use residuals::{residuals, ResidualInput, Residuals};
 pub use setup::{setup, CellAttr, Setup};
-pub use vst::{sctransform, Sct};
+pub use vst::{finish, sctransform, start, Sct, Started};
 
 use std::fmt;
 

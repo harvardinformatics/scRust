@@ -79,8 +79,8 @@ fn reproduces_the_reference_runs() {
         // everything the fixtures hold was compared: files, every result field but the RNG
         // digest, the S4 digests, S5, S6_gkde and S7, and the teacher-forced S6 and S7
         let identical: Vec<&str> = report.checks.iter().filter(|c| c.status == Status::Identical).map(|c| c.name.as_str()).collect();
-        for want in ["cells.tsv", "sweep_stats.tsv", "bcmvn.tsv", "pK", "nExp", "k", "pANN_column", "S4_digest.npy",
-                     "S5_pann_sweep.npy", "S5_pann_final.npy", "S6_gkde.npy", "S7_doublet.npy",
+        for want in ["cells.tsv", "sweep_stats.tsv", "bcmvn.tsv", "pK", "nExp", "k", "pANN_column", "final: S4_digest",
+                     "sweep_pN0.05: S4_digest", "sweep_pN0.3: S5_pann_sweep", "final: S5_pann_final", "S6_gkde", "final: S7_doublet",
                      "S6_gkde (teacher-forced on R's S5)", "BCreal (teacher-forced on R's S5)", "S7_doublet (teacher-forced on R's S5)",
                      "S1_subsample (from R's RNG state)", "S1_doublets (from R's RNG states)"] {
             assert!(identical.contains(&want), "{object}: {want} not compared");

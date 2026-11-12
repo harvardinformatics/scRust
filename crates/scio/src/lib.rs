@@ -11,11 +11,13 @@
 //! - [`text`]: doubles as `%.17g` text, as the R reference scripts write them, and back;
 //! - [`json`]: `summary.json` in the R scripts' layout, and a small parser;
 //! - [`npy`]: `.npy` arrays, the format of the R scripts' dense intermediates and RNG
-//!   checkpoints.
+//!   checkpoints;
+//! - [`sha256`]: SHA-256, the digest the R scripts record (`digest::digest`).
 
 pub mod gz;
 pub mod json;
 pub mod npy;
+pub mod sha256;
 pub mod sparse;
 pub mod tenx;
 pub mod text;

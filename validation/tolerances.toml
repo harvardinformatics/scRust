@@ -7,9 +7,10 @@
 # M2) and says so in its report (A5b).
 #
 # The criteria are the plan's (B5) and the key names a proposal. Each stage is uncommented and
-# settled when its milestone lands (S0: M1; S1 and S4-S7: M3; S2a-S2d: M4; S3: M5). `scrust validate doubletfinder`
-# (crates/doubletfinder/src/validate.rs) applies the settled S1 and S4-S7 criteria: everything
-# it compares must be identical.
+# settled when its milestone lands (S0: M1; S1 and S4-S7: M3; S2a-S2d: M4; S3: M5; the end-to-end,
+# saved-output and performance rows: M6). `scrust validate doubletfinder`
+# (crates/doubletfinder/src/validate.rs) applies the settled criteria: everything it compares
+# must be identical.
 
 # DoubletFinder -------------------------------------------------------------------------------
 
@@ -179,10 +180,59 @@ compare = ["S6_bkde", "S6_gkde", "BCreal", "bcmvn", "pK", "pK_label"]
 criterion = "exact"
 compare = ["nExp_poi", "homotypic_prop", "nExp", "S7_doublet"]
 
-# Against the saved workflow outputs (tiers T and P, full panel): doublet set as in S7, singlet
-# pANN as in S5, pK and nExp identical (M6, M7)
-# [doubletfinder.saved_outputs]
+# End to end (M6): `scrust doubletfinder` from the counts, the cluster labels and the seed, every
+# stage computed by Rust, the random-number state flowing through the seven contexts of a run
+# from Rust's own draws (nothing read from an R run). Settled: exact, under the reference run's
+# OpenBLAS kernel (the portable runs with OPENBLAS_CORETYPE=Haswell, the production runs with
+# SapphireRapids detected; the kernel each run recorded is compared too). In all 24 instrumented
+# runs of the 10 objects: every block of every stage array R dumped, S1 to S7 (scale.data and the
+# residual matrix wherever R dumped them), every .Random.seed checkpoint and their sequence, every
+# per-context scalar, the final files and every field of summary.json's result section, the
+# digest of R's final .Random.seed included. In all 23 direct runs: cells.tsv, sweep_stats.tsv
+# and bcmvn.tsv byte-identical, the result section identical. Not compared: summary.json's run
+# section, a record of the run (R's and Rust's differ by nature: script or program, input and
+# output paths, start time, SLURM job, profile label, versions and library paths, timings and
+# memory per phase; R's load_input_s and peak_rss_after_load_kib, Rust's parameters, threads
+# and dump level), apart from the OpenBLAS kernel in its fingerprint; and R's five structural
+# checks of its own Seurat containers among the stage scalars (vst_rows_are_input_features,
+# scale_data_rows_are_top_features, variable_features_equal_top_features,
+# scale_data_equals_sctransform_default_y, pca_cells_are_vst_cells), which hold by
+# construction in Rust (docs/validation/doubletfinder.md). The results do not depend on the
+# number of threads (1, 8 and 32 on the P objects; 1 to 7 on tier T). Validation label m6-bc1b48e
+# (job 60007108): 24 instrumented runs, 13,396 checks and 2,646 RNG checkpoints identical, 1.58
+# billion values compared; 23 direct runs and 20 saved-output comparisons identical.
+[doubletfinder.end_to_end]
+criterion = "exact"
+blas_dependent = true
+compare = ["cells.tsv", "sweep_stats.tsv", "bcmvn.tsv", "result", "S1", "S2a", "S2b", "S2c", "S2d", "S3",
+           "S4", "S5", "S6", "S7", "rng_checkpoints", "rng_checkpoint_sequence", "stage_scalars",
+           "openblas_kernel"]
+not_compared = ["summary.json run section (except the OpenBLAS kernel)", "R's structural checks of its own containers"]
+
+# Against the saved workflow outputs (tiers T and P; the full panel in M7): the doublet set
+# (input barcodes minus the kept barcodes), the kept cells' pANN as R wrote them, pK and nExp
+# (from the column names). Settled (M6): exact. Rust's run of each of the 10 objects reproduces
+# its saved output in both profiles: the same doublet set, every kept cell's pANN identical as
+# 17-digit text (so bitwise), in order, the same pK label, nExp and column names.
+[doubletfinder.saved_outputs]
+criterion = "exact"
+compare = ["doublet_set", "singlet_pANN", "pK_label", "nExp", "pANN_column", "classification_column"]
 
 # Performance: peak RSS and wall time below the direct R DoubletFinder run on the same input;
-# soupx_emptydrops_sscovelli <= 10 GiB (M6)
-# [doubletfinder.performance]
+# soupx_emptydrops_sscovelli <= 10 GiB. Settled (M6): met. `scrust doubletfinder` on the exported
+# input, production profile, Intel Xeon Platinum 8480CL, against the direct production R run of
+# M2 on the same input and CPU type (one CPU), every output identical to R's
+# (docs/validation/doubletfinder.md; jobs 60007089 and 60007102, binary scrust-m6-bc1b48e):
+#   soupx_emptydrops_sscovelli     R 36:15, 126.95 GiB; Rust 6:21, 4.41 GiB (1 thread), 43.5 s, 4.51 GiB (32)
+#   cellbender_fromraw_ghirsutum2  R 33:53, 150.41 GiB; Rust 8:58, 4.02 GiB (1 thread), 60.9 s, 4.08 GiB (32)
+[doubletfinder.performance]
+criterion = "peak RSS and wall time below the direct R run on the same input and CPU type"
+sscovelli_peak_rss_gib_max = 10
+measured = [
+  { object = "soupx_emptydrops_sscovelli", side = "R", threads = 1, wall_s = 2175.3, peak_rss_gib = 126.95 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 1, wall_s = 380.6, peak_rss_gib = 4.41 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 32, wall_s = 43.5, peak_rss_gib = 4.51 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "R", threads = 1, wall_s = 2033.0, peak_rss_gib = 150.41 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, wall_s = 538.4, peak_rss_gib = 4.02 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, wall_s = 60.9, peak_rss_gib = 4.08 },
+]
