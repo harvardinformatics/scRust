@@ -17,10 +17,11 @@
 //! time, each by one `tcrossprod` with R's arguments into one of two reused buffers, and each bin's
 //! genes are shared among the threads (eight at a time, or one at a time above 16,384 cells:
 //! [`gene_group`]); while they turn one bin's product into residuals, one thread makes the next
-//! bin's. Only the rows of the current best `variable_features_n` genes are kept, so memory stays
-//! near `(variable_features_n + 2 * bin_size + 2 * threads) * ncells` doubles: two products, the
-//! kept rows, and a residual and a counts row per thread. Results do not depend on the number of
-//! threads.
+//! bin's. Only the rows of the current best `variable_features_n` genes are kept, as slots of one
+//! buffer that becomes `scale.data` in place (its rows reordered, clipped and centred), so memory
+//! stays near `(variable_features_n + 2 * bin_size + 2 * threads) * ncells` doubles: two products,
+//! the kept rows, and a residual and a counts row per thread. Results do not depend on the number
+//! of threads.
 
 use crate::matrix::GeneRows;
 use crate::params::{MinVariance, SctParams};
@@ -143,8 +144,11 @@ struct ActiveBin {
     done: usize,
 }
 
+/// A row of the slot buffer: its index, and the row.
+type Slot<'s> = (usize, &'s mut [f64]);
+
 /// What the threads share, behind one lock.
-struct State {
+struct State<'s> {
     /// the next bin to make the product of; whether a thread is making one
     next_product: usize,
     producing: bool,
@@ -158,14 +162,16 @@ struct State {
     failed: bool,
     residual_mean: Vec<f64>,
     residual_variance: Vec<f64>,
-    /// the best candidates so far (worst on top) and their residual rows
+    /// the best candidates so far (worst on top) and their residual rows, slots of one buffer;
+    /// the slots that hold no kept row and no thread's working row
     heap: BinaryHeap<Cand>,
-    kept: HashMap<usize, Vec<f64>>,
+    kept: HashMap<usize, Slot<'s>>,
+    free_slots: Vec<Slot<'s>>,
     all_y: Option<Vec<f64>>,
 }
 
 /// One S2d computation: what every thread reads, and the shared state.
-struct Run<'a> {
+struct Run<'a, 's> {
     rows: &'a GeneRows,
     model_pars_fit: &'a [[f64; 3]],
     /// `model.matrix(~ log_umi, cell_attr)`: (Intercept), log_umi; column-major ncells x 2
@@ -178,14 +184,14 @@ struct Run<'a> {
     /// keep the best `k_top` genes at or above `threshold`
     k_top: usize,
     threshold: f64,
-    state: Mutex<State>,
+    state: Mutex<State<'s>>,
     cv: Condvar,
 }
 
 /// Stops the other threads when the one holding it panics, instead of leaving them waiting.
-struct StopOnPanic<'r, 'a>(&'r Run<'a>);
+struct StopOnPanic<'r, 'a, 's>(&'r Run<'a, 's>);
 
-impl Drop for StopOnPanic<'_, '_> {
+impl Drop for StopOnPanic<'_, '_, '_> {
     fn drop(&mut self) {
         if std::thread::panicking() {
             self.0.lock().failed = true;
@@ -194,8 +200,8 @@ impl Drop for StopOnPanic<'_, '_> {
     }
 }
 
-impl Run<'_> {
-    fn lock(&self) -> MutexGuard<'_, State> {
+impl<'s> Run<'_, 's> {
+    fn lock(&self) -> MutexGuard<'_, State<'s>> {
         match self.state.lock() {
             Ok(st) => st,
             Err(poisoned) => {
@@ -206,7 +212,7 @@ impl Run<'_> {
         }
     }
 
-    fn wait<'g>(&self, st: MutexGuard<'g, State>) -> MutexGuard<'g, State> {
+    fn wait<'g>(&self, st: MutexGuard<'g, State<'s>>) -> MutexGuard<'g, State<'s>> {
         match self.cv.wait(st) {
             Ok(st) => st,
             Err(poisoned) => {
@@ -223,8 +229,9 @@ impl Run<'_> {
         let _stop = StopOnPanic(self);
         let nc = self.rows.ncol;
         let mut counts = vec![0.0f64; nc];
-        let mut row: Vec<f64> = Vec::new();
         let mut st = self.lock();
+        // the working row: a slot of its own (there is one per thread beyond the kept rows)
+        let mut row: Slot<'s> = st.free_slots.pop().expect("a slot per thread");
         loop {
             if st.failed {
                 return;
@@ -257,11 +264,8 @@ impl Run<'_> {
                 drop(st);
                 let nb = self.bins[b].len();
                 for r in genes.clone() {
-                    if row.len() != nc {
-                        row = vec![0.0f64; nc];
-                    }
                     let g = self.bins[b].start + r;
-                    let (mean, var) = self.gene(&eta, nb, r, g, &mut counts, &mut row);
+                    let (mean, var) = self.gene(&eta, nb, r, g, &mut counts, row.1);
                     self.record(&mut self.lock(), g, mean, var, &mut row);
                 }
                 drop(eta);
@@ -334,22 +338,24 @@ impl Run<'_> {
         ((s / F80::from_u64(nc as u64)).to_f64(), var_refined(row))
     }
 
-    /// Stores gene `g`'s statistics, and its row if it is among the best so far: the row moves
-    /// into `kept`, and `row` becomes the buffer of the row it displaces (or empty).
-    fn record(&self, st: &mut State, g: usize, mean: f64, var: f64, row: &mut Vec<f64>) {
+    /// Stores gene `g`'s statistics, and its row if it is among the best so far: the row's slot
+    /// moves into `kept`, and `row` becomes the slot of the row it displaces (or a free slot).
+    fn record(&self, st: &mut State<'s>, g: usize, mean: f64, var: f64, row: &mut Slot<'s>) {
         let nc = self.rows.ncol;
         st.residual_mean[g] = mean;
         st.residual_variance[g] = var;
         if let Some(all) = st.all_y.as_mut() {
-            all[g * nc..(g + 1) * nc].copy_from_slice(row);
+            all[g * nc..(g + 1) * nc].copy_from_slice(row.1);
         }
         if var.is_nan() || self.k_top == 0 || !(var >= self.threshold) {
             return; // sort() drops NA
         }
         let cand = Cand { var, gene: g };
         if st.heap.len() < self.k_top {
+            // fewer kept rows than k_top: a slot is free (the buffer has k_top plus one per thread)
+            let fresh = st.free_slots.pop().expect("a free slot while fewer rows are kept");
             st.heap.push(cand);
-            st.kept.insert(g, std::mem::take(row));
+            st.kept.insert(g, std::mem::replace(row, fresh));
         } else if cand.better(st.heap.peek().expect("full heap")) == Ordering::Greater {
             let worst = st.heap.pop().expect("full heap");
             let old = st.kept.remove(&worst.gene).expect("a kept row per candidate");
@@ -382,55 +388,74 @@ fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParam
         Some(n) => (n.min(ng), f64::NEG_INFINITY),
         None => (usize::MAX, params.variable_features_rv_th),
     };
-    let run = Run {
-        rows,
-        model_pars_fit: input.model_pars_fit,
-        xreg,
-        bins: bins(ng, params.bin_size),
-        group: group.max(1),
-        min_var,
-        res_clip,
-        k_top,
-        threshold,
-        state: Mutex::new(State {
-            next_product: 0,
-            producing: false,
-            buffers: 0,
-            free: Vec::new(),
-            active: VecDeque::new(),
-            finished: 0,
-            failed: false,
-            residual_mean: vec![0.0f64; ng],
-            residual_variance: vec![0.0f64; ng],
-            heap: BinaryHeap::with_capacity(k_top.min(ng) + 1),
-            kept: HashMap::with_capacity(k_top.min(ng) + 1),
-            all_y: if keep_y { Some(vec![0.0f64; ng * nc]) } else { None },
-        }),
-        cv: Condvar::new(),
-    };
     // the threads share each bin's genes: more threads than genes would idle
     let threads = threads.max(1).min(ng.max(1));
-    std::thread::scope(|scope| {
-        for _ in 1..threads {
-            scope.spawn(|| run.work());
+    // One buffer of rows: at most k_top kept rows (every gene with the threshold) and one working
+    // row per thread. Its pages are touched as rows are written; it becomes scale.data in place.
+    let n_slots = k_top.min(ng) + threads;
+    let mut slab = vec![0.0f64; n_slots * nc];
+    let (residual_mean, residual_variance, top_features, slot_of_top, all_y) = {
+        let mut slots: Vec<Slot> = Vec::with_capacity(n_slots);
+        let mut rest: &mut [f64] = &mut slab;
+        for i in 0..n_slots {
+            let (row, tail) = std::mem::take(&mut rest).split_at_mut(nc);
+            slots.push((i, row));
+            rest = tail;
         }
-        run.work();
-    });
-    // (a thread's panic has been propagated by the scope)
-    let State { residual_mean, residual_variance, heap, mut kept, all_y, free, .. } = run.state.into_inner().unwrap_or_else(|e| e.into_inner());
-    drop(free);
-    // the variable features in R's order
-    let mut top: Vec<Cand> = heap.into_vec();
-    top.sort_by(|a, b| b.better(a));
-    let top_features: Vec<usize> = top.iter().map(|c| c.gene).collect();
-    // scale.data: clip to +-sqrt(ncells / 30), then (do.center) subtract rowMeans2(na.rm = TRUE);
-    // each kept row is released once copied
-    let mut scale_data = vec![0.0f64; top_features.len() * nc];
-    for (k, &g) in top_features.iter().enumerate() {
-        let src = kept.remove(&g).expect("a kept row per variable feature");
+        // popped from the end: the lowest slots first
+        slots.reverse();
+        let run = Run {
+            rows,
+            model_pars_fit: input.model_pars_fit,
+            xreg,
+            bins: bins(ng, params.bin_size),
+            group: group.max(1),
+            min_var,
+            res_clip,
+            k_top,
+            threshold,
+            state: Mutex::new(State {
+                next_product: 0,
+                producing: false,
+                buffers: 0,
+                free: Vec::new(),
+                active: VecDeque::new(),
+                finished: 0,
+                failed: false,
+                residual_mean: vec![0.0f64; ng],
+                residual_variance: vec![0.0f64; ng],
+                heap: BinaryHeap::with_capacity(k_top.min(ng) + 1),
+                kept: HashMap::with_capacity(k_top.min(ng) + 1),
+                free_slots: slots,
+                all_y: if keep_y { Some(vec![0.0f64; ng * nc]) } else { None },
+            }),
+            cv: Condvar::new(),
+        };
+        std::thread::scope(|scope| {
+            for _ in 1..threads {
+                scope.spawn(|| run.work());
+            }
+            run.work();
+        });
+        // (a thread's panic has been propagated by the scope)
+        let State { residual_mean, residual_variance, heap, kept, all_y, .. } = run.state.into_inner().unwrap_or_else(|e| e.into_inner());
+        // the variable features in R's order, and the slot of each one's row
+        let mut top: Vec<Cand> = heap.into_vec();
+        top.sort_by(|a, b| b.better(a));
+        let top_features: Vec<usize> = top.iter().map(|c| c.gene).collect();
+        let slot_of_top: Vec<usize> = top_features.iter().map(|g| kept.get(g).expect("a kept row per variable feature").0).collect();
+        (residual_mean, residual_variance, top_features, slot_of_top, all_y)
+    };
+    // scale.data in place: the kept rows in R's order, then clipped to +-sqrt(ncells / 30) and
+    // (do.center) centred by rowMeans2(na.rm = TRUE), as ScaleData does
+    gather_rows(&mut slab, nc, &slot_of_top);
+    slab.truncate(top_features.len() * nc);
+    slab.shrink_to_fit();
+    let mut scale_data = slab;
+    for k in 0..top_features.len() {
         let row = &mut scale_data[k * nc..(k + 1) * nc];
-        for (d, &v) in row.iter_mut().zip(&src) {
-            let mut v = v;
+        for d in row.iter_mut() {
+            let mut v = *d;
             if v < clip.0 {
                 v = clip.0;
             }
@@ -439,7 +464,6 @@ fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParam
             }
             *d = v;
         }
-        drop(src);
         if params.do_center {
             let rm = mean2_na_rm(row);
             for d in row.iter_mut() {
@@ -448,6 +472,67 @@ fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParam
         }
     }
     Ok(Residuals { ncells: nc, min_var, res_clip, clip, residual_mean, residual_variance, top_features, scale_data, y: all_y })
+}
+
+/// Reorders the rows of `m` (each `nc` long) in place so that row `k` holds what row `src[k]`
+/// held, for every `k < src.len()`; the rows after them are left in no particular state. `src`
+/// must not repeat a row. Rows whose old content no target needs start chains, which end at a
+/// row beyond the targets; what remains are cycles, rotated through one spare row.
+fn gather_rows(m: &mut [f64], nc: usize, src: &[usize]) {
+    let k = src.len();
+    if nc == 0 || k == 0 {
+        return;
+    }
+    let n = m.len() / nc;
+    let mut needed = vec![false; n];
+    for &s in src {
+        assert!(s < n && !needed[s], "gather_rows: a source row out of range or repeated");
+        needed[s] = true;
+    }
+    let mut done = vec![false; k];
+    let copy = |m: &mut [f64], from: usize, to: usize| {
+        if from != to {
+            m.copy_within(from * nc..(from + 1) * nc, to * nc);
+        }
+    };
+    for t in 0..k {
+        if needed[t] || done[t] {
+            continue;
+        }
+        // row t's old content is not needed: fill it, then the row it read from, and so on
+        let mut cur = t;
+        loop {
+            let s = src[cur];
+            copy(m, s, cur);
+            done[cur] = true;
+            if s >= k || done[s] {
+                break;
+            }
+            cur = s;
+        }
+    }
+    let mut spare: Vec<f64> = Vec::new();
+    for t in 0..k {
+        if done[t] {
+            continue;
+        }
+        // a cycle through row t
+        if spare.len() != nc {
+            spare = vec![0.0f64; nc];
+        }
+        spare.copy_from_slice(&m[t * nc..(t + 1) * nc]);
+        let mut cur = t;
+        loop {
+            let s = src[cur];
+            done[cur] = true;
+            if s == t {
+                m[cur * nc..(cur + 1) * nc].copy_from_slice(&spare);
+                break;
+            }
+            copy(m, s, cur);
+            cur = s;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -601,6 +686,30 @@ mod tests {
                     (None, false) => {}
                     _ => panic!("y kept when not asked, or not kept when asked: {what}"),
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn rows_gathered_in_place() {
+        // every way the kept rows can sit in the slots: chains from rows nobody reads, cycles,
+        // rows already in place, sources beyond the targets
+        let mut rng = Lcg(3);
+        for case in 0..400 {
+            let n = 1 + (rng.next() % 12) as usize;
+            let k = (rng.next() % (n as u64 + 1)) as usize;
+            let nc = (rng.next() % 4) as usize;
+            // a random injective map from k targets to n rows (a shuffled prefix)
+            let mut perm: Vec<usize> = (0..n).collect();
+            for i in (1..n).rev() {
+                perm.swap(i, (rng.next() % (i as u64 + 1)) as usize);
+            }
+            let src = &perm[..k];
+            let m: Vec<f64> = (0..n * nc).map(|v| v as f64).collect();
+            let mut got = m.clone();
+            gather_rows(&mut got, nc, src);
+            for (t, &s) in src.iter().enumerate() {
+                assert_eq!(got[t * nc..(t + 1) * nc], m[s * nc..(s + 1) * nc], "case {case}: n {n}, k {k}, src {src:?}");
             }
         }
     }
