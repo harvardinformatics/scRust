@@ -15,16 +15,25 @@
 //!   and the comparison with R's stage dumps;
 //! - [`pca`]: RunPCA as DoubletFinder calls it (stage S3) and the comparison with R's dumps,
 //!   teacher-forced and chained after Rust's SCTransform;
+//! - [`chain`]: the whole pipeline in Rust (M6): doublets drawn from R's random-number stream,
+//!   SCTransform and PCA, as an [`run::EmbeddingSource`];
+//! - [`input`]: what the command reads: the counts, the cells' cluster labels and the factor's
+//!   levels;
 //! - [`stages`]: stage dumps in the instrumented R runs' layout, read (teacher forcing) and
-//!   written;
-//! - [`validate`]: comparison of a Rust run with an R reference run.
+//!   written; [`record`]: a Rust run's dumps of every stage, S1 to S7, with the RNG
+//!   checkpoints and scalars;
+//! - [`validate`]: comparison of a Rust run with an R reference run, and with the saved
+//!   workflow output.
 //!
-//! Milestone M3 runs it on R's own embeddings (teacher forcing, plan A5b); SCTransform (M4) and
-//! PCA (M5) will provide Rust's own in M6, through the same [`run::EmbeddingSource`] trait.
+//! Milestone M3 ran it on R's own embeddings (teacher forcing, plan A5b, still available through
+//! [`stages::StageSource`]); from M6 on, [`chain::RustSource`] computes them from the counts.
 
+pub mod chain;
+pub mod input;
 pub mod pann;
 pub mod params;
 pub mod pca;
+pub mod record;
 pub mod run;
 pub mod sct;
 pub mod stages;

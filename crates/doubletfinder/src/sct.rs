@@ -19,37 +19,66 @@ use rcompat::RRng;
 use scio::{CscMatrix, Npy, Table};
 
 /// DoubletFinder's SCT input: the real cells (columns `real_cells` of `counts`, in that order)
-/// followed by one doublet per pair `(a, b)` of positions in the real cells.
+/// followed by one doublet per pair `(a, b)` of positions in the real cells. Built in one
+/// allocation of the exact size (the doublets' entries are counted first), so the largest
+/// input is held once.
 pub fn sct_input(counts: &CscMatrix, real_cells: &[usize], pairs: &[(usize, usize)]) -> CscMatrix {
-    let data = counts.select_cols(real_cells);
-    let mut doublets = CscMatrix::zeros(data.nrow, pairs.len());
-    doublets.p.clear();
-    doublets.p.push(0);
+    let col = |pos: usize| counts.col(real_cells[pos]);
+    let union_len = |ra: &[u32], rb: &[u32]| -> usize {
+        let (mut i, mut k, mut n) = (0, 0, 0);
+        while i < ra.len() && k < rb.len() {
+            match ra[i].cmp(&rb[k]) {
+                std::cmp::Ordering::Less => i += 1,
+                std::cmp::Ordering::Greater => k += 1,
+                std::cmp::Ordering::Equal => {
+                    i += 1;
+                    k += 1;
+                }
+            }
+            n += 1;
+        }
+        n + (ra.len() - i) + (rb.len() - k)
+    };
+    let nnz_real: usize = real_cells.iter().map(|&j| counts.p[j + 1] - counts.p[j]).sum();
+    let nnz_doublets: usize = pairs.iter().map(|&(a, b)| union_len(col(a).0, col(b).0)).sum();
+    let (ncol, nnz) = (real_cells.len() + pairs.len(), nnz_real + nnz_doublets);
+    let mut out = CscMatrix { nrow: counts.nrow, ncol, p: Vec::with_capacity(ncol + 1), i: Vec::with_capacity(nnz), x: Vec::with_capacity(nnz) };
+    out.p.push(0);
+    // data <- counts[, real.cells]: every stored entry, explicit zeros included
+    for &j in real_cells {
+        let (r, v) = counts.col(j);
+        out.i.extend_from_slice(r);
+        out.x.extend_from_slice(v);
+        out.p.push(out.i.len());
+    }
+    // (data[, real.cells1] + data[, real.cells2]) / 2: the union of the two columns' stored
+    // entries, a shared row summed, then every stored value halved
     for &(a, b) in pairs {
-        let (ra, va) = data.col(a);
-        let (rb, vb) = data.col(b);
+        let (ra, va) = col(a);
+        let (rb, vb) = col(b);
         let (mut i, mut k) = (0, 0);
         while i < ra.len() || k < rb.len() {
             let take_a = k >= rb.len() || (i < ra.len() && ra[i] < rb[k]);
             let take_b = i >= ra.len() || (k < rb.len() && rb[k] < ra[i]);
             if take_a {
-                doublets.i.push(ra[i]);
-                doublets.x.push(va[i] / 2.0);
+                out.i.push(ra[i]);
+                out.x.push(va[i] / 2.0);
                 i += 1;
             } else if take_b {
-                doublets.i.push(rb[k]);
-                doublets.x.push(vb[k] / 2.0);
+                out.i.push(rb[k]);
+                out.x.push(vb[k] / 2.0);
                 k += 1;
             } else {
-                doublets.i.push(ra[i]);
-                doublets.x.push((va[i] + vb[k]) / 2.0);
+                out.i.push(ra[i]);
+                out.x.push((va[i] + vb[k]) / 2.0);
                 i += 1;
                 k += 1;
             }
         }
-        doublets.p.push(doublets.i.len());
+        out.p.push(out.i.len());
     }
-    data.cbind(&doublets)
+    debug_assert_eq!(out.i.len(), nnz);
+    out
 }
 
 /// `.Random.seed` checkpoints of an instrumented run (`rng.npy`, `rng.tsv`).

@@ -5,8 +5,8 @@ use crate::cli::{self, Args};
 use std::path::PathBuf;
 
 pub const USAGE: &str = "\
-Usage: scrust validate doubletfinder --reference <R run dir> --candidate <Rust output dir>
-                                     [--reference-stages <dir>] [--json <file>]
+Usage: scrust validate doubletfinder --candidate <Rust output dir> [--reference <R run dir>]
+                                     [--reference-stages <dir>] [--saved <dir>] [--json <file>]
                                      [--markdown <file>] [--threads N]
        scrust validate sctransform --input <10x dir> --stages <R stage dir>
                                    [--mode both|teacher|chained] [--contexts <ctx,ctx,...>]
@@ -15,9 +15,13 @@ Usage: scrust validate doubletfinder --reference <R run dir> --candidate <Rust o
                            [--mode both|teacher|chained] [--contexts <ctx,ctx,...>]
                            [--json <file>] [--markdown <file>] [--threads N]
 
-doubletfinder: compares cells.tsv, sweep_stats.tsv and bcmvn.tsv byte for byte, the result
-section of summary.json field by field, every stage array block (S4-S7) the two runs both dumped
-bit for bit, and S6 and S7 recomputed from R's own S5 (teacher forcing).
+doubletfinder: compares a Rust run with an R reference run (--reference): cells.tsv,
+sweep_stats.tsv and bcmvn.tsv byte for byte and the result section of summary.json field by
+field; against an instrumented run (with stages/, or --reference-stages), also every block of
+every stage array R dumped (S1-S7) bit for bit, every .Random.seed checkpoint by context and
+label, every per-context scalar, and S6 and S7 recomputed from R's own S5. With --saved (an
+export's saved/ directory), also the saved workflow output: the doublet set, the kept cells'
+pANN as R wrote them, the column names (pK, nExp).
 
 sctransform: runs Rust's SCTransform on the SCT input of every context of an instrumented
 DoubletFinder run (the counts in --input, R's S1 draws from --stages) and compares stage S2
@@ -105,11 +109,26 @@ fn pca_report(argv: &[String]) -> Result<(doubletfinder::validate::Report, Args)
 
 fn doubletfinder_report(argv: &[String]) -> Result<(doubletfinder::validate::Report, Args), String> {
     let args = Args::parse(argv)?;
-    args.only(&["reference", "reference-stages", "candidate", "json", "markdown", "threads"])?;
-    let reference = args.path("reference")?;
-    let reference_stages = args.get("reference-stages").map(PathBuf::from).unwrap_or_else(|| reference.join("stages"));
+    args.only(&["reference", "reference-stages", "candidate", "saved", "json", "markdown", "threads"])?;
     let candidate = args.path("candidate")?;
     let threads = cli::threads(&args)?;
-    let report = doubletfinder::validate::compare(&reference, &reference_stages, &candidate, threads).map_err(|e| e.to_string())?;
+    let mut report = match args.get("reference").map(PathBuf::from) {
+        Some(reference) => {
+            let reference_stages = args.get("reference-stages").map(PathBuf::from).unwrap_or_else(|| reference.join("stages"));
+            Some(doubletfinder::validate::compare(&reference, &reference_stages, &candidate, threads).map_err(|e| e.to_string())?)
+        }
+        None => None,
+    };
+    if let Some(saved) = args.get("saved").map(PathBuf::from) {
+        let s = doubletfinder::validate::compare_saved(&saved, &candidate).map_err(|e| e.to_string())?;
+        report = Some(match report {
+            Some(mut r) => {
+                r.checks.extend(s.checks);
+                r
+            }
+            None => s,
+        });
+    }
+    let report = report.ok_or("--reference or --saved is required")?;
     Ok((report, args))
 }

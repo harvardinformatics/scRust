@@ -295,6 +295,33 @@ pub fn write_f64(path: &Path, data: &[f64], shape: &[usize]) -> io::Result<()> {
     fs::File::create(path)?.write_all(&out)
 }
 
+/// Writes a matrix held row-major in memory (`rows[r * ncol + c]`, as `scale.data` rows are) as
+/// R's `npy_write` writes it: column-major, shape `(nrow, ncol)`. The file is streamed in blocks
+/// of columns, so memory does not grow with the matrix.
+pub fn write_f64_rows(path: &Path, rows: &[f64], nrow: usize, ncol: usize) -> io::Result<()> {
+    assert_eq!(rows.len(), nrow * ncol);
+    let mut out = io::BufWriter::with_capacity(1 << 22, fs::File::create(path)?);
+    out.write_all(&header_bytes(Dtype::F8, &[nrow, ncol]))?;
+    // 64 columns at a time: each row's 64 values are 8 cache lines read once
+    const BLOCK: usize = 64;
+    let mut buf: Vec<u8> = Vec::with_capacity(8 * nrow * BLOCK);
+    let mut c0 = 0;
+    while c0 < ncol {
+        let nb = BLOCK.min(ncol - c0);
+        buf.clear();
+        buf.resize(8 * nrow * nb, 0);
+        for r in 0..nrow {
+            for (k, v) in rows[r * ncol + c0..r * ncol + c0 + nb].iter().enumerate() {
+                let i = 8 * (k * nrow + r);
+                buf[i..i + 8].copy_from_slice(&v.to_le_bytes());
+            }
+        }
+        out.write_all(&buf)?;
+        c0 += nb;
+    }
+    out.flush()
+}
+
 /// Writes 32-bit integers in column-major order with the given shape, as R's `npy_write`.
 pub fn write_i32(path: &Path, data: &[i32], shape: &[usize]) -> io::Result<()> {
     assert_eq!(data.len(), shape.iter().product::<usize>());
@@ -331,6 +358,14 @@ mod tests {
         assert_eq!((nr, nc), (3, 2));
         assert_eq!(rm, vec![1.0, 4.0, 2.0, 5.0, 3.0, 6.0]);
         assert!(read_f64_row_major(&q).is_err());
+        // a row-major matrix written in R's layout: the same bytes as write_f64 of its columns
+        let (nr, nc) = (3usize, 130usize);
+        let rows: Vec<f64> = (0..nr * nc).map(|k| k as f64 * 0.5 - 7.0).collect();
+        let cols: Vec<f64> = (0..nc).flat_map(|c| (0..nr).map(move |r| (r, c))).map(|(r, c)| rows[r * nc + c]).collect();
+        let (pr, pc) = (dir.join("rows.npy"), dir.join("cols.npy"));
+        write_f64_rows(&pr, &rows, nr, nc).unwrap();
+        write_f64(&pc, &cols, &[nr, nc]).unwrap();
+        assert_eq!(fs::read(&pr).unwrap(), fs::read(&pc).unwrap());
         fs::remove_dir_all(&dir).unwrap();
     }
 }

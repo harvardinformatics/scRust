@@ -79,6 +79,9 @@ pub struct SweepIteration {
     pub digests: Option<Vec<(u64, u64)>>,
     /// The first `ind` order positions per real cell (0-based), if requested.
     pub positions: Option<Vec<Vec<u32>>>,
+    /// Real cells whose order position 1 is the cell itself (R's dumps record it; a
+    /// lower-index twin at distance 0 comes first otherwise).
+    pub first_is_self: usize,
 }
 
 /// `parallel_paramSweep`'s neighbour ranking and pANN for one pN, from the embeddings of the
@@ -100,7 +103,7 @@ pub fn sweep_iteration(emb: &Embeddings, pcs: usize, n_real: usize, pk: &[f64], 
     let pk_temp: Vec<usize> = pk.iter().map(|&p| count_of(round(n_cells as f64 * p), "pk.temp")).collect::<Result<_, _>>()?;
     let ranges: Vec<(usize, usize)> = pk_temp.iter().map(|&k| r_neighbour_range(k)).collect();
     let digest = dumps.digests.then(|| Digest::new(ind));
-    let per_cell = neighbours(&points, n_real, ind, Order::Sorted, threads, |_, pos| {
+    let per_cell = neighbours(&points, n_real, ind, Order::Sorted, threads, |q, pos| {
         // cum[m]: doublets among the first m positions
         let mut cum = Vec::with_capacity(pos.len() + 1);
         cum.push(0u32);
@@ -110,12 +113,14 @@ pub fn sweep_iteration(emb: &Embeddings, pcs: usize, n_real: usize, pk: &[f64], 
             cum.push(c);
         }
         let counts: Vec<u32> = ranges.iter().map(|&(lo, hi)| cum[hi + 1] - cum[lo]).collect();
-        (counts, digest.as_ref().map(|d| d.of(pos)), dumps.positions.then(|| pos.to_vec()))
+        (counts, digest.as_ref().map(|d| d.of(pos)), dumps.positions.then(|| pos.to_vec()), pos.first() == Some(&(q as u32)))
     });
     let mut pann = vec![Vec::with_capacity(n_real); pk.len()];
     let mut digests = dumps.digests.then(|| Vec::with_capacity(n_real));
     let mut positions = dumps.positions.then(|| Vec::with_capacity(n_real));
-    for (counts, dg, ps) in per_cell {
+    let mut first_is_self = 0;
+    for (counts, dg, ps, own) in per_cell {
+        first_is_self += own as usize;
         for (j, &cnt) in counts.iter().enumerate() {
             pann[j].push(cnt as f64 / pk_temp[j] as f64);
         }
@@ -126,7 +131,7 @@ pub fn sweep_iteration(emb: &Embeddings, pcs: usize, n_real: usize, pk: &[f64], 
             v.push(p);
         }
     }
-    Ok(SweepIteration { n_real, n_cells, ind, pk_temp, pann, digests, positions })
+    Ok(SweepIteration { n_real, n_cells, ind, pk_temp, pann, digests, positions, first_is_self })
 }
 
 /// The final run of `doubletFinder`: pANN of every real cell.
@@ -141,6 +146,8 @@ pub struct FinalRun {
     pub digests: Option<Vec<(u64, u64)>>,
     /// The first k + 1 order positions per cell (0-based), if requested.
     pub positions: Option<Vec<Vec<u32>>>,
+    /// Real cells whose order position 1 is the cell itself.
+    pub first_is_self: usize,
 }
 
 /// `doubletFinder`'s pANN: `k = round(nCells * pK)`, then for each real cell the doublets among
@@ -159,7 +166,7 @@ pub fn final_pann(emb: &Embeddings, pcs: usize, n_real: usize, pk: f64, threads:
     let l = (hi + 1).max(ku + 1).min(n_cells);
     let sorted = dumps.digests || dumps.positions;
     let digest = dumps.digests.then(|| Digest::new((ku + 1).min(n_cells)));
-    let per_cell = neighbours(&points, n_real, l, if sorted { Order::Sorted } else { Order::FirstThenSet }, threads, |_, pos| {
+    let per_cell = neighbours(&points, n_real, l, if sorted { Order::Sorted } else { Order::FirstThenSet }, threads, |q, pos| {
         let is_doublet = |p: u32| (p as usize >= n_real) as u32;
         let count = if sorted {
             pos[lo.min(pos.len())..(hi + 1).min(pos.len())].iter().map(|&p| is_doublet(p)).sum::<u32>()
@@ -173,12 +180,15 @@ pub fn final_pann(emb: &Embeddings, pcs: usize, n_real: usize, pk: f64, threads:
             }
         };
         let take = (ku + 1).min(pos.len());
-        (count, digest.as_ref().map(|d| d.of(&pos[..take])), dumps.positions.then(|| pos[..take].to_vec()))
+        // either order puts position 1 first
+        (count, digest.as_ref().map(|d| d.of(&pos[..take])), dumps.positions.then(|| pos[..take].to_vec()), pos.first() == Some(&(q as u32)))
     });
     let mut pann = Vec::with_capacity(n_real);
     let mut digests = dumps.digests.then(|| Vec::with_capacity(n_real));
     let mut positions = dumps.positions.then(|| Vec::with_capacity(n_real));
-    for (count, dg, ps) in per_cell {
+    let mut first_is_self = 0;
+    for (count, dg, ps, own) in per_cell {
+        first_is_self += own as usize;
         pann.push(count as f64 / k);
         if let (Some(d), Some(v)) = (dg, digests.as_mut()) {
             v.push(d);
@@ -187,7 +197,7 @@ pub fn final_pann(emb: &Embeddings, pcs: usize, n_real: usize, pk: f64, threads:
             v.push(p);
         }
     }
-    Ok(FinalRun { n_real, n_cells, k, pann, digests, positions })
+    Ok(FinalRun { n_real, n_cells, k, pann, digests, positions, first_is_self })
 }
 
 /// Stage S7: `classifications[order(pANN, decreasing = TRUE)[1:nExp]] <- "Doublet"`, a stable

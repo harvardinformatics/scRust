@@ -146,6 +146,8 @@ pub struct StageWriter {
     i32s: BTreeMap<String, Vec<ArrayBlock<i32>>>,
     /// one file per context: (file, block)
     big: Vec<(String, ArrayBlock<i32>)>,
+    /// one file per context, already written: (file, ctx, nrow, ncol, dtype, stage)
+    written: Vec<(String, String, usize, usize, Dtype, String)>,
 }
 
 /// Stacks the blocks' rows, column by column (Fortran order): (values, total rows, columns).
@@ -175,6 +177,17 @@ impl StageWriter {
     pub fn add_big_i32(&mut self, name: &str, ctx: &str, values: Vec<i32>, nrow: usize, ncol: usize, stage: &str) {
         assert_eq!(values.len(), nrow * ncol);
         self.big.push((format!("{name}.{ctx}.npy"), ArrayBlock { ctx: ctx.into(), values, nrow, ncol, stage: stage.into() }));
+    }
+
+    /// One matrix file per context (`<name>.<ctx>.npy`), written into `dir` right away, as R
+    /// writes `S2d_scale_data` and `S2d_y`: `rows` holds the matrix row-major (`nrow x ncol`),
+    /// the file is R's column-major layout. Nothing of it is kept.
+    pub fn write_big_f64_rows(&mut self, dir: &Path, name: &str, ctx: &str, rows: &[f64], nrow: usize, ncol: usize, stage: &str) -> std::io::Result<()> {
+        std::fs::create_dir_all(dir)?;
+        let file = format!("{name}.{ctx}.npy");
+        npy::write_f64_rows(&dir.join(&file), rows, nrow, ncol)?;
+        self.written.push((file, ctx.into(), nrow, ncol, Dtype::F8, stage.into()));
+        Ok(())
     }
 
     /// Writes every array and `index.tsv` into `dir`.
@@ -207,6 +220,9 @@ impl StageWriter {
             npy::write_i32(&dir.join(file), &b.values, &[b.nrow, b.ncol])?;
             push_index(file, &[(b.ctx.as_str(), b.nrow, b.ncol, b.stage.as_str())], Dtype::I4);
         }
+        for (file, ctx, nrow, ncol, dtype, stage) in &self.written {
+            push_index(file, &[(ctx.as_str(), *nrow, *ncol, stage.as_str())], *dtype);
+        }
         index.sort_by(|a, b| a[0].cmp(&b[0]).then(a[2].parse::<usize>().unwrap().cmp(&b[2].parse::<usize>().unwrap())));
         Table { header: ["file", "ctx", "row_start", "nrow", "ncol", "dtype", "stage"].iter().map(|s| s.to_string()).collect(), rows: index }
             .write(&dir.join("index.tsv"))
@@ -233,9 +249,15 @@ fn digest_columns(d: &[(u64, u64)]) -> Vec<f64> {
 /// Rust's stage arrays S4-S7 for a run, in R's layout and with R's names: `S4_digest` (and
 /// `S4_positions.<ctx>` when kept), `S5_pann_sweep`, `S5_pann_final`, `S6_bkde`, `S6_gkde`,
 /// `S7_doublet`. S1-S3 (doublets, SCTransform, PCA) are not Rust's in teacher-forced runs and
-/// are not written.
+/// are not written; a full Rust run records them with [`crate::record::Recorder`].
 pub fn stage_dumps(out: &Output) -> StageWriter {
     let mut w = StageWriter::default();
+    add_outputs(&mut w, out);
+    w
+}
+
+/// Adds the stage arrays S4-S7 of `out` to `w` (see [`stage_dumps`]).
+pub fn add_outputs(w: &mut StageWriter, out: &Output) {
     if let Some(sweep) = &out.sweep {
         for (it, pn) in sweep.iterations.iter().zip(&sweep.pn) {
             let ctx = format!("sweep_pN{}", pn.label);
@@ -275,5 +297,4 @@ pub fn stage_dumps(out: &Output) -> StageWriter {
     }
     w.add_f64("S5_pann_final", "final", f.pann.clone(), f.pann.len(), 1, "S5");
     w.add_i32("S7_doublet", "final", out.doublet.iter().map(|&d| d as i32).collect(), out.doublet.len(), 1, "S7");
-    w
 }

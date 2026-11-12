@@ -1,98 +1,85 @@
 //! `scrust doubletfinder`: DoubletFinder as the workflow calls it (docs/PLAN.md B1 and B3).
 //!
-//! Milestone M3 runs the DoubletFinder core on R's own embeddings (teacher forcing): with
-//! `--from-stages <dir>`, the sweep subsample and the PCA embeddings of every sweep iteration
-//! and of the final run come from an instrumented R run's stage dumps, and everything after
-//! them is Rust's: neighbours, pANN, the sweep summary and pK, nExp, the calls. The outputs have
-//! the reference runs' layout (`cells.tsv`, `sweep_stats.tsv`, `bcmvn.tsv`, `summary.json`), so
-//! runs compare file to file.
+//! From a 10x counts directory and the cells' cluster labels, every stage is computed by Rust
+//! (milestone M6): the sweep subsample and the artificial doublets, drawn from R's
+//! random-number stream; SCTransform and RunPCA in each of the six sweep iterations and the final
+//! run; neighbours, pANN, the sweep summary and pK, nExp, the calls. With `--from-stages <dir>`,
+//! the sweep subsample and the PCA embeddings come from an instrumented R run instead (teacher
+//! forcing, milestone M3). The outputs have the reference runs' layout (`cells.tsv`,
+//! `sweep_stats.tsv`, `bcmvn.tsv`, `summary.json`, and with `--dump-stages` the stage arrays),
+//! so runs compare file to file.
 
 use crate::cli::{self, Args, Phases};
+use doubletfinder::chain::{rng_digest, RustSource};
+use doubletfinder::input::{read_counts, read_input};
 use doubletfinder::pann::NeighbourDumps;
-use doubletfinder::run::{run, Input, Params, PkChoice};
+use doubletfinder::record::{DumpLevel, Recorder};
+use doubletfinder::run::{run, Params, PkChoice};
 use doubletfinder::stages::{stage_dumps, StageSource};
-use scio::{tenx, Json, Table};
+use scio::Json;
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 
 pub const USAGE: &str = "\
-Usage: scrust doubletfinder --counts <10x dir> --clusters <tsv> --out <dir> --from-stages <dir>
-                            [--cluster-levels <txt>] [--threads N] [--pcs 10] [--pn 0.25]
-                            [--nexp-rate 0.15] [--pk auto|<value>] [--seed 12345]
-                            [--dump-stages none|light|full]
+Usage: scrust doubletfinder --counts <10x dir> --clusters <tsv> --out <dir>
+                            [--seed 12345] [--pcs 10] [--pn 0.25] [--nexp-rate 0.15]
+                            [--pk auto|<value>] [--threads N] [--cluster-levels <txt>]
+                            [--dump-stages none|light|standard|full] [--from-stages <dir>]
 
-DoubletFinder 2.0.6 as the workflow calls it. Milestone M3: teacher forcing only.
+DoubletFinder 2.0.6 as the workflow calls it (docs/PLAN.md B1), every stage computed by Rust:
+the sweep subsample and the artificial doublets drawn from R's random-number stream,
+SCTransform and RunPCA in each of the six sweep iterations and in the final run, neighbours and
+pANN, summarizeSweep, find.pK, nExp with the homotypic adjustment, and the calls. SCTransform's
+and RunPCA's products are the OpenBLAS calls R makes, so the results are R's bit for bit under
+the OpenBLAS kernel R ran with (OPENBLAS_CORETYPE; see env.sh).
 
-  --counts <dir>          10x Matrix Market directory (barcodes.tsv(.gz), features.tsv(.gz))
+  --counts <dir>          10x Matrix Market directory: matrix.mtx(.gz), barcodes.tsv(.gz),
+                          features.tsv(.gz): the RNA counts, stored zeros kept
   --clusters <tsv>        cluster labels: a header line, then barcode and label per cell, in
                           the matrix's column order (the export's seurat_clusters.tsv)
   --cluster-levels <txt>  the factor levels in order, one per line (default:
                           seurat_clusters_levels.txt next to --clusters, else the order of
                           first appearance)
-  --from-stages <dir>     an instrumented R run's stages/: the sweep subsample and the PCA
-                          embeddings come from there (teacher forcing); required until
-                          SCTransform and PCA are ported (M4-M6)
   --out <dir>             output directory (must not hold a previous run)
-  --threads N             threads (default: SLURM_CPUS_PER_TASK, else 1); results do not
+  --seed N                set.seed(N) before paramSweep and before doubletFinder (default
+                          12345, the workflow's)
+  --pcs N                 PCs = 1:N, RunPCA(npcs = N) (default 10)
+  --pn X                  doubletFinder's pN (default 0.25)
+  --nexp-rate X           nExp_poi = round(X * cells) (default 0.15)
+  --pk auto|X             auto (default): find.pK's choice from the sweep; a value is read
+                          with R's parser and skips the sweep
+  --threads N             threads (default: SLURM_CPUS_PER_TASK, else 1); the results do not
                           depend on it
-  --dump-stages <level>   none (default); light: stage arrays S4 (digests), S5, S6, S7 in the
-                          instrumented R runs' layout, in <out>/stages/; full: also the S4
-                          order positions
+  --dump-stages <level>   none (default), light, standard or full: every stage array, RNG
+                          checkpoint and scalar in the instrumented R runs' layout, in
+                          <out>/stages/; standard adds scale.data per context, full the
+                          residual matrices and the S4 order positions
+  --from-stages <dir>     teacher forcing (milestone M3): the sweep subsample and the PCA
+                          embeddings from an instrumented R run's stages/ (dumps: S4-S7)
+
+Outputs: cells.tsv (barcode, pANN and classification of every cell), sweep_stats.tsv (pN, pK,
+BCreal), bcmvn.tsv (find.pK's table), summary.json (\"result\": pK and its label as R writes it,
+nExp_poi, the homotypic proportion, nExp, the doublets made, k, the column names R writes, the
+digest of the final .Random.seed; \"run\": parameters, versions, timings and peak memory per
+phase).
 ";
-
-/// Reads the cluster labels (second column, or the column named seurat_clusters) and checks
-/// the barcodes against the matrix's.
-fn read_clusters(path: &Path, barcodes: &[String]) -> Result<Vec<String>, String> {
-    let t = Table::read(path).map_err(|e| e.to_string())?;
-    let bc = t.col("barcode").unwrap_or(0);
-    let cl = t.col("seurat_clusters").unwrap_or(1);
-    if t.header.len() < 2 {
-        return Err(format!("{}: expected a barcode and a cluster column", path.display()));
-    }
-    if t.rows.len() != barcodes.len() || t.rows.iter().zip(barcodes).any(|(r, b)| r.get(bc) != Some(b)) {
-        return Err(format!("{}: barcodes differ from the matrix's (order or set)", path.display()));
-    }
-    Ok(t.rows.iter().map(|r| r.get(cl).cloned().unwrap_or_default()).collect())
-}
-
-fn read_levels(args: &Args, clusters_path: &Path, labels: &[String]) -> Result<(Vec<String>, String), String> {
-    let explicit = args.get("cluster-levels").map(PathBuf::from);
-    let beside = clusters_path.parent().map(|d| d.join("seurat_clusters_levels.txt"));
-    let path = explicit.or_else(|| beside.filter(|p| p.is_file()));
-    match path {
-        Some(p) => {
-            let text = std::fs::read_to_string(&p).map_err(|e| format!("{}: {e}", p.display()))?;
-            Ok((text.lines().map(str::to_owned).collect(), p.display().to_string()))
-        }
-        None => {
-            let mut lv: Vec<String> = Vec::new();
-            for l in labels {
-                if !lv.contains(l) {
-                    lv.push(l.clone());
-                }
-            }
-            Ok((lv, "order of first appearance".into()))
-        }
-    }
-}
 
 pub fn main(argv: &[String]) -> Result<(), String> {
     let args = Args::parse(argv)?;
     args.only(&["counts", "clusters", "cluster-levels", "from-stages", "out", "threads", "pcs", "pn", "nexp-rate", "pk", "seed", "dump-stages"])?;
-    let mut phases = Phases::new();
+    let phases = RefCell::new(Phases::new());
     let start_time = cli::utc_now();
     let counts = args.path("counts")?;
     let clusters_path = args.path("clusters")?;
     let out = args.path("out")?;
-    let Some(stages) = args.get("from-stages").map(PathBuf::from) else {
-        return Err("--from-stages is required: Rust's SCTransform and PCA come in milestones M4 to M6".into());
-    };
+    let stages = args.get("from-stages").map(PathBuf::from);
     let threads = cli::threads(&args)?;
-    let dump = args.get("dump-stages").unwrap_or("none");
+    let dump_arg = args.get("dump-stages").unwrap_or("none");
+    let dump = DumpLevel::parse(dump_arg).map_err(|e| format!("--dump-stages: {e}"))?;
     let neighbour_dumps = match dump {
-        "none" => NeighbourDumps::default(),
-        "light" => NeighbourDumps { digests: true, positions: false },
-        "full" => NeighbourDumps { digests: true, positions: true },
-        d => return Err(format!("--dump-stages: unknown level '{d}'")),
+        None => NeighbourDumps::default(),
+        Some(DumpLevel::Full) => NeighbourDumps { digests: true, positions: true },
+        Some(_) => NeighbourDumps { digests: true, positions: false },
     };
     let pk = match args.get("pk").unwrap_or("auto") {
         "auto" => PkChoice::Auto,
@@ -111,42 +98,86 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         pk,
         seed: args.number("seed", 12345)?,
         threads,
-        keep_stages: dump != "none",
+        keep_stages: dump.is_some(),
         neighbour_dumps,
     };
+    if params.pcs < 2 {
+        return Err("--pcs: at least 2 (RunPCA's embeddings are u %*% diag(d))".into());
+    }
+    if !(params.pn > 0.0 && params.pn < 1.0) {
+        return Err(format!("--pn: expected a value in (0, 1), not {}", params.pn));
+    }
     if out.join("cells.tsv").exists() || out.join("summary.json").exists() {
         return Err(format!("{}: holds a previous run; choose another --out", out.display()));
     }
 
-    let barcodes = tenx::read_barcodes(&counts).map_err(|e| e.to_string())?;
-    let n_genes = tenx::read_features(&counts).map_err(|e| e.to_string())?.len();
-    let clusters = read_clusters(&clusters_path, &barcodes)?;
-    let (cluster_levels, levels_source) = read_levels(&args, &clusters_path, &clusters)?;
-    let input = Input { barcodes, clusters, cluster_levels, n_genes };
-    phases.mark("load");
-
-    let mut source = StageSource::new(&stages).map_err(|e| e.to_string())?;
-    let output = run(&input, &params, &mut source, &mut |p| phases.mark(p)).map_err(|e| e.to_string())?;
+    let (input, levels) = read_input(&counts, &clusters_path, args.get("cluster-levels").map(Path::new)).map_err(|e| e.to_string())?;
+    let mut rng_end = None;
+    let mut recorder = None;
+    let output = match &stages {
+        Some(dir) => {
+            phases.borrow_mut().mark("load");
+            let mut source = StageSource::new(dir).map_err(|e| e.to_string())?;
+            run(&input, &params, &mut source, &mut |p| phases.borrow_mut().mark(p)).map_err(|e| e.to_string())?
+        }
+        None => {
+            let m = read_counts(&counts, &input).map_err(|e| e.to_string())?;
+            phases.borrow_mut().mark("load");
+            let mut source = RustSource::new(m, params.seed, params.pcs, threads).with_marks(|p| phases.borrow_mut().mark(p));
+            if let Some(level) = dump {
+                source = source.with_recorder(Recorder::new(&out.join("stages"), level));
+            }
+            let output = run(&input, &params, &mut source, &mut |p| phases.borrow_mut().mark(p)).map_err(|e| e.to_string())?;
+            rng_end = Some(source.rng_state());
+            recorder = source.take_recorder();
+            output
+        }
+    };
 
     std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
     output.write_tables(&out).map_err(|e| e.to_string())?;
-    if dump != "none" {
-        stage_dumps(&output).write(&out.join("stages")).map_err(|e| e.to_string())?;
+    match recorder {
+        Some(r) => r.finish(&output).map_err(|e| format!("{}: {e}", out.join("stages").display()))?,
+        None if dump.is_some() => stage_dumps(&output).write(&out.join("stages")).map_err(|e| e.to_string())?,
+        None => {}
     }
+    let mut phases = phases.into_inner();
     phases.mark("write");
 
     let fingerprint = Json::parse(&crate::fingerprint::json()).unwrap_or(Json::Null);
+    let mode = match &stages {
+        Some(_) => "teacher-forced: R's sweep subsample and PCA embeddings (stages S1, S3)",
+        None => "rust: every stage (S1-S7) computed by Rust from the counts, the cluster labels and the seed",
+    };
+    let pk_text = match params.pk {
+        PkChoice::Auto => Json::Str("auto".into()),
+        PkChoice::Fixed(v) => Json::Num(v),
+    };
     let run_info = Json::obj(vec![
         ("kind", Json::Str("scrust doubletfinder".into())),
-        ("mode", Json::Str("teacher-forced: R's sweep subsample and PCA embeddings (stages S1, S3)".into())),
+        ("mode", Json::Str(mode.into())),
         ("scrust_version", Json::Str(env!("CARGO_PKG_VERSION").into())),
+        (
+            "reproduces",
+            Json::strs(&[doubletfinder::REFERENCE, sctransform::REFERENCE, pca::REFERENCE]),
+        ),
         ("counts", Json::Str(counts.display().to_string())),
         ("clusters", Json::Str(clusters_path.display().to_string())),
-        ("cluster_levels", Json::Str(levels_source)),
-        ("from_stages", Json::Str(stages.display().to_string())),
+        ("cluster_levels", Json::Str(levels.describe())),
+        ("from_stages", stages.as_ref().map(|d| Json::Str(d.display().to_string())).unwrap_or(Json::Null)),
         ("outdir", Json::Str(out.display().to_string())),
+        (
+            "parameters",
+            Json::obj(vec![
+                ("seed", Json::Int(params.seed as i64)),
+                ("pcs", Json::Int(params.pcs as i64)),
+                ("pN", Json::Num(params.pn)),
+                ("nexp_rate", Json::Num(params.nexp_rate)),
+                ("pK", pk_text),
+            ]),
+        ),
         ("threads", Json::Int(threads as i64)),
-        ("dump_stages", Json::Str(dump.into())),
+        ("dump_stages", Json::Str(dump_arg.into())),
         ("start_time", Json::Str(start_time)),
         ("slurm_job_id", cli::env_json("SLURM_JOB_ID")),
         ("elapsed_s", Json::Num(phases.elapsed())),
@@ -154,17 +185,19 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         ("peak_rss_kib", cli::peak_rss_kib().map(|v| Json::Int(v as i64)).unwrap_or(Json::Null)),
         ("fingerprint", fingerprint),
     ]);
-    let summary = Json::obj(vec![("result", output.result_json(None)), ("run", run_info)]);
+    let digest = rng_end.as_deref().map(rng_digest);
+    let summary = Json::obj(vec![("result", output.result_json(digest)), ("run", run_info)]);
     std::fs::write(out.join("summary.json"), scio::json::to_file_text(&summary)).map_err(|e| e.to_string())?;
     eprintln!(
-        "scrust doubletfinder: pK {} (BCmetric row {}), nExp {}, {} doublets of {} cells; {:.1} s, {} threads",
+        "scrust doubletfinder: pK {} (BCmetric row {}), nExp {}, {} doublets of {} cells; {:.1} s, {} threads, peak RSS {:.2} GiB",
         output.pk_label,
         output.sweep.as_ref().map_or("-".into(), |s| (s.best_row + 1).to_string()),
         output.nexp,
         output.doublet.iter().filter(|&&d| d).count(),
         output.n_cells,
         phases.elapsed(),
-        threads
+        threads,
+        cli::peak_rss_kib().unwrap_or(0) as f64 / 1048576.0
     );
     Ok(())
 }
