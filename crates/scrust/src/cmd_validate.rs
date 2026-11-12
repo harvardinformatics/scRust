@@ -8,27 +8,34 @@ pub const USAGE: &str = "\
 Usage: scrust validate doubletfinder --reference <R run dir> --candidate <Rust output dir>
                                      [--reference-stages <dir>] [--json <file>]
                                      [--markdown <file>] [--threads N]
+       scrust validate sctransform --input <10x dir> --stages <R stage dir>
+                                   [--mode both|teacher|chained] [--contexts <ctx,ctx,...>]
+                                   [--json <file>] [--markdown <file>] [--threads N]
 
-Compares cells.tsv, sweep_stats.tsv and bcmvn.tsv byte for byte, the result section of
-summary.json field by field, every stage array block (S4-S7) the two runs both dumped bit for
-bit, and S6 and S7 recomputed from R's own S5 (teacher forcing). Exit status 0 when nothing
-differs, 1 otherwise.
+doubletfinder: compares cells.tsv, sweep_stats.tsv and bcmvn.tsv byte for byte, the result
+section of summary.json field by field, every stage array block (S4-S7) the two runs both dumped
+bit for bit, and S6 and S7 recomputed from R's own S5 (teacher forcing).
+
+sctransform: runs Rust's SCTransform on the SCT input of every context of an instrumented
+DoubletFinder run (the counts in --input, R's S1 draws from --stages) and compares stage S2
+with R's dumps bit for bit, plus the RNG checkpoints and scalars: each sub-stage teacher-forced
+on R's own inputs (S2a-S2d; --mode teacher), and the whole chain on Rust's own results
+(S2-chain; --mode chained); both by default. S2d's products are OpenBLAS calls: run under the
+reference run's OpenBLAS kernel (OPENBLAS_CORETYPE).
+
+Exit status 0 when nothing differs, 1 otherwise.
 ";
 
 pub fn main(argv: &[String]) -> Result<bool, String> {
     let Some(tool) = argv.first() else {
-        return Err("which tool? (doubletfinder)".into());
+        return Err("which tool? (doubletfinder, sctransform)".into());
     };
-    if tool != "doubletfinder" {
-        return Err(format!("no validation for '{tool}' yet"));
-    }
-    let args = Args::parse(&argv[1..])?;
-    args.only(&["reference", "reference-stages", "candidate", "json", "markdown", "threads"])?;
-    let reference = args.path("reference")?;
-    let reference_stages = args.get("reference-stages").map(PathBuf::from).unwrap_or_else(|| reference.join("stages"));
-    let candidate = args.path("candidate")?;
-    let threads = cli::threads(&args)?;
-    let report = doubletfinder::validate::compare(&reference, &reference_stages, &candidate, threads).map_err(|e| e.to_string())?;
+    let report = match tool.as_str() {
+        "doubletfinder" => doubletfinder_report(&argv[1..])?,
+        "sctransform" => sctransform_report(&argv[1..])?,
+        _ => return Err(format!("no validation for '{tool}' yet")),
+    };
+    let (report, args) = report;
     if let Some(p) = args.get("json").map(PathBuf::from) {
         std::fs::write(&p, scio::json::to_file_text(&report.to_json())).map_err(|e| format!("{}: {e}", p.display()))?;
     }
@@ -43,4 +50,34 @@ pub fn main(argv: &[String]) -> Result<bool, String> {
     }
     eprintln!("{}", if report.pass() { "pass: everything compared is identical" } else { "FAIL" });
     Ok(report.pass())
+}
+
+fn sctransform_report(argv: &[String]) -> Result<(doubletfinder::validate::Report, Args), String> {
+    let args = Args::parse(argv)?;
+    args.only(&["input", "stages", "mode", "contexts", "json", "markdown", "threads"])?;
+    let input = args.path("input")?;
+    let stages = args.path("stages")?;
+    let only: Option<Vec<String>> = args.get("contexts").map(|s| s.split(',').map(String::from).collect());
+    use doubletfinder::sct::Which;
+    let which = match args.get("mode").unwrap_or("both") {
+        "both" => Which::ALL,
+        "teacher" => Which::TEACHER,
+        "chained" => Which::CHAIN,
+        m => return Err(format!("--mode: expected both, teacher or chained, not {m}")),
+    };
+    let params = sctransform::SctParams::default();
+    let threads = cli::threads(&args)?;
+    let report = doubletfinder::sct::validate(&input, &stages, &params, which, only.as_deref(), threads).map_err(|e| e.to_string())?;
+    Ok((report, args))
+}
+
+fn doubletfinder_report(argv: &[String]) -> Result<(doubletfinder::validate::Report, Args), String> {
+    let args = Args::parse(argv)?;
+    args.only(&["reference", "reference-stages", "candidate", "json", "markdown", "threads"])?;
+    let reference = args.path("reference")?;
+    let reference_stages = args.get("reference-stages").map(PathBuf::from).unwrap_or_else(|| reference.join("stages"));
+    let candidate = args.path("candidate")?;
+    let threads = cli::threads(&args)?;
+    let report = doubletfinder::validate::compare(&reference, &reference_stages, &candidate, threads).map_err(|e| e.to_string())?;
+    Ok((report, args))
 }

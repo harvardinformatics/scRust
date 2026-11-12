@@ -7,7 +7,7 @@
 # M2) and says so in its report (A5b).
 #
 # The criteria are the plan's (B5) and the key names a proposal. Each stage is uncommented and
-# settled when its milestone lands (S0: M1; S1 and S4-S7: M3). `scrust validate doubletfinder`
+# settled when its milestone lands (S0: M1; S1 and S4-S7: M3; S2a-S2d: M4). `scrust validate doubletfinder`
 # (crates/doubletfinder/src/validate.rs) applies the settled S1 and S4-S7 criteria: everything
 # it compares must be identical.
 
@@ -55,30 +55,61 @@ criterion = "exact"
 compare = ["S1_subsample", "S1_doublets", "rng_state_after"]
 
 # S2a SCTransform setup: log_umi, filtered genes, gmeans, fitting cells and genes, bins,
-# RNG state (M4a)
-# [doubletfinder.S2a]
-# criterion = "exact"
+# RNG state (M4a). Settled (M4): exact. In every context of all 24 instrumented runs of the 10
+# objects, from the SCT input rebuilt from the counts and R's S1 draws: cell attributes, the gene
+# filter, geometric means, means and variances (explicit zeros as R stores them), the fitting
+# cells and genes, the density-weighted gene sampling (density, probabilities, the draw), and R's
+# .Random.seed at vst's entry, after the cell sampling and at the fits' entry
+# (docs/validation/doubletfinder_m4.md).
+[doubletfinder.S2a]
+criterion = "exact"
+compare = ["S2a_cells", "S2a_genes", "S2a_gene_stats", "S2a_cells_step1", "S2a_genes_step1_pool",
+           "S2a_genes_step1", "S2a_log_gmean_step1", "S2a_sampling_prob", "S2a_density",
+           "rng_vst_entry", "rng_after_cell_sampling", "rng_fits_entry"]
 
 # S2b SCTransform fits: per-gene Beta and theta, given R's fitting cells and genes (M4b).
-# Target exact; fallback relative <= 1e-6 if nlminb can't be made bit-exact (decision point).
-# [doubletfinder.S2b]
-# criterion = "exact"
-# fallback = { criterion = "numeric", rel = 1e-6 }
+# Settled (M4): exact, so the decision point's fallback (relative 1e-6) is not needed. Every
+# intermediate of every gene's glmGamPoi fit (moment dispersion and start, first Newton fit and
+# its iterations, the overdispersion MLE through nlminb with the Cox-Reid term, the trend, the
+# second fit, its iterations and deviance), model_pars before and after the 1e-7 floor, and the
+# RNG state at each bin's future_lapply and at the fits' exit, in all 24 runs; the Cox-Reid
+# sums are OpenBLAS dgemv calls, identical across kernels at these sizes.
+[doubletfinder.S2b]
+criterion = "exact"
+compare = ["S2b_glm", "S2b_model_pars_raw", "S2b_model_pars", "rng_bin_entry", "rng_fits_exit"]
 
-# S2c SCTransform regularisation: regularised parameters, given R's fit outputs (M4c)
-# [doubletfinder.S2c]
-# criterion = "exact"
+# S2c SCTransform regularisation: regularised parameters, given R's fit outputs (M4c). Settled
+# (M4): exact. model_pars_fit of every kept gene, the outliers, the Poisson and smoothing genes,
+# mean(colSums(umi)) and the bw.SJ bandwidth, in all 24 runs.
+[doubletfinder.S2c]
+criterion = "exact"
+compare = ["S2c_model_pars_fit", "S2c_outliers", "S2c_poisson_genes", "S2c_smoothing_genes",
+           "mean_cell_sum", "reg_bw"]
 
 # S2d SCTransform residuals: residual variance, the 3,000 variable features (ordered) and
-# scale.data, given R's parameters (M4d). Exact when the BLAS kernel matches; otherwise a
-# numeric tolerance set from the R-vs-R floor.
+# scale.data, given R's parameters (M4d). Settled (M4): exact when the OpenBLAS kernel is the
+# reference run's (the residuals' tcrossprod is a dgemm call): residual mean and variance of every
+# kept gene, the top, variable and PCA features in order, min_variance and both clip ranges, and
+# wherever R dumped them the full residual matrix and scale.data, in all 24 runs, each under its
+# own profile (portable runs with OPENBLAS_CORETYPE=Haswell, production runs with SapphireRapids
+# detected). Under another kernel the comparison is not exact; the fallback stays as proposed.
 # Floor (M2): across OpenBLAS kernels, residual statistics and scale.data differ in the last
 # bits on the larger objects (at most 5.7e-14 absolute, in at most 0.8% of a scale.data block);
-# bit-identical on tier T, and across CPU types with the same kernel. Proposed fallback, about
-# 20 times the floor: numeric, abs = 1e-12.
-# [doubletfinder.S2d]
-# criterion = "exact"
-# blas_dependent = true
+# bit-identical on tier T, and across CPU types with the same kernel. Fallback, about 20 times
+# the floor: numeric, abs = 1e-12.
+[doubletfinder.S2d]
+criterion = "exact"
+blas_dependent = true
+compare = ["S2d_residual_stats", "S2d_top_features", "S2d_variable_features", "S2d_pca_features",
+           "S2d_scale_data", "S2d_y", "min_variance", "res_clip_range", "clip_range"]
+otherwise = { criterion = "numeric", abs = 1e-12 }
+
+# S2 chained (M4): the whole SCTransform from the counts and R's S1 draws, each sub-stage on the
+# previous one's Rust results; every S2 array, scalar and RNG checkpoint above plus the states at
+# vst's and SCTransform's exits. Settled: exact, in all 24 runs (under each run's kernel).
+[doubletfinder.S2_chain]
+criterion = "exact"
+blas_dependent = true
 
 # S3 PCA: standard deviations, embeddings (up to sign per component), RNG state afterwards (M5).
 # Identical when the BLAS kernel matches the fixture; otherwise relative <= 1e-10. The RNG state

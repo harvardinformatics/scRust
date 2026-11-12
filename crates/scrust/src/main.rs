@@ -2,12 +2,14 @@
 //!
 //! Each tool is a library crate under `crates/` plus a subcommand here, so the repository ships
 //! as one binary: `doubletfinder` (milestone M3: on R's own embeddings), `knn` (the shared
-//! neighbour stage on its own), `validate` (Rust against R, plan A4) and `fingerprint` (the
+//! neighbour stage on its own), `sctransform` (SCTransform v2, milestone M4), `validate` (Rust
+//! against R, plan A4) and `fingerprint` (the
 //! environment fingerprint of plan A5b, which the R reference runs record too).
 
 mod cli;
 mod cmd_doubletfinder;
 mod cmd_knn;
+mod cmd_sctransform;
 mod cmd_validate;
 mod fingerprint;
 
@@ -20,7 +22,9 @@ Commands:
   doubletfinder  Doublet detection reproducing DoubletFinder 2.0.6 (milestone M3: on the
                  embeddings of an instrumented R run, --from-stages)
   knn            Exact nearest neighbours as DoubletFinder ranks them
-  validate       Compare a Rust run with an R reference run (validate doubletfinder ...)
+  sctransform    SCTransform v2 as Seurat 5.5.1 runs it (sctransform 0.4.3, glmGamPoi 1.22.0):
+                 Pearson residuals, variable features and scale.data (milestone M4)
+  validate       Compare a Rust run with an R reference run (validate doubletfinder|sctransform)
   fingerprint    Print the environment fingerprint as JSON: node, CPU, OpenBLAS kernel
                  and threads, glibc (docs/PLAN.md A5b)
 
@@ -49,11 +53,12 @@ fn main() -> ExitCode {
             print!("{}", fingerprint::json());
             ExitCode::SUCCESS
         }
-        Some(cmd @ ("doubletfinder" | "knn" | "validate")) => {
+        Some(cmd @ ("doubletfinder" | "knn" | "sctransform" | "validate")) => {
             let rest: Vec<String> = std::env::args().skip(2).collect();
             let usage = match cmd {
                 "doubletfinder" => cmd_doubletfinder::USAGE,
                 "knn" => cmd_knn::USAGE,
+                "sctransform" => cmd_sctransform::USAGE,
                 _ => cmd_validate::USAGE,
             };
             if rest.iter().any(|a| a == "-h" || a == "--help") {
@@ -63,6 +68,7 @@ fn main() -> ExitCode {
             let result = match cmd {
                 "doubletfinder" => cmd_doubletfinder::main(&rest).map(|_| true),
                 "knn" => cmd_knn::main(&rest).map(|_| true),
+                "sctransform" => cmd_sctransform::main(&rest).map(|_| true),
                 _ => cmd_validate::main(&rest),
             };
             match result {

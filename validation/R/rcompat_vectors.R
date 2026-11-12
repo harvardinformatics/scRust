@@ -2,7 +2,10 @@
 # Reference vectors for the rcompat crate (docs/PLAN.md A5 and B6, milestones M1 and M3; stage S0
 # in validation/tolerances.toml): R's random-number stream, sampling, rnorm/qnorm, round, ^, seq,
 # order, sum/mean/var/sd and number formatting (M1); as.numeric() of strings, fft, dnorm and
-# approxfun (M3); over many seeds, sizes and edge cases.
+# approxfun (M3); quantile, median, mad, IQR, density (bw = "nrd"), nlminb, gamma functions,
+# matrixStats, dnbinom (mu form), optimize, uniroot, bw.SJ, ksmooth and .bincode (M4); over
+# many seeds,
+# sizes and edge cases.
 #
 # Reads no .rds, so it may run on a login node. Run from the repository root with the production
 # R env and the hermetic flags:
@@ -12,8 +15,9 @@
 #
 # Output: one tab-separated file per family; lines starting with "#" describe the columns. Doubles
 # are written as their IEEE-754 bit patterns (16 hex digits), lists comma-separated, "-" for an
-# empty list. Results do not depend on BLAS, so the files are the same on any x86-64 node with
-# this R build and glibc (2.28 on Cannon).
+# empty list. Results do not depend on BLAS, except nlminb.tsv (PORT's inner products and norms
+# are BLAS ddot and dnrm2): run with OPENBLAS_CORETYPE=Haswell, the portable profile, as env.sh
+# sets it. The files are the same on any x86-64 node with this R build and glibc (2.28 on Cannon).
 
 args <- commandArgs(trailingOnly = TRUE)
 out <- if (length(args)) args[[1]] else file.path("tests", "fixtures", "rcompat")
@@ -490,5 +494,311 @@ write_tsv("approx.tsv", "x\ty\txout\tmethod\trule\tf\tapproxfun(x, y, method, ru
               paste(hexl(cs[[1]]), hexl(cs[[2]]), hexl(cs[[3]]), cs[[4]], cs[[5]], hex(cs[[6]]),
                     hexl(fun(cs[[3]])), sep = "\t")
           }))
+
+# =============================================================================================
+# M4: the stats functions SCTransform v2 reaches (sctransform 0.4.3, glmGamPoi 1.22.0)
+# =============================================================================================
+
+# ---------------------------------------------------------------------------------------------
+# quantile(x, c(0.25, 0.75), type = 7), median, mad, IQR: odd and even lengths, ties, negative
+# values; the vectors are written out.
+
+set.seed(41)
+os_cases <- list(c(3, 1, 2), c(4, 1, 3, 2), c(1, 1, 1, 1), c(-2.5, 7, 0, 0, 0.5),
+                 runif(1), runif(2), runif(101, -5, 5), round(rnorm(500), 1), rexp(1000),
+                 log10(1 + rpois(777, 3)), c(rep(0, 50), runif(51)))
+write_tsv("orderstat.tsv", "x\tquantile(x, c(0.25, 0.75), type = 7)\tmedian(x)\tmad(x)\tIQR(x)",
+          lapply(os_cases, function(x)
+              paste(hexl(x), hexl(quantile(x, c(0.25, 0.75), names = FALSE)), hex(median(x)),
+                    hex(mad(x)), hex(IQR(x)), sep = "\t")))
+
+# ---------------------------------------------------------------------------------------------
+# density(x, bw = "nrd", adjust = 1)$x, $y and $bw (512 points; R >= 4.4 coordinates), as
+# sctransform weights its gene sampling: log10 geometric means and other shapes.
+
+set.seed(43)
+de_cases <- list(log10(1 + rexp(800, 2)), rnorm(300), c(runif(200), runif(30, 5, 6)),
+                 log10(1 + rpois(1200, 0.3) + runif(1200)), c(1, 2), seq(0, 1, length.out = 7))
+write_tsv("density.tsv", "x\tbw.nrd(x)\tdensity(x, bw = \"nrd\")$x\t$y",
+          lapply(de_cases, function(x) {
+              d <- density(x, bw = "nrd", adjust = 1)
+              stopifnot(identical(d$bw, bw.nrd(x)))
+              paste(hexl(x), hex(d$bw), hexl(d$x), hexl(d$y), sep = "\t")
+          }))
+
+# ---------------------------------------------------------------------------------------------
+# nlminb(start, objective, gradient, hessian, lower, upper, control = list(iter.max = m)): R's
+# PORT library (DRMNHB; DRMNGB without the Hessian, glmGamPoi's fallback), as glmGamPoi calls
+# it, on analytic test functions in one and two
+# dimensions whose arithmetic Rust repeats operation for operation (always with finite bounds:
+# without them R calls DRMNH, which glmGamPoi never reaches): the result (par, objective,
+# convergence, iterations, evaluations, the PORT return code iv[1]) and the trace of every point
+# at which the objective ("f") or the gradient and Hessian ("g") were evaluated.
+#   quad:a:c        a * ((x - c) * (x - c))
+#   quart:a:c       (x - c)^4 + a * (x - c)^2, written as products
+#   explin:b        exp(x) - b * x
+#   flat            exp(-x) (no minimum inside large bounds)
+#   rosen           100 * (x2 - x1 * x1)^2 + (1 - x1)^2 (two dimensions)
+#   nbll:s:m        a negative binomial profile in log(theta): s * log(1 + m * exp(x)) - ...
+
+nl_fun <- function(spec) {
+    f <- strsplit(spec, ":", fixed = TRUE)[[1]]
+    num <- as.numeric(f[-1])
+    switch(f[1],
+        quad = list(
+            fn = function(x) num[1] * ((x - num[2]) * (x - num[2])),
+            gr = function(x) 2 * num[1] * (x - num[2]),
+            he = function(x) matrix(2 * num[1], 1, 1)),
+        quart = list(
+            fn = function(x) { d <- x - num[2]; d2 <- d * d; d2 * d2 + num[1] * d2 },
+            gr = function(x) { d <- x - num[2]; 4 * (d * d * d) + 2 * num[1] * d },
+            he = function(x) { d <- x - num[2]; matrix(12 * (d * d) + 2 * num[1], 1, 1) }),
+        explin = list(
+            fn = function(x) exp(x) - num[1] * x,
+            gr = function(x) exp(x) - num[1],
+            he = function(x) matrix(exp(x), 1, 1)),
+        flat = list(
+            fn = function(x) exp(-x),
+            gr = function(x) -exp(-x),
+            he = function(x) matrix(exp(-x), 1, 1)),
+        rosen = list(
+            fn = function(x) { a <- x[2] - x[1] * x[1]; b <- 1 - x[1]; 100 * (a * a) + b * b },
+            gr = function(x) { a <- x[2] - x[1] * x[1]; b <- 1 - x[1];
+                               c(-400 * x[1] * a - 2 * b, 200 * a) },
+            he = function(x) { a <- x[2] - x[1] * x[1];
+                               h11 <- 1200 * (x[1] * x[1]) - 400 * x[2] + 2
+                               matrix(c(h11, -400 * x[1], -400 * x[1], 200), 2, 2) }),
+        nbll = list(
+            # theta = exp(x): -( s * x - (s + m) * log(1 + exp(x)) ) style concave profile
+            fn = function(x) (num[1] + num[2]) * log(1 + exp(x)) - num[1] * x,
+            gr = function(x) (num[1] + num[2]) * (exp(x) / (1 + exp(x))) - num[1],
+            he = function(x) { e <- exp(x); matrix((num[1] + num[2]) * (e / ((1 + e) * (1 + e))), 1, 1) }),
+        stop("unknown function ", spec))
+}
+
+nl_cases <- list(
+    list("quad:1:3", 0, -10, 10, 200), list("quad:1:3", 0, -10, 1, 200),
+    list("quad:2.5:-1.25", 4, -1e300, 1e300, 200), list("quad:1e-3:7", -5, -20, 20, 200),
+    list("quart:0:2", -1, -10, 10, 200), list("quart:0.01:0.5", 3, -5, 5, 200),
+    list("quart:1e-8:1", 10, -36.841361487904734, 36.841361487904734, 200),
+    list("explin:2", 0, -10, 10, 200), list("explin:1e-6", 0, -36.841361487904734, 36.841361487904734, 200),
+    list("explin:1e8", 0, -36.841361487904734, 36.841361487904734, 200),
+    list("flat", 0, -36.841361487904734, 36.841361487904734, 200),
+    list("flat", 0, -36.841361487904734, 36.841361487904734, 3),
+    list("explin:3", 5, -10, 10, 1), list("explin:3", 5, -10, 10, 2),
+    list("nbll:5:20", log(0.5), -36.841361487904734, 36.841361487904734, 200),
+    list("nbll:0.5:300", 1, -36.841361487904734, 36.841361487904734, 200),
+    list("nbll:50:2", -3, -36.841361487904734, 36.841361487904734, 200),
+    list("rosen", c(-1.2, 1), c(-50, -50), c(50, 50), 200),
+    list("rosen", c(-1.2, 1), c(-2, -2), c(0.5, 2), 200),
+    list("rosen", c(2, 2), c(1.5, -1), c(3, 3), 200),
+    list("rosen", c(0, 0), c(-1, -1), c(1, 1), 5))
+# the same cases without the Hessian (DRMNGB: glmGamPoi's fallback)
+nl_cases <- c(lapply(nl_cases, function(cs) c(cs, TRUE)), lapply(nl_cases, function(cs) c(cs, FALSE)))
+write_tsv("nlminb.tsv",
+          paste("function\tstart\tlower\tupper\titer.max\thessian\tpar\tobjective\tconvergence",
+                "iterations\tevaluations (f,g)\tiv[1] code\ttrace kinds\ttrace points", sep = "\t"),
+          lapply(nl_cases, function(cs) {
+              fun <- nl_fun(cs[[1]])
+              kinds <- character(); pts <- numeric()
+              res <- nlminb(cs[[2]],
+                            objective = function(x) { kinds <<- c(kinds, "f"); pts <<- c(pts, x); fun$fn(x) },
+                            gradient = function(x) { kinds <<- c(kinds, "g"); pts <<- c(pts, x); fun$gr(x) },
+                            hessian = if (cs[[6]]) function(x) fun$he(x),
+                            lower = cs[[3]], upper = cs[[4]], control = list(iter.max = cs[[5]]))
+              code <- match(res$message, vapply(c(3:10, 14:16, 63, 65), function(i)
+                  stats:::port_msg(i), ""))
+              code <- c(3:10, 14:16, 63, 65)[code]
+              if (is.na(code)) code <- -1L
+              paste(cs[[1]], hexl(cs[[2]]), hexl(cs[[3]]), hexl(cs[[4]]), cs[[5]], as.integer(cs[[6]]), hexl(res$par),
+                    hex(res$objective), res$convergence, res$iterations,
+                    paste(res$evaluations, collapse = ","), code, lst(kinds), hexl(pts), sep = "\t")
+          }))
+
+# ---------------------------------------------------------------------------------------------
+# lgamma (R's lgammafn), digamma and trigamma (dpsifn), at the arguments glmGamPoi's
+# likelihood reaches (count + 1/theta for theta from 1e-16 to 1e16, counts and half counts) and
+# across the branches of the implementations (tiny, <= 10, > 10, huge, negative non-integers).
+
+set.seed(47)
+gm_x <- c(1e-310, 1e-300, 1e-20, 1e-8, 0.1, 0.5, 1, 1.5, 2, 2.5, 3, 9.999, 10, 10.5, 11, 50.25,
+          1e3, 4934720, 4934721, 1e10, 1e17, 1.1e17, 1e300,
+          -0.5, -1.5, -2.25, -9.5, -10.5, -11.25, -100.5,
+          exp(runif(150, log(1e-16), log(1e16))),
+          outer(c(0, 0.5, 1, 1.5, 2, 3, 5, 7.5, 12, 40, 155.5),
+                exp(c(-36.8, -20, -9, -3, -1, 0, 1, 3, 9, 20, 36.8)), "+"),
+          runif(100, 0, 30))
+write_tsv("gamma.tsv", "x\tlgamma(x)\tdigamma(x)\ttrigamma(x)",
+          lapply(gm_x, function(x) paste(hex(x), hex(lgamma(x)), hex(digamma(x)),
+                                         hex(trigamma(x)), sep = "\t")))
+
+# ---------------------------------------------------------------------------------------------
+# matrixStats 1.5.0 as glmGamPoi reaches it through DelayedMatrixStats/MatrixGenerics (checked
+# identical here): rowMeans2, colMeans2 and rowVars of matrices (refine = TRUE; the installed
+# package accumulates in double, as HAVE_LONG_DOUBLE is not visible to packages), and
+# weightedMedian(x, w, interpolate = FALSE) with ties in x (R_qsort_I is not stable), as
+# loc_median_fit calls it with dnorm weights, and weightedMedian(x, w) (interpolate = TRUE). Matrices are written column-major.
+
+suppressPackageStartupMessages(library(matrixStats))
+set.seed(53)
+ms_mats <- list(matrix(rpois(60, 2) / 2, 6, 10), matrix(runif(35) * 1e3, 5, 7),
+                matrix(exp(rnorm(400, 0, 3)), 20, 20), matrix(c(0.1, 0.1, 0.1, 0.2, 0.3, 0.1), 2, 3),
+                matrix(rep(1 / 3, 64), 4, 16))
+write_tsv("matrixstats.tsv", "nrow\tncol\tx\trowMeans2\tcolMeans2\trowVars",
+          lapply(ms_mats, function(m) {
+              stopifnot(identical(DelayedMatrixStats::rowMeans2(m), matrixStats::rowMeans2(m)),
+                        identical(DelayedMatrixStats::colMeans2(m), matrixStats::colMeans2(m)),
+                        identical(DelayedMatrixStats::rowVars(m), matrixStats::rowVars(m)))
+              paste(nrow(m), ncol(m), hexl(m), hexl(rowMeans2(m)), hexl(colMeans2(m)),
+                    hexl(rowVars(m)), sep = "\t")
+          }))
+wm_cases <- list()
+for (h in c(1, 2, 5, 10, 50)) {
+    w <- dnorm(seq(-3, 3, length.out = 2 * h + 1))
+    wm_cases[[length(wm_cases) + 1]] <- list(runif(2 * h + 1), w)
+    wm_cases[[length(wm_cases) + 1]] <- list(sample(c(0, 0, 0, 1e16, runif(2 * h + 1)))[seq_len(2 * h + 1)], w)
+    wm_cases[[length(wm_cases) + 1]] <- list(round(runif(2 * h + 1) * 3) / 4, w)
+}
+wm_cases[[length(wm_cases) + 1]] <- list(c(1, 2, 3), c(1, 1, 1))
+wm_cases[[length(wm_cases) + 1]] <- list(c(1, 2, 3, 4), c(1, 1, 1, 1))
+wm_cases[[length(wm_cases) + 1]] <- list(rep(0.25, 31), dnorm(seq(-3, 3, length.out = 31)))
+# loc_median_fit's fallback when its window is wider than the data: weightedMedian(y, w =
+# dnorm(seq(-3, 3, length.out = length(y)))) with the default interpolate = TRUE
+for (n in c(2, 3, 4, 7, 10, 25)) {
+    w <- dnorm(seq(-3, 3, length.out = n))
+    wm_cases[[length(wm_cases) + 1]] <- list(runif(n), w)
+    wm_cases[[length(wm_cases) + 1]] <- list(round(runif(n) * 3) / 4, w)
+}
+write_tsv("weighted_median.tsv", "x\tw\tweightedMedian(x, w, interpolate = FALSE)\tweightedMedian(x, w)",
+          lapply(wm_cases, function(cs) paste(hexl(cs[[1]]), hexl(cs[[2]]),
+                 hex(weightedMedian(cs[[1]], w = cs[[2]], interpolate = FALSE)),
+                 hex(weightedMedian(cs[[1]], w = cs[[2]])), sep = "\t")))
+
+# ---------------------------------------------------------------------------------------------
+# dnbinom(x, size, mu = mu, log = TRUE) (nmath dnbinom_mu, with dbinom_raw, stirlerr, bd0 and
+# lgamma1p), as glmGamPoi's optimize() fallback evaluates it: sizes on both sides of every
+# stirlerr() branch and series cut-off, x = 0, x < 1e-10 * size, non-integer x (-Inf), mu from
+# 1e-12 to 1e8. One line per (size, mu) pair.
+
+set.seed(61)
+nb_size <- c(1e-6, 0.006, 0.1, 0.3, 0.49, 0.5, 0.51, 0.75, 0.99, 1, 1.5, 2, 2.25, 3.7, 5, 5.25,
+             5.3, 5.5, 6, 6.05, 6.3, 6.6, 6.9, 7.3, 8, 8.9, 10.25, 12.3, 12.5, 12.8, 13.3, 15, 15.5,
+             20, 23.5, 24, 26.9, 27, 50, 86, 100, 205, 1000, 6180, 1e4, 15.7e6, 2e7, 1e11, 1e13,
+             1 / c(166.61835542451206, 2.869887632263776, 4.69942116835039),
+             runif(10, 0, 30), exp(rnorm(10, 0, 4)))
+nb_x <- c(0, 1, 2, 3, 4, 7, 10, 13, 30, 100, 1234, 1e5, 0.5, 2.5, 3 + 1e-12, 1e-300)
+nb_mu <- c(1e-12, 1e-4, 0.03, 0.5, 1, 2.7, 10, 333, 1e5, 1e8)
+nb_rows <- list()
+for (size in nb_size) for (mu in nb_mu)
+    nb_rows[[length(nb_rows) + 1]] <- paste(hex(size), hex(mu), hexl(nb_x),
+        hexl(suppressWarnings(dnbinom(nb_x, size = size, mu = mu, log = TRUE))), sep = "\t")
+write_tsv("dnbinom.tsv", "size\tmu\tx\tdnbinom(x, size, mu = mu, log = TRUE)", nb_rows)
+
+# ---------------------------------------------------------------------------------------------
+# optimize() (Brent_fmin; fcn1 turns -Inf into -DBL_MAX, NaN and Inf into DBL_MAX) on functions
+# whose every value Rust computes the same way: each line has the points optimize() evaluated,
+# in order (without the objective at the result that optimize() adds), and the result.
+
+opt_fns <- list(
+    list("sq", function(x) (x - 1/3)^2, -3, 5),
+    list("abs", function(x) abs(x - 0.7), 0, 2),
+    list("floor", function(x) floor(4 * x) / 4, -1, 1),
+    list("inf_right", function(x) if (x > 0.3) Inf else (x - 0.5)^2, -2, 2),
+    list("sin", function(x) sin(3 * x) + x / 5, -4, 4),
+    list("neg_inf", function(x) -Inf, -30, 30),
+    list("xexp", function(x) exp(-x) * x, 0, 10),
+    list("log", function(x) log(x), -1, 2))
+opt_rows <- list()
+for (fn in opt_fns) for (maximum in c(FALSE, TRUE)) {
+    xs <- numeric(0)
+    g <- function(x) { xs <<- c(xs, x); fn[[2]](x) }
+    r <- suppressWarnings(optimize(g, lower = fn[[3]], upper = fn[[4]], maximum = maximum))
+    res <- if (maximum) r$maximum else r$minimum
+    stopifnot(identical(xs[length(xs)], res))
+    opt_rows[[length(opt_rows) + 1]] <- paste(fn[[1]], as.integer(maximum), hex(fn[[3]]), hex(fn[[4]]),
+                                              hexl(xs[-length(xs)]), hex(res), sep = "\t")
+}
+write_tsv("optimize.tsv", "function\tmaximum\tlower\tupper\tevaluated at\tresult", opt_rows)
+
+# ---------------------------------------------------------------------------------------------
+# uniroot() (R_zeroin2; fcn2 turns -Inf into -DBL_MAX, NaN and Inf into DBL_MAX; extendInt =
+# "no"): every point evaluated, in order (the two end points first, then zeroin's; without the
+# value at the root that uniroot() adds), and the root, iterations and estimated precision.
+
+ur_fns <- list(
+    list("cubic", function(x) x^3 - 2 * x - 5, 2, 3, 1e-10, 1000L),
+    list("cubic_default_tol", function(x) x^3 - 2 * x - 5, 2, 3, .Machine$double.eps^0.25, 1000L),
+    list("cos", function(x) cos(x) - x, 0, 1, 1e-12, 1000L),
+    list("exp", function(x) exp(x) - 10, 0, 5, 1e-6, 1000L),
+    list("log", function(x) log(x), 0, 2, 1e-9, 1000L),
+    list("step", function(x) if (x < 0.3) -1 else 2, -1, 1, 1e-8, 1000L),
+    list("flat", function(x) (x - 0.25)^3, -2, 3, 1e-14, 1000L),
+    list("few_iter", function(x) x^3 - 2 * x - 5, 2, 3, 1e-15, 3L),
+    list("root_at_end", function(x) x - 1, 1, 2, 1e-8, 1000L))
+ur_rows <- list()
+for (fn in ur_fns) {
+    xs <- numeric(0)
+    g <- function(x) { xs <<- c(xs, x); fn[[2]](x) }
+    r <- suppressWarnings(uniroot(g, c(fn[[3]], fn[[4]]), tol = fn[[5]], maxiter = fn[[6]]))
+    stopifnot(identical(xs[length(xs)], r$root))
+    ur_rows[[length(ur_rows) + 1]] <- paste(fn[[1]], hex(fn[[3]]), hex(fn[[4]]), hex(fn[[5]]), fn[[6]],
+                                            hexl(xs[-length(xs)]), hex(r$root), r$iter, hex(r$estim.prec), sep = "\t")
+}
+write_tsv("uniroot.tsv", "function\tlower\tupper\ttol\tmaxiter\tevaluated at\troot\titer\testim.prec", ur_rows)
+
+# ---------------------------------------------------------------------------------------------
+# bw.SJ(x) (method "ste", nb = 1000): pairwise distance counts from all pairs for n <= 500
+# (bw_den), from bin counts above (bw_pair_cnts' tabulate and bw_den_binned); bw_phi4/bw_phi6;
+# the search interval widened while fSD has one sign; uniroot with tol = 0.1 * lower. Samples
+# like sctransform's (log10 geometric means of genes) and others; "error" where R stops.
+
+set.seed(81)
+sj_cases <- list(rnorm(2), rnorm(10), rnorm(100), runif(499), rnorm(500), rnorm(501), runif(2000),
+                 log10(rgamma(2000, 0.3, 0.1) + 1e-3), log10(rgamma(1700, 0.5, 1) + 0.01),
+                 round(rnorm(800), 1), c(rnorm(300), rnorm(300, 6)), rexp(3000), rt(1000, 2),
+                 log10(exp(rnorm(1500, -1, 1.5))), c(rep(0, 50), rnorm(30)), rnorm(600) * 1e-8 + 5,
+                 c(-3, rnorm(200, 0, 0.01), 4), seq(-1, 1, length.out = 777), c(1, 1, 1, 2))
+sj_rows <- lapply(sj_cases, function(x) {
+    r <- tryCatch(hex(bw.SJ(x)), error = function(e) "error")
+    paste(hexl(x), r, sep = "\t")
+})
+write_tsv("bw_sj.tsv", "x\tbw.SJ(x)", sj_rows)
+
+# ---------------------------------------------------------------------------------------------
+# ksmooth(x, y, kernel, bandwidth, x.points = xp) (BDRksmooth): x with ties, unsorted x.points
+# inside and outside range(x); the result at sort(x.points), NA where the kernel reaches no x.
+
+set.seed(82)
+ks_rows <- list()
+for (k in 1:12) {
+    n <- sample(c(5, 50, 400, 2000), 1)
+    x <- if (k %% 3 == 0) round(rnorm(n), 1) else rnorm(n)
+    y <- rnorm(n) * 3 + x
+    xp <- c(runif(sample(c(1, 20, 300), 1), min(x) - 1, max(x) + 1), x[1:min(3, n)])
+    kernel <- if (k %% 4 == 1) "box" else "normal"
+    bw <- c(0.05, 0.3, 1, 3)[(k %% 4) + 1]
+    r <- ksmooth(x, y, kernel = kernel, bandwidth = bw, x.points = xp)
+    ks_rows[[k]] <- paste(kernel, hex(bw), hexl(x), hexl(y), hexl(xp), hexl(r$x), hexl(r$y), sep = "\t")
+}
+write_tsv("ksmooth.tsv", "kernel\tbandwidth\tx\ty\tx.points\tsort(x.points)\ty", ks_rows)
+
+# ---------------------------------------------------------------------------------------------
+# .bincode(x, breaks, right, include.lowest), the codes cut() makes: points on the breaks and
+# outside them; 0 for NA.
+
+set.seed(83)
+bc_rows <- list()
+for (k in 1:8) {
+    breaks <- sort(unique(round(runif(sample(c(2, 5, 30), 1) + 1, -2, 2), 2)))
+    if (length(breaks) < 2) breaks <- c(-1, 1)
+    x <- c(runif(40, -2.5, 2.5), breaks, NaN)
+    for (right in c(TRUE, FALSE)) for (lowest in c(FALSE, TRUE)) {
+        codes <- .bincode(x, breaks, right, lowest)
+        codes[is.na(codes)] <- 0L
+        bc_rows[[length(bc_rows) + 1]] <- paste(hexl(breaks), as.integer(right), as.integer(lowest),
+                                                hexl(x), lst(codes), sep = "\t")
+    }
+}
+write_tsv("bincode.tsv", "breaks\tright\tinclude.lowest\tx\tcodes (0 = NA)", bc_rows)
 
 cat("written to", normalizePath(out), "\n")

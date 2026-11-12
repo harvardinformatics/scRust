@@ -240,6 +240,308 @@ env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
 milestone = "M3"
 
+
+# rcompat and sctransform (M4) ----------------------------------------------------------------
+#
+# Stage S0/S2: R reference vectors for the functions SCTransform v2 reaches, checked bit for bit
+# by crates/rcompat/tests/r_vectors.rs (base R and stats: validation/R/rcompat_vectors.R) and by
+# crates/doubletfinder/tests/m4_vectors.rs and crates/sctransform/tests/ (the installed
+# packages' own code: validation/R/sctransform_vectors.R). Made on a login node (no .rds is
+# read) with the production R env, the hermetic flags and OPENBLAS_CORETYPE=Haswell (portable
+# profile; only nlminb's PORT routines, through ddot and dnrm2, and glmGamPoi's Cox-Reid term
+# call BLAS); regenerating gives identical files.
+
+[[file]]
+path = "tests/fixtures/rcompat/orderstat.tsv"
+sha256 = "28a83e8391adb5ce1f0c35861e4fa93a2d5440771f8b8db6b94f57a9cd328d3e"
+bytes = 43466
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+
+[[file]]
+path = "tests/fixtures/rcompat/density.tsv"
+sha256 = "7131d4b3adc82441c602b4060baccb931245db4b52a509dc0829980e80556003"
+bytes = 147755
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+
+[[file]]
+path = "tests/fixtures/rcompat/gamma.tsv"
+sha256 = "81c77575c372de96bfcd76332ceca38384b9723e143251d1c3e7f85f846f318e"
+bytes = 27305
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "glibc lgamma (glmGamPoi's scalar table path) and R's lgammafn, digamma, trigamma"
+
+[[file]]
+path = "tests/fixtures/rcompat/matrixstats.tsv"
+sha256 = "2c448b2f06a5c3c0b99ce202c877e4493d449e46be334dc5b89f1a0afb25421c"
+bytes = 11881
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "matrixStats 1.5.0 rowMeans2, colMeans2, rowVars (double accumulators, refine = TRUE)"
+
+[[file]]
+path = "tests/fixtures/rcompat/weighted_median.tsv"
+sha256 = "65f6327ecdd00a8945a0bbc323202b43e121b3d662fc2c59031f9f6ece3f25e7"
+bytes = 20231
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "matrixStats 1.5.0 weightedMedian with interpolate = FALSE (loc_median_fit's windows) and with its default interpolate = TRUE (its fallback), R_qsort_I order"
+
+[[file]]
+path = "tests/fixtures/rcompat/nlminb.tsv"
+sha256 = "403f935628d278163ebb8c9e9c4fc9e03ec320892606bc9c70e0cdd72303b42f"
+bytes = 34437
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "portable (OPENBLAS_CORETYPE=Haswell): PORT's dd7tpr and dv2nrm are BLAS ddot and dnrm2"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "nlminb (PORT DRMNHB with Hessian, DRMNGB without) with bounds: every objective, gradient and Hessian evaluation point, and the result"
+
+[[file]]
+path = "tests/fixtures/rcompat/dnbinom.tsv"
+sha256 = "5ecba12977f63b3d1034839bd2a15047660b6cc01542d47569ff4b6a50d4acb7"
+bytes = 416210
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "dnbinom(x, size, mu = mu, log = TRUE): nmath dnbinom_mu, dbinom_raw, stirlerr, bd0, lgamma1p over every branch"
+
+[[file]]
+path = "tests/fixtures/rcompat/optimize.tsv"
+sha256 = "5a399d300967b1796254f4e95e7fda676e98cad9a47c435a7bba03bf59b32154"
+bytes = 6444
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "optimize() (Brent_fmin, fcn1's handling of non-finite values): every evaluation point and the result"
+
+[[file]]
+path = "tests/fixtures/rcompat/uniroot.tsv"
+sha256 = "ccaadaaa869f7d5cbb7741b7b640e13cd60ac02fb0ae4a238a946a52ede05281"
+bytes = 4057
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "uniroot() (R_zeroin2, fcn2's handling of non-finite values): every evaluation point, the root, iterations and precision"
+
+[[file]]
+path = "tests/fixtures/rcompat/bw_sj.tsv"
+sha256 = "6d406f8bdc25019cb3c5faa50bbc008f98e6c6c77742790c0903fed6a9d82b96"
+bytes = 270200
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "bw.SJ(x), method ste: unbinned (n <= 500) and binned pair counts, phi4/phi6, the widened search interval, uniroot"
+
+[[file]]
+path = "tests/fixtures/rcompat/ksmooth.tsv"
+sha256 = "bbfe1ec91ae12078063476a8f55ec36c0a4e3ebb1ae19c65f2e4c00a038a8827"
+bytes = 399539
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "ksmooth() (BDRksmooth), box and normal kernels, ties, x.points outside the data"
+
+[[file]]
+path = "tests/fixtures/rcompat/bincode.tsv"
+sha256 = "d809bfcb2d1dab92cd9ea703e0883b2a5501a4525f93c157d1ad2315c46bee0c"
+bytes = 42126
+tool = "rcompat"
+role = "reference"
+stage = "S0"
+profile = "none (no BLAS)"
+recipe = "validation/R/rcompat_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = ".bincode() (cut()'s codes), right and left closed, include.lowest, points on the breaks"
+
+[[file]]
+path = "tests/fixtures/sctransform/sct_input.tsv"
+sha256 = "801420b8a9165d705f833062fc875a845710cdd0adee9a58feff73ccd249eac6"
+bytes = 111304
+tool = "sctransform"
+role = "reference"
+stage = "S2a"
+profile = "none (no BLAS)"
+recipe = "validation/R/sctransform_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+
+[[file]]
+path = "tests/fixtures/sctransform/fit_beta.tsv"
+sha256 = "5184e57b7c3895bc1e1cd7c44ca09813abe86480b28eb1111164866dfa3061d8"
+bytes = 299278
+tool = "sctransform"
+role = "reference"
+stage = "S2b"
+profile = "none (no BLAS)"
+recipe = "validation/R/sctransform_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "glmGamPoi fitBeta_one_group: Newton fits and the optimize() fallback (NaN steps, half-integer counts, theta = 0, all-zero genes)"
+
+[[file]]
+path = "tests/fixtures/sctransform/is_outlier.tsv"
+sha256 = "645e313934908cd6dc27ecf19447b67bf9954a6dc0276703aa4fa5e19e2527e2"
+bytes = 177143
+tool = "sctransform"
+role = "reference"
+stage = "S2c"
+profile = "none (no BLAS)"
+recipe = "validation/R/sctransform_vectors.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "sctransform is_outlier(y, x): bw.SJ bins on two grids, median/mad robust scores, planted outliers and ties"
+
+[[file]]
+path = "tests/fixtures/sctransform/cli_soupx_tenx_test/cell_attr.tsv"
+sha256 = "52cb715fee7d25d4c1b1f2846aaf2739f742f417afcda2701a3f2f30671eaa4c"
+bytes = 12595
+tool = "sctransform"
+role = "reference"
+stage = "S2a"
+profile = "portable (OPENBLAS_CORETYPE=Haswell)"
+recipe = "validation/R/sctransform_cli_reference.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "SCTransform() on tests/fixtures/doubletfinder/soupx_tenx_test/input: vst's cell_attr"
+
+[[file]]
+path = "tests/fixtures/sctransform/cli_soupx_tenx_test/gene_attr.tsv"
+sha256 = "b1dcbcca4f7182b8bdfd8bd9b31607f479a6c1f7525d1c001ca6358d7978abab"
+bytes = 108036
+tool = "sctransform"
+role = "reference"
+stage = "S2d"
+profile = "portable (OPENBLAS_CORETYPE=Haswell): the residuals' dgemm"
+recipe = "validation/R/sctransform_cli_reference.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "SCTransform() on the soupx_tenx_test counts: gene_attr with residual mean and variance"
+
+[[file]]
+path = "tests/fixtures/sctransform/cli_soupx_tenx_test/model_pars.tsv"
+sha256 = "a0f72ab9cdc6e135a7a4bd1a44ac0a16871334a993c4736a51ae279a67224ecd"
+bytes = 50684
+tool = "sctransform"
+role = "reference"
+stage = "S2b"
+profile = "portable (OPENBLAS_CORETYPE=Haswell)"
+recipe = "validation/R/sctransform_cli_reference.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "SCTransform() on the soupx_tenx_test counts: model_pars after the 1e-7 floor"
+
+[[file]]
+path = "tests/fixtures/sctransform/cli_soupx_tenx_test/model_pars_fit.tsv"
+sha256 = "6687aa080f4f3574bf89267b1a140538ca4f169f1e75c2f36fdde321a199a61c"
+bytes = 57058
+tool = "sctransform"
+role = "reference"
+stage = "S2c"
+profile = "portable (OPENBLAS_CORETYPE=Haswell)"
+recipe = "validation/R/sctransform_cli_reference.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "SCTransform() on the soupx_tenx_test counts: model_pars_fit"
+
+[[file]]
+path = "tests/fixtures/sctransform/cli_soupx_tenx_test/variable_features.tsv"
+sha256 = "dce2c88386871ea8f2e28a692659237641383bfb41030872e3176b6f02c17047"
+bytes = 11048
+tool = "sctransform"
+role = "reference"
+stage = "S2d"
+profile = "portable (OPENBLAS_CORETYPE=Haswell): the residuals' dgemm"
+recipe = "validation/R/sctransform_cli_reference.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "SCTransform() on the soupx_tenx_test counts: the variable features in order"
+
+[[file]]
+path = "tests/fixtures/sctransform/cli_soupx_tenx_test/scale_data.npy.sha256"
+sha256 = "20ab34511c51ef8de720566c6902a7ff85f31ccfaa384ba01e9658e1ce884da0"
+bytes = 65
+tool = "sctransform"
+role = "reference"
+stage = "S2d"
+profile = "portable (OPENBLAS_CORETYPE=Haswell): the residuals' dgemm"
+recipe = "validation/R/sctransform_cli_reference.R"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Gold 6426Y (Sapphire Rapids login node), glibc 2.28"
+milestone = "M4"
+note = "SHA-256 of SCTransform()'s scale.data on the soupx_tenx_test counts, written by npy_write"
+
 # DoubletFinder (plan B4) ---------------------------------------------------------------------
 #
 # Milestone M2: exports, direct and instrumented reference runs, generated by

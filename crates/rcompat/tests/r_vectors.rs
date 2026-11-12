@@ -333,3 +333,346 @@ fn approxfun_against_r() {
         assert_same_vec(&fun.eval_all(&xout), &fl(&row[6]), &format!("approx case {i}"));
     }
 }
+
+// --- M4 -------------------------------------------------------------------------------------
+
+#[test]
+fn order_statistics_against_r() {
+    use rcompat::quantile::{iqr, mad, median, quantile7};
+    for row in fixture("orderstat.tsv") {
+        let x = fl(&row[0]);
+        let what = format!("n = {}", x.len());
+        assert_same_vec(&quantile7(&x, &[0.25, 0.75]), &fl(&row[1]), &format!("quantile, {what}"));
+        assert_same(median(&x), f(&row[2]), &format!("median, {what}"));
+        assert_same(mad(&x), f(&row[3]), &format!("mad, {what}"));
+        assert_same(iqr(&x), f(&row[4]), &format!("IQR, {what}"));
+    }
+}
+
+#[test]
+fn density_nrd_against_r() {
+    use rcompat::density::{bw_nrd, density_nrd};
+    for row in fixture("density.tsv") {
+        let x = fl(&row[0]);
+        let what = format!("density, n = {}", x.len());
+        assert_same(bw_nrd(&x).unwrap(), f(&row[1]), &format!("bw.nrd, {what}"));
+        let d = density_nrd(&x, 1.0, 512).unwrap();
+        assert_same(d.bw, f(&row[1]), &format!("{what}: bw"));
+        assert_same_vec(&d.x, &fl(&row[2]), &format!("{what}: x"));
+        assert_same_vec(&d.y, &fl(&row[3]), &format!("{what}: y"));
+    }
+}
+
+/// The analytic test functions of nlminb.tsv, with R's arithmetic.
+struct NlFun {
+    spec: Vec<String>,
+}
+
+impl NlFun {
+    fn num(&self, i: usize) -> f64 {
+        self.spec[i + 1].parse().unwrap()
+    }
+}
+
+impl rcompat::port::Problem for NlFun {
+    fn objective(&mut self, x: &[f64]) -> f64 {
+        use rcompat::libm::{exp, log};
+        match self.spec[0].as_str() {
+            "quad" => self.num(0) * ((x[0] - self.num(1)) * (x[0] - self.num(1))),
+            "quart" => {
+                let d = x[0] - self.num(1);
+                let d2 = d * d;
+                d2 * d2 + self.num(0) * d2
+            }
+            "explin" => exp(x[0]) - self.num(0) * x[0],
+            "flat" => exp(-x[0]),
+            "rosen" => {
+                let a = x[1] - x[0] * x[0];
+                let b = 1.0 - x[0];
+                100.0 * (a * a) + b * b
+            }
+            "nbll" => (self.num(0) + self.num(1)) * log(1.0 + exp(x[0])) - self.num(0) * x[0],
+            s => panic!("unknown function {s}"),
+        }
+    }
+    fn gradient(&mut self, x: &[f64], g: &mut [f64]) {
+        use rcompat::libm::exp;
+        match self.spec[0].as_str() {
+            "quad" => g[0] = 2.0 * self.num(0) * (x[0] - self.num(1)),
+            "quart" => {
+                let d = x[0] - self.num(1);
+                g[0] = 4.0 * (d * d * d) + 2.0 * self.num(0) * d;
+            }
+            "explin" => g[0] = exp(x[0]) - self.num(0),
+            "flat" => g[0] = -exp(-x[0]),
+            "rosen" => {
+                let a = x[1] - x[0] * x[0];
+                let b = 1.0 - x[0];
+                g[0] = -400.0 * x[0] * a - 2.0 * b;
+                g[1] = 200.0 * a;
+            }
+            "nbll" => g[0] = (self.num(0) + self.num(1)) * (exp(x[0]) / (1.0 + exp(x[0]))) - self.num(0),
+            s => panic!("unknown function {s}"),
+        }
+    }
+    fn hessian(&mut self, x: &[f64], h: &mut [f64]) {
+        use rcompat::libm::exp;
+        match self.spec[0].as_str() {
+            "quad" => h[0] = 2.0 * self.num(0),
+            "quart" => {
+                let d = x[0] - self.num(1);
+                h[0] = 12.0 * (d * d) + 2.0 * self.num(0);
+            }
+            "explin" => h[0] = exp(x[0]),
+            "flat" => h[0] = exp(-x[0]),
+            "rosen" => {
+                let h11 = 1200.0 * (x[0] * x[0]) - 400.0 * x[1] + 2.0;
+                h.copy_from_slice(&[h11, -400.0 * x[0], -400.0 * x[0], 200.0]);
+            }
+            "nbll" => {
+                let e = exp(x[0]);
+                h[0] = (self.num(0) + self.num(1)) * (e / ((1.0 + e) * (1.0 + e)));
+            }
+            s => panic!("unknown function {s}"),
+        }
+    }
+}
+
+/// Records every evaluation point, like the R closures of nlminb.tsv.
+struct Traced {
+    f: NlFun,
+    kinds: Vec<&'static str>,
+    pts: Vec<f64>,
+}
+
+impl rcompat::port::Problem for Traced {
+    fn objective(&mut self, x: &[f64]) -> f64 {
+        self.kinds.push("f");
+        self.pts.extend_from_slice(x);
+        self.f.objective(x)
+    }
+    fn gradient(&mut self, x: &[f64], g: &mut [f64]) {
+        self.kinds.push("g");
+        self.pts.extend_from_slice(x);
+        self.f.gradient(x, g)
+    }
+    fn hessian(&mut self, x: &[f64], h: &mut [f64]) {
+        self.f.hessian(x, h)
+    }
+}
+
+#[test]
+fn nlminb_against_r() {
+    for row in fixture("nlminb.tsv") {
+        let what = format!("nlminb {} from {}", row[0], row[1]);
+        let spec: Vec<String> = row[0].split(':').map(String::from).collect();
+        let (start, lower, upper) = (fl(&row[1]), fl(&row[2]), fl(&row[3]));
+        let iter_max: i32 = row[4].parse().unwrap();
+        let hessian = row[5] == "1";
+        let what = format!("{what}, hessian {hessian}");
+        let mut prob = Traced { f: NlFun { spec }, kinds: Vec::new(), pts: Vec::new() };
+        let r = rcompat::port::nlminb(&start, &mut prob, &lower, &upper, Some(iter_max), hessian).unwrap();
+        // R evaluates the objective once more after PORT returns (port_nlminb's loop)
+        assert_same_vec(&r.par, &fl(&row[6]), &format!("{what}: par"));
+        assert_same(r.objective, f(&row[7]), &format!("{what}: objective"));
+        assert_eq!(r.convergence.to_string(), row[8], "{what}: convergence");
+        assert_eq!(r.iterations.to_string(), row[9], "{what}: iterations");
+        assert_eq!(format!("{},{}", r.evaluations_function, r.evaluations_gradient), row[10], "{what}: evaluations");
+        assert_eq!(r.code.to_string(), row[11], "{what}: PORT code");
+        assert_eq!(prob.kinds.join(","), row[12], "{what}: evaluation kinds");
+        assert_same_vec(&prob.pts, &fl(&row[13]), &format!("{what}: evaluation points"));
+    }
+}
+
+#[test]
+fn gamma_functions_against_r() {
+    use rcompat::gamma::{digamma, lgammafn, trigamma};
+    for row in fixture("gamma.tsv") {
+        let x = f(&row[0]);
+        assert_same(lgammafn(x), f(&row[1]), &format!("lgamma({x:e})"));
+        assert_same(digamma(x), f(&row[2]), &format!("digamma({x:e})"));
+        assert_same(trigamma(x), f(&row[3]), &format!("trigamma({x:e})"));
+    }
+}
+
+#[test]
+fn matrixstats_against_r() {
+    use rcompat::matrixstats::{col_means2, row_means2, row_vars, weighted_median, weighted_median_interpolated};
+    for row in fixture("matrixstats.tsv") {
+        let (nr, nc): (usize, usize) = (row[0].parse().unwrap(), row[1].parse().unwrap());
+        let x = fl(&row[2]);
+        let what = format!("{nr} x {nc}");
+        assert_same_vec(&row_means2(&x, nr, nc, None), &fl(&row[3]), &format!("rowMeans2 {what}"));
+        assert_same_vec(&col_means2(&x, nr, nc), &fl(&row[4]), &format!("colMeans2 {what}"));
+        assert_same_vec(&row_vars(&x, nr, nc), &fl(&row[5]), &format!("rowVars {what}"));
+    }
+    for row in fixture("weighted_median.tsv") {
+        let (x, w) = (fl(&row[0]), fl(&row[1]));
+        assert_same(weighted_median(&x, &w), f(&row[2]), &format!("weightedMedian, n = {}", x.len()));
+        assert_same(weighted_median_interpolated(&x, &w), f(&row[3]), &format!("weightedMedian interpolated, n = {}", x.len()));
+    }
+}
+
+#[test]
+fn dnbinom_against_r() {
+    use rcompat::nbinom::dnbinom_mu_log;
+    let mut n = 0;
+    for row in fixture("dnbinom.tsv") {
+        let (size, mu) = (f(&row[0]), f(&row[1]));
+        let got: Vec<f64> = fl(&row[2]).iter().map(|&x| dnbinom_mu_log(x, size, mu)).collect();
+        assert_same_vec(&got, &fl(&row[3]), &format!("dnbinom(x, size = {size:e}, mu = {mu:e}, log = TRUE)"));
+        n += got.len();
+    }
+    assert!(n > 10_000);
+}
+
+#[test]
+fn optimize_against_r() {
+    use rcompat::libm::{exp, log, sin};
+    use rcompat::optimize::{optimize_maximum, optimize_minimum, OPTIMIZE_TOL};
+    let rows = fixture("optimize.tsv");
+    assert_eq!(rows.len(), 16);
+    for row in rows {
+        let name = row[0].as_str();
+        let maximum = row[1] == "1";
+        let (lower, upper) = (f(&row[2]), f(&row[3]));
+        // R's arithmetic for each function: x^2 is x * x, log(x) is NaN for x < 0
+        let fun = |x: f64| -> f64 {
+            match name {
+                "sq" => (x - 1.0 / 3.0) * (x - 1.0 / 3.0),
+                "abs" => (x - 0.7).abs(),
+                "floor" => (4.0 * x).floor() / 4.0,
+                "inf_right" => {
+                    if x > 0.3 {
+                        f64::INFINITY
+                    } else {
+                        (x - 0.5) * (x - 0.5)
+                    }
+                }
+                "sin" => sin(3.0 * x) + x / 5.0,
+                "neg_inf" => f64::NEG_INFINITY,
+                "xexp" => exp(-x) * x,
+                "log" => {
+                    if x < 0.0 {
+                        f64::NAN
+                    } else {
+                        log(x)
+                    }
+                }
+                _ => panic!("unknown function {name}"),
+            }
+        };
+        let mut xs = Vec::new();
+        let mut g = |x: f64| {
+            xs.push(x);
+            fun(x)
+        };
+        let res = if maximum {
+            optimize_maximum(&mut g, lower, upper, OPTIMIZE_TOL)
+        } else {
+            optimize_minimum(&mut g, lower, upper, OPTIMIZE_TOL)
+        };
+        let what = format!("optimize({name}, maximum = {maximum})");
+        assert_same_vec(&xs, &fl(&row[4]), &format!("{what}: evaluation points"));
+        assert_same(res, f(&row[5]), &what);
+    }
+}
+
+#[test]
+fn uniroot_against_r() {
+    use rcompat::libm::{cos, exp, log};
+    use rcompat::zeroin::uniroot;
+    let rows = fixture("uniroot.tsv");
+    assert_eq!(rows.len(), 9);
+    for row in rows {
+        let name = row[0].as_str();
+        let (lower, upper, tol) = (f(&row[1]), f(&row[2]), f(&row[3]));
+        let maxiter: i32 = row[4].parse().unwrap();
+        // R's arithmetic: x^3 is pow(x, 3), x^2 would be x * x; log(0) is -Inf
+        let fun = |x: f64| -> f64 {
+            match name {
+                "cubic" | "cubic_default_tol" | "few_iter" => r_pow(x, 3.0) - 2.0 * x - 5.0,
+                "cos" => cos(x) - x,
+                "exp" => exp(x) - 10.0,
+                "log" => {
+                    if x > 0.0 {
+                        log(x)
+                    } else if x == 0.0 {
+                        f64::NEG_INFINITY
+                    } else {
+                        f64::NAN
+                    }
+                }
+                "step" => {
+                    if x < 0.3 {
+                        -1.0
+                    } else {
+                        2.0
+                    }
+                }
+                "flat" => r_pow(x - 0.25, 3.0),
+                "root_at_end" => x - 1.0,
+                _ => panic!("unknown function {name}"),
+            }
+        };
+        let mut xs = Vec::new();
+        let r = uniroot(
+            &mut |x| {
+                xs.push(x);
+                fun(x)
+            },
+            lower,
+            upper,
+            tol,
+            maxiter,
+        )
+        .unwrap();
+        let what = format!("uniroot({name})");
+        assert_same_vec(&xs, &fl(&row[5]), &format!("{what}: evaluation points"));
+        assert_same(r.root, f(&row[6]), &format!("{what}: root"));
+        assert_eq!(r.iter, row[7].parse::<i32>().unwrap(), "{what}: iterations");
+        assert_same(r.estim_prec, f(&row[8]), &format!("{what}: estim.prec"));
+    }
+}
+
+#[test]
+fn bw_sj_against_r() {
+    use rcompat::bandwidth::bw_sj;
+    let rows = fixture("bw_sj.tsv");
+    assert_eq!(rows.len(), 19);
+    for (k, row) in rows.iter().enumerate() {
+        let x = fl(&row[0]);
+        let what = format!("bw.SJ case {} (n = {})", k + 1, x.len());
+        match (bw_sj(&x), row[1].as_str()) {
+            (Err(_), "error") => {}
+            (Ok(v), w) if w != "error" => assert_same(v, f(w), &what),
+            (got, w) => panic!("{what}: got {got:?}, R gives {w}"),
+        }
+    }
+}
+
+#[test]
+fn ksmooth_against_r() {
+    use rcompat::smooth::{ksmooth, Kernel};
+    let rows = fixture("ksmooth.tsv");
+    assert_eq!(rows.len(), 12);
+    for (k, row) in rows.iter().enumerate() {
+        let kernel = if row[0] == "box" { Kernel::Box } else { Kernel::Normal };
+        let (xp, yp) = ksmooth(&fl(&row[2]), &fl(&row[3]), kernel, f(&row[1]), &fl(&row[4]));
+        let what = format!("ksmooth case {} ({})", k + 1, row[0]);
+        assert_same_vec(&xp, &fl(&row[5]), &format!("{what}: x"));
+        assert_same_vec(&yp, &fl(&row[6]), &format!("{what}: y"));
+    }
+}
+
+#[test]
+fn bincode_against_r() {
+    use rcompat::smooth::bincode;
+    let rows = fixture("bincode.tsv");
+    assert_eq!(rows.len(), 32);
+    for row in rows {
+        let codes = bincode(&fl(&row[3]), &fl(&row[0]), row[1] == "1", row[2] == "1");
+        let got: Vec<u64> = codes.iter().map(|c| c.map_or(0, |v| v as u64)).collect();
+        assert_eq!(got, il(&row[4]), "bincode(right = {}, include.lowest = {})", row[1], row[2]);
+    }
+}

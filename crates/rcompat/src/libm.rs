@@ -29,3 +29,17 @@ macro_rules! wrap {
 }
 
 wrap!(pow(x, y), log(x), log1p(x), log2(x), log10(x), logb(x), exp(x), expm1(x), sin(x), cos(x));
+
+mod sys_int {
+    use std::os::raw::c_int;
+    extern "C" {
+        pub fn ldexp(x: f64, e: c_int) -> f64;
+    }
+}
+
+/// `ldexp(x, e)`: `x * 2^e`, rounded once (exact unless the result is subnormal or overflows).
+#[inline]
+pub fn ldexp(x: f64, e: i32) -> f64 {
+    // SAFETY: a pure C math function of a double and an int.
+    unsafe { sys_int::ldexp(x, e) }
+}

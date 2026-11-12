@@ -23,24 +23,43 @@
 //! - [`strtod`]: R's own decimal parser (`R_strtod`, not correctly rounded) and `as.numeric()`
 //!   of strings;
 //! - [`fft`]: `fft()`, Singleton's mixed-radix transform, as R computes it;
-//! - [`normal::dnorm`] and [`approx`]: `dnorm()`, and `approx()`/`approxfun()` interpolation.
+//! - [`normal::dnorm`] and [`approx`]: `dnorm()`, and `approx()`/`approxfun()` interpolation;
+//! - [`blas`]: the conda env's OpenBLAS through FFI (`dgemm`, `dgemv`, `ddot`, `dnrm2`) and R's
+//!   `tcrossprod`, so products round exactly as R's do on the same kernel (M4);
+//! - [`quantile`]: `quantile(type = 7)`, `IQR`, `median`, `mad` (M4);
+//! - [`density`]: `density()` with `bw = "nrd"` and its binning (M4);
+//! - [`gamma`]: R's `lgammafn`, `digamma`, `trigamma`, and glibc's `lgamma` (M4);
+//! - [`port`]: `nlminb()`, R's PORT library (`DRMNHB` and its call tree) (M4);
+//! - [`matrixstats`]: matrixStats' `rowMeans2`, `colMeans2`, `rowVars`, `weightedMedian`, and
+//!   R's `R_qsort_I` (M4).
 //!
 //! Indices are 0-based throughout (R's minus one). Functions that call the C math library ([`libm`])
 //! use the system glibc, as R does.
 
 pub mod approx;
 pub mod arith;
+pub mod bandwidth;
+pub mod blas;
+pub mod density;
 pub mod fft;
 pub mod format;
+pub mod gamma;
 pub mod ldouble;
 pub mod libm;
+pub mod matrixstats;
+pub mod nbinom;
 pub mod normal;
+pub mod optimize;
 pub mod order;
+pub mod port;
 mod powl10;
+pub mod quantile;
 pub mod rng;
 pub mod sample;
+pub mod smooth;
 pub mod strtod;
 pub mod summary;
+pub mod zeroin;
 
 pub use arith::{r_pow, round, round_digits, seq_by, seq_length_out};
 pub use format::as_character;

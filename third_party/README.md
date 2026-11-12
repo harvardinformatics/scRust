@@ -20,9 +20,17 @@ This downloads each tarball into `third_party/src/tarballs/` (gitignored), check
 | KernSmooth | 2.23-27 | CRAN |
 | fields | 17.3 | CRAN archive |
 | DoubletFinder | commit `1b244d8f0d54b4b1cb4365639931bbb16f01e1cd` (2.0.6) | GitHub archive of chris-mcginnis-ucsf/DoubletFinder |
+| Matrix | 1.7-6 | CRAN (M4: `dgCMatrix` arithmetic, margins, subsetting) |
+| RcppArmadillo | 15.2.3-1 | CRAN archive (M4: the headers glmGamPoi 1.22.0 and sctransform 0.4.3 were compiled with; the env has 15.6.2-1 installed) |
+| Rcpp | 1.1.1 | CRAN archive (M4: the headers glmGamPoi was compiled with; sugar `lgamma`, `digamma`, `sum`) |
+| future | 1.82.0 | CRAN (M4: `future.seed` and the main RNG stream) |
+| future.apply | 1.21.0 | CRAN (M4: `future_lapply`) |
+| parallelly | 1.50.0 | CRAN (M4: `supportsMulticore`, number of workers) |
+| MatrixGenerics | 1.22.0 | Bioconductor 3.22 (M4: dispatch of `rowMeans2` etc.) |
+| DelayedMatrixStats | 1.32.0 | Bioconductor 3.22 (M4: glmGamPoi's `rowMeans2`, `rowVars`, `colMeans2`) |
 
 CRAN and Bioconductor move a version to their archive once a newer one is released, so the script tries the current index first and then the archive; the sha256 guarantees the same bytes either way.
 
-**These are the sources of the production R env** (`envs/r-reference/`). Checked on 2026-11-10: each sha256 in `SHA256SUMS` equals the source checksum recorded in the conda-forge recipe (`info/recipe/meta.yaml`) of the package build installed in the production env, and glmGamPoi's tarball has the md5 recorded by its bioconda recipe. DoubletFinder's tarball records its commit in the tar header, which the script checks; the production env's DoubletFinder has the same `RemoteSha`.
+**These are the sources of the production R env** (`envs/r-reference/`), except where a package's compiled code includes another package's headers: then it is the version the binary was built against (M4: glmGamPoi 1.22.0 and sctransform 0.4.3 were built with RcppArmadillo 15.2.3-1 and Rcpp 1.1.1, per the host requirements in their conda recipes, `info/recipe/meta.yaml`). Checked on 2026-11-10 (M1b) and 2026-11-11 (M4 additions): each CRAN sha256 in `SHA256SUMS` equals the source checksum recorded in the conda-forge recipe (`info/recipe/meta.yaml`) of the package build installed in the production env (for RcppArmadillo and Rcpp, of the builds glmGamPoi was compiled against), and the Bioconductor tarballs (glmGamPoi, MatrixGenerics, DelayedMatrixStats) have the md5 recorded by their bioconda recipes. DoubletFinder's tarball records its commit in the tar header, which the script checks; the production env's DoubletFinder has the same `RemoteSha`.
 
 GitHub generates archive tarballs on request. If DoubletFinder's sha256 ever stops matching, its compression may have changed rather than its content: compare the unpacked files with the old ones before recording the new checksum.
