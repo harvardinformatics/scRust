@@ -39,6 +39,8 @@ BIOC=https://bioconductor.org/packages/3.22/bioc
 # package's headers: then it is the version the binary was built against (milestone M4:
 # glmGamPoi 1.22.0 and sctransform 0.4.3 were built with RcppArmadillo 15.2.3-1 and Rcpp 1.1.1,
 # per their conda recipes' host requirements; the env has RcppArmadillo 15.6.2-1 installed).
+# OpenBLAS (M5) is the library both envs load (libopenblasp-r0.3.34.so, conda-forge build
+# pthreads_hf13c14d_2); its sha256 is the one in that build's recipe (info/recipe/recipe.yaml).
 SOURCES='
 R              4.5.3       R-4.5.3.tar.gz                  https://cran.r-project.org/src/base/R-4/R-4.5.3.tar.gz
 sctransform    0.4.3       sctransform_0.4.3.tar.gz        cran
@@ -58,6 +60,7 @@ future.apply   1.21.0      future.apply_1.21.0.tar.gz      cran
 parallelly     1.50.0      parallelly_1.50.0.tar.gz        cran
 MatrixGenerics 1.22.0      MatrixGenerics_1.22.0.tar.gz    bioc
 DelayedMatrixStats 1.32.0  DelayedMatrixStats_1.32.0.tar.gz  bioc
+OpenBLAS       0.3.34      OpenBLAS-0.3.34.tar.gz          https://github.com/OpenMathLib/OpenBLAS/archive/v0.3.34.tar.gz
 '
 
 die() { echo "fetch_sources.sh: $*" >&2; exit 1; }
