@@ -42,11 +42,11 @@ The rcompat pieces were checked alone first, on reference vectors that `validati
 
 ## Results
 
-Commit 7a273be (`rust/m4d-7a273be/<run>/validate.{json,md}`), job 59770277: `scrust validate sctransform --mode both`, 8 threads, each run under its own OpenBLAS profile, on Intel Xeon Platinum 8480+ (`sapphire`). Each stage cell gives the checks identical out of the checks made, and the values compared; a check is one array, scalar or RNG state of one context. The S2-chain column repeats every S2a-S2d check on the chained run's results and adds the mean cell sum and the RNG states at `vst`'s and `SCTransform`'s exits. "Fitting genes" is the number of genes in the fits (2,000 when density sampling applies), "theta Inf" the fitted thetas set to infinity, "outliers" the fitting genes left out of the smoothing (outliers in a parameter, or infinite theta). The cells include the artificial doublets.
+Commit 2dc515e (`rust/m4-mem2/<run>/validate.{json,md}`), job 59869616: `scrust validate sctransform --mode both`, 8 threads, each run under its own OpenBLAS profile, on Intel Xeon Platinum 8480+ (`sapphire`). Commit 7a273be's run, before the residual-memory change (`rust/m4d-7a273be/`, job 59770277), made the same checks with the same results. Wall times depend on the node: soupx_tenx_SRR18256555's portable run took 40.4 s here; on another node it took 29.2 and 28.9 s, and 31.1 and 29.5 s with 7a273be (job 59873178). Each stage cell gives the checks identical out of the checks made, and the values compared; a check is one array, scalar or RNG state of one context. The S2-chain column repeats every S2a-S2d check on the chained run's results and adds the mean cell sum and the RNG states at `vst`'s and `SCTransform`'s exits. "Fitting genes" is the number of genes in the fits (2,000 when density sampling applies), "theta Inf" the fitted thetas set to infinity, "outliers" the fitting genes left out of the smoothing (outliers in a parameter, or infinite theta). The cells include the artificial doublets.
 
 #### soupx_tenx_test, `instrumented-portable-cascadelake`
 
-Validation: 0:02.03 wall, 0.1 GiB peak RSS (8 threads).
+Validation: 0:02.02 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -60,7 +60,7 @@ Validation: 0:02.03 wall, 0.1 GiB peak RSS (8 threads).
 
 #### soupx_tenx_test, `instrumented-portable-sapphirerapids`
 
-Validation: 0:02.07 wall, 0.1 GiB peak RSS (8 threads).
+Validation: 0:01.87 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -74,7 +74,7 @@ Validation: 0:02.07 wall, 0.1 GiB peak RSS (8 threads).
 
 #### soupx_tenx_test, `instrumented-production-sapphirerapids`
 
-Validation: 0:02.05 wall, 0.0 GiB peak RSS (8 threads).
+Validation: 0:01.97 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -88,7 +88,7 @@ Validation: 0:02.05 wall, 0.0 GiB peak RSS (8 threads).
 
 #### soupx_emptydrops_test, `instrumented-portable-cascadelake`
 
-Validation: 0:01.96 wall, 0.0 GiB peak RSS (8 threads).
+Validation: 0:02.02 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -102,7 +102,7 @@ Validation: 0:01.96 wall, 0.0 GiB peak RSS (8 threads).
 
 #### soupx_emptydrops_test, `instrumented-portable-sapphirerapids`
 
-Validation: 0:01.88 wall, 0.0 GiB peak RSS (8 threads).
+Validation: 0:01.92 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -116,7 +116,7 @@ Validation: 0:01.88 wall, 0.0 GiB peak RSS (8 threads).
 
 #### soupx_emptydrops_test, `instrumented-production-sapphirerapids`
 
-Validation: 0:01.97 wall, 0.0 GiB peak RSS (8 threads).
+Validation: 0:01.91 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -130,7 +130,7 @@ Validation: 0:01.97 wall, 0.0 GiB peak RSS (8 threads).
 
 #### decontx_raw_tenx_test, `instrumented-portable-cascadelake`
 
-Validation: 0:01.79 wall, 0.1 GiB peak RSS (8 threads).
+Validation: 0:01.65 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -144,7 +144,7 @@ Validation: 0:01.79 wall, 0.1 GiB peak RSS (8 threads).
 
 #### decontx_raw_tenx_test, `instrumented-portable-sapphirerapids`
 
-Validation: 0:01.89 wall, 0.1 GiB peak RSS (8 threads).
+Validation: 0:01.68 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -158,7 +158,7 @@ Validation: 0:01.89 wall, 0.1 GiB peak RSS (8 threads).
 
 #### decontx_raw_tenx_test, `instrumented-production-sapphirerapids`
 
-Validation: 0:01.73 wall, 0.0 GiB peak RSS (8 threads).
+Validation: 0:01.81 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -172,7 +172,7 @@ Validation: 0:01.73 wall, 0.0 GiB peak RSS (8 threads).
 
 #### decontx_raw_emptydrops_test, `instrumented-portable-cascadelake`
 
-Validation: 0:01.83 wall, 0.0 GiB peak RSS (8 threads).
+Validation: 0:01.62 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -186,7 +186,7 @@ Validation: 0:01.83 wall, 0.0 GiB peak RSS (8 threads).
 
 #### decontx_raw_emptydrops_test, `instrumented-portable-sapphirerapids`
 
-Validation: 0:01.86 wall, 0.0 GiB peak RSS (8 threads).
+Validation: 0:01.72 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -200,7 +200,7 @@ Validation: 0:01.86 wall, 0.0 GiB peak RSS (8 threads).
 
 #### decontx_raw_emptydrops_test, `instrumented-production-sapphirerapids`
 
-Validation: 0:01.65 wall, 0.0 GiB peak RSS (8 threads).
+Validation: 0:01.70 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -214,7 +214,7 @@ Validation: 0:01.65 wall, 0.0 GiB peak RSS (8 threads).
 
 #### cellbender_fromraw_test, `instrumented-portable-cascadelake`
 
-Validation: 0:01.91 wall, 0.0 GiB peak RSS (8 threads).
+Validation: 0:01.83 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -228,7 +228,7 @@ Validation: 0:01.91 wall, 0.0 GiB peak RSS (8 threads).
 
 #### cellbender_fromraw_test, `instrumented-portable-sapphirerapids`
 
-Validation: 0:01.87 wall, 0.0 GiB peak RSS (8 threads).
+Validation: 0:02.09 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -242,7 +242,7 @@ Validation: 0:01.87 wall, 0.0 GiB peak RSS (8 threads).
 
 #### cellbender_fromraw_test, `instrumented-production-sapphirerapids`
 
-Validation: 0:01.93 wall, 0.0 GiB peak RSS (8 threads).
+Validation: 0:02.18 wall, 0.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -256,7 +256,7 @@ Validation: 0:01.93 wall, 0.0 GiB peak RSS (8 threads).
 
 #### soupx_tenx_SRR18256555, `instrumented-portable-cascadelake`
 
-Validation: 0:34.22 wall, 0.9 GiB peak RSS (8 threads).
+Validation: 0:40.45 wall, 0.9 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -270,7 +270,7 @@ Validation: 0:34.22 wall, 0.9 GiB peak RSS (8 threads).
 
 #### soupx_tenx_SRR18256555, `instrumented-portable-sapphirerapids`
 
-Validation: 0:33.97 wall, 1.0 GiB peak RSS (8 threads).
+Validation: 0:40.35 wall, 0.9 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -284,7 +284,7 @@ Validation: 0:33.97 wall, 1.0 GiB peak RSS (8 threads).
 
 #### soupx_tenx_SRR18256555, `instrumented-production-sapphirerapids`
 
-Validation: 0:33.48 wall, 0.9 GiB peak RSS (8 threads).
+Validation: 0:40.90 wall, 0.9 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -298,7 +298,7 @@ Validation: 0:33.48 wall, 0.9 GiB peak RSS (8 threads).
 
 #### soupx_tenx_10xmousebrain, `instrumented-portable-sapphirerapids`
 
-Validation: 2:10.06 wall, 3.4 GiB peak RSS (8 threads).
+Validation: 2:11.74 wall, 3.6 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -312,7 +312,7 @@ Validation: 2:10.06 wall, 3.4 GiB peak RSS (8 threads).
 
 #### soupx_tenx_10xmousebrain, `instrumented-production-sapphirerapids`
 
-Validation: 2:07.93 wall, 3.4 GiB peak RSS (8 threads).
+Validation: 2:05.64 wall, 3.5 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -326,7 +326,7 @@ Validation: 2:07.93 wall, 3.4 GiB peak RSS (8 threads).
 
 #### soupx_emptydrops_4500871lane, `instrumented-portable-sapphirerapids`
 
-Validation: 1:55.95 wall, 5.3 GiB peak RSS (8 threads).
+Validation: 1:54.47 wall, 5.3 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -340,7 +340,7 @@ Validation: 1:55.95 wall, 5.3 GiB peak RSS (8 threads).
 
 #### soupx_emptydrops_4500871lane, `instrumented-production-sapphirerapids`
 
-Validation: 1:53.71 wall, 5.3 GiB peak RSS (8 threads).
+Validation: 1:44.27 wall, 5.3 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -354,7 +354,7 @@ Validation: 1:53.71 wall, 5.3 GiB peak RSS (8 threads).
 
 #### soupx_emptydrops_sscovelli, `instrumented-portable-sapphirerapids`
 
-Validation: 2:06.96 wall, 10.8 GiB peak RSS (8 threads).
+Validation: 1:49.29 wall, 7.8 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -368,7 +368,7 @@ Validation: 2:06.96 wall, 10.8 GiB peak RSS (8 threads).
 
 #### cellbender_fromraw_ghirsutum2, `instrumented-portable-sapphirerapids`
 
-Validation: 3:12.75 wall, 9.3 GiB peak RSS (8 threads).
+Validation: 2:45.73 wall, 7.0 GiB peak RSS (8 threads).
 
 | context | cells | genes kept | fitting genes | theta Inf | Poisson genes | outliers | smoothing genes | S2a | S2b | S2c | S2d | S2-chain |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -415,25 +415,38 @@ All 24 runs pass: every check of every context is identical, teacher-forced and 
 
 ## Benchmark
 
-SCTransform on the final run of the two largest objects, Rust and R on the same input: the counts with that run's artificial doublets, built from the export and the instrumented run's S1 draws (`scrust sctransform --from-stages ... --context final`, and [`validation/R/sctransform_benchmark.R`](../../validation/R/sctransform_benchmark.R), which builds it as DoubletFinder 2.0.6 does). Portable profile (OPENBLAS_CORETYPE=Haswell, the instrumented runs'), Intel Xeon Platinum 8480+ and 8480CL (`sapphire`, shared nodes), [`validation/slurm/m4_benchmark.sbatch`](../../validation/slurm/m4_benchmark.sbatch): Rust jobs 59770299 and 59770303 (commit 7a273be, 32 CPUs allocated) and 59769186 and 59769206 (b70bb14, before rows were dropped early), R jobs 59769194 and 59769218 (one CPU). *SCTransform* is R's `SCTransform()` call alone (`proc.time`) and Rust's `sctransform` phase (`summary.json`); process wall, CPU time and peak RSS come from `/usr/bin/time -v`, and include reading `matrix.mtx.gz` and building the input (R: `mtx_read_10x`, 35-40 s; Rust: 15 s).
+SCTransform on the final run of the two largest objects, Rust and R on the same input: the counts with that run's artificial doublets, built from the export and the instrumented run's S1 draws (`scrust sctransform --from-stages ... --context final`, and [`validation/R/sctransform_benchmark.R`](../../validation/R/sctransform_benchmark.R), which builds it as DoubletFinder 2.0.6 does). Portable profile (OPENBLAS_CORETYPE=Haswell, the instrumented runs'), Intel Xeon Platinum 8480+ and 8480CL (`sapphire`, shared nodes), [`validation/slurm/m4_benchmark.sbatch`](../../validation/slurm/m4_benchmark.sbatch): Rust jobs 59869623 and 59869628 (commit 2dc515e, 32 CPUs allocated), 59770299 and 59770303 (7a273be, before the residual-memory change) and 59769186 and 59769206 (b70bb14, before rows were dropped early), R jobs 59769194 and 59769218 (one CPU). *SCTransform* is R's `SCTransform()` call alone (`proc.time`) and Rust's `sctransform` phase (`summary.json`). Process wall, CPU time and peak RSS come from `/usr/bin/time -v`. They include reading `matrix.mtx.gz` and building the input (R: `mtx_read_10x`, 35-40 s; Rust: 15 s), and writing the outputs. *Peak RSS by the end of SCTransform* is the process's peak when Rust's SCTransform returns, before `scale_data.npy` is written (`summary.json`).
 
-| object (final run) | cells x genes kept | label | side | threads | SCTransform (s) | process wall (s) | process CPU (s) | peak RSS (GiB) | RSS after loading (GiB) |
-|---|---|---|---|---|---|---|---|---|---|
-| soupx_emptydrops_sscovelli | 105,879 x 22,247 | m4-benchmark-7a273be | Rust | 1 | 134.8 | 149.3 | 148.8 | 9.5 | 3.1 |
-| soupx_emptydrops_sscovelli | 105,879 x 22,247 | m4-benchmark-7a273be | Rust | 32 | 15.2 | 29.7 | 193.0 | 27.4 | 3.1 |
-| soupx_emptydrops_sscovelli | 105,879 x 22,247 | m4-benchmark | R | 1 | 353.9 | 414.1 | 410.7 | 88.8 | 4.3 |
-| soupx_emptydrops_sscovelli | 105,879 x 22,247 | m4-benchmark | Rust | 1 | 133.6 | 148.3 | 150.6 | 9.5 | 3.1 |
-| soupx_emptydrops_sscovelli | 105,879 x 22,247 | m4-benchmark | Rust | 32 | 13.9 | 28.6 | 175.2 | 27.6 | 3.1 |
-| cellbender_fromraw_ghirsutum2 | 79,097 x 57,899 | m4-benchmark-7a273be | Rust | 1 | 240.8 | 256.7 | 255.9 | 8.0 | 3.5 |
-| cellbender_fromraw_ghirsutum2 | 79,097 x 57,899 | m4-benchmark-7a273be | Rust | 32 | 18.7 | 34.6 | 295.9 | 21.6 | 3.5 |
-| cellbender_fromraw_ghirsutum2 | 79,097 x 57,899 | m4-benchmark | R | 1 | 641.9 | 699.9 | 695.0 | 144.1 | 4.7 |
-| cellbender_fromraw_ghirsutum2 | 79,097 x 57,899 | m4-benchmark | Rust | 1 | 255.3 | 270.5 | 272.4 | 8.0 | 3.5 |
-| cellbender_fromraw_ghirsutum2 | 79,097 x 57,899 | m4-benchmark | Rust | 32 | 19.0 | 34.0 | 302.2 | 31.0 | 3.5 |
+| object (final run) | cells x genes kept | label | side | threads | SCTransform (s) | process wall (s) | process CPU (s) | peak RSS (GiB) | peak RSS by the end of SCTransform (GiB) | RSS after loading (GiB) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| soupx_emptydrops_sscovelli | 105,879 x 22,247 | m4-benchmark-mem2 | Rust | 1 | 156.8 | 174.0 | 173.4 | 9.5 | 7.1 | 3.1 |
+| soupx_emptydrops_sscovelli | 105,879 x 22,247 | m4-benchmark-mem2 | Rust | 32 | 12.3 | 28.3 | 169.0 | 9.7 | 6.9 | 3.1 |
+| soupx_emptydrops_sscovelli | 105,879 x 22,247 | m4-benchmark-7a273be | Rust | 1 | 134.8 | 149.3 | 148.8 | 9.5 | 7.5 | 3.1 |
+| soupx_emptydrops_sscovelli | 105,879 x 22,247 | m4-benchmark-7a273be | Rust | 32 | 15.2 | 29.7 | 193.0 | 27.4 | 27.4 | 3.1 |
+| soupx_emptydrops_sscovelli | 105,879 x 22,247 | m4-benchmark | R | 1 | 353.9 | 414.1 | 410.7 | 88.8 | - | 4.3 |
+| soupx_emptydrops_sscovelli | 105,879 x 22,247 | m4-benchmark | Rust | 1 | 133.6 | 148.3 | 150.6 | 9.5 | 7.1 | 3.1 |
+| soupx_emptydrops_sscovelli | 105,879 x 22,247 | m4-benchmark | Rust | 32 | 13.9 | 28.6 | 175.2 | 27.6 | 27.6 | 3.1 |
+| cellbender_fromraw_ghirsutum2 | 79,097 x 57,899 | m4-benchmark-mem2 | Rust | 1 | 257.0 | 272.0 | 271.0 | 8.0 | 6.2 | 3.5 |
+| cellbender_fromraw_ghirsutum2 | 79,097 x 57,899 | m4-benchmark-mem2 | Rust | 32 | 18.4 | 32.9 | 300.6 | 8.1 | 6.1 | 3.5 |
+| cellbender_fromraw_ghirsutum2 | 79,097 x 57,899 | m4-benchmark-7a273be | Rust | 1 | 240.8 | 256.7 | 255.9 | 8.0 | 6.5 | 3.5 |
+| cellbender_fromraw_ghirsutum2 | 79,097 x 57,899 | m4-benchmark-7a273be | Rust | 32 | 18.7 | 34.6 | 295.9 | 21.6 | 21.6 | 3.5 |
+| cellbender_fromraw_ghirsutum2 | 79,097 x 57,899 | m4-benchmark | R | 1 | 641.9 | 699.9 | 695.0 | 144.1 | - | 4.7 |
+| cellbender_fromraw_ghirsutum2 | 79,097 x 57,899 | m4-benchmark | Rust | 1 | 255.3 | 270.5 | 272.4 | 8.0 | 6.2 | 3.5 |
+| cellbender_fromraw_ghirsutum2 | 79,097 x 57,899 | m4-benchmark | Rust | 32 | 19.0 | 34.0 | 302.2 | 31.0 | 31.0 | 3.5 |
 
 **Every output was byte-identical to R's:** `cell_attr.tsv`, `gene_attr.tsv`, `model_pars.tsv`, `model_pars_fit.tsv`, `variable_features.tsv` and `scale_data.npy` (2.5 GB for sscovelli, 1.9 GB for ghirsutum2), for every Rust run, at 1 and 32 threads.
 
-- **Time.** On one thread Rust's SCTransform is 2.6 (sscovelli) and 2.7 (ghirsutum2) times faster than R's; on 32 threads 23 and 34 times. R's time includes `sctransform::correct()`, the corrected counts that `do.correct.umi = TRUE` adds to the SCT assay and DoubletFinder never reads; Rust does not compute them.
-- **Memory.** R holds the full residual matrix: 88.8 and 144.1 GiB at its peak. Rust needs 9.5 and 8.0 GiB on one thread, 9 and 18 times less: the counts and the SCT input (3.1-3.5 GiB after loading), the rows of the 3,000 variable features (2.5 and 1.9 GB), and per thread one bin's product (500 genes x cells, 0.4 and 0.3 GB) while it is turned into residuals. On 32 threads the bins in flight dominate (27.4 and 21.6 GiB): workers drop a row once its variance is below the 3,000th best so far, but sscovelli has only 45 bins, and the first 32 start before 3,000 genes are ranked. Computing each bin's rows on all threads, one bin at a time, would make the memory independent of the thread count (a possible follow-up; the bins' products must keep R's `dgemm` shapes).
+- **Time.** With the final code, Rust's SCTransform is 2.3 (sscovelli) and 2.5 (ghirsutum2) times faster than R's on one thread, and 29 and 35 times on 32 threads. R's time includes `sctransform::correct()`, the corrected counts that `do.correct.umi = TRUE` adds to the SCT assay and DoubletFinder never reads; Rust does not compute them.
+- **Memory.** R holds the full residual matrix: 88.8 and 144.1 GiB at its peak. Rust's peak barely depends on the number of threads: 9.5 and 8.0 GiB on one thread, 9.7 and 8.1 GiB on 32, 9 and 18 times less than R. When SCTransform returns, the process holds 6.9-7.1 and 6.1-6.2 GiB: the counts and the SCT input (3.1-3.5 GiB after loading) and the rows of the 3,000 variable features (2.5 and 1.9 GB); while the residuals are computed, also two bins' products (500 genes x cells, 0.4 and 0.3 GB each) and two rows per thread. Writing `scale_data.npy` then adds a column-major copy of `scale.data` (2.5 and 1.9 GB), which sets the process's peak. Before the residual-memory change (7a273be), each thread made a whole bin's product and residuals, and on 32 threads the bins in flight took 27.4 and 21.6 GiB.
+- **The change and time.** On 32 threads SCTransform got faster. The products are made one at a time, but the residuals of the previous bin hide them, and the reused buffers spare each product the page faults of fresh memory (two thirds of the time of a 0.4 GB `dgemm`). Shared nodes vary: on a busy node, one-thread runs of the same binary differed by a fifth, depending on which socket the thread ran on. So the runs above, on different nodes, do not compare the two codes; the one-thread runs of the final code happened to be slower than 7a273be's. Transparent huge pages matter too, since a gene's residuals read its row of the product a page apart: with them disabled for the process (job 59877875, one socket of one node), sscovelli's one-thread SCTransform took 151.4 and 150.1 s instead of 134.1 and 137.6 s, and 7a273be's 162.6 s. Alternating the two binaries on one node (jobs 59872787 and 59872798; outputs identical):
+
+  | object | node | threads | SCTransform, 7a273be (s) | SCTransform, 2dc515e (s) | peak RSS by the end of SCTransform, 7a273be (GiB) | the same, 2dc515e (GiB) |
+  |---|---|---|---|---|---|---|
+  | soupx_emptydrops_sscovelli | holy8a26210 | 1 | 138.8, 135.0 | 131.1, 131.0 | 7.5, 7.5 | 7.1, 7.1 |
+  | soupx_emptydrops_sscovelli | holy8a26210 | 32 | 17.6, 16.1 | 13.9, 13.8 | 26.0, 26.6 | 7.0, 6.9 |
+  | cellbender_fromraw_ghirsutum2 | holy8a24203 (load 178) | 1 | 274.7, 331.4 | 324.2, 310.4 | 6.5, 6.5 | 6.2, 6.2 |
+  | cellbender_fromraw_ghirsutum2 | holy8a24203 (load 178) | 32 | 24.7, 25.9 | 22.6, 22.6 | 21.5, 21.3 | 6.1, 6.2 |
+- **Scheduling.** Up to 16,384 cells a thread takes eight neighbouring genes at a time, above that one ([`gene_group`](../../crates/sctransform/src/residuals.rs)). Neighbouring genes share cache lines of the product. With few cells the lines stay in a core's L2 across the eight genes; with many, the threads, working on neighbouring genes at once, share them through the L3. On one node (job 59867195), SCTransform on SRR18256555's final run (4,144 cells, 8 threads) took 1.76 s in groups of eight, 1.89 s one gene at a time and 1.77 s with 7a273be. On 10xmousebrain's (15,775 cells) the same three took 7.0, 7.35 and 6.95 s on 8 threads, and 4.7, 4.8 and 5.2 s on 32. On sscovelli's (32 threads) they took 14.4, 13.3 and 14.9 s.
 - **R's SCTransform share, from M2.** M2's runs time DoubletFinder's phases, not SCTransform itself. In the instrumented portable runs, the final run's `doubletFinder()` (SCTransform, PCA, the distance matrix, pANN) took 1,712 s (sscovelli) and 1,527 s (ghirsutum2), with peaks of 127.5 and 153.1 GiB. SCTransform on the same input measured here is 354 s (21%) and 642 s (42%) of that, at 88.8 and 144.1 GiB. In the direct production runs (SapphireRapids kernels) the phase took 1,477 and 1,258 s, of which the same SCTransform would be 24% and 51%. The sweep's six SCTransforms (on 10,000 real cells and their doublets each) are inside `paramSweep`'s 458 and 753 s, which M2 does not break down further.
 
 ## Findings for the port
@@ -447,7 +460,7 @@ SCTransform on the final run of the two largest objects, Rust and R on the same 
 - **`future.seed` costs two draws per bin.** future 1.82.0's `make_rng_seeds` and future.apply 1.21.0's `future_xapply` each call `next_random_seed()` (one uniform), on R's main stream; the L'Ecuyer kind switch in between is undone.
 - **Explicit zeros matter.** `dgCMatrix + dgCMatrix` keeps the union of the patterns with explicit zeros, and sctransform's `row_var_dgcmatrix` adds stored entries' squared deviations in storage order and the implicit zeros at the end, so an explicit zero changes the bits; `median(umi@x)` counts them too.
 - **The last bin's product.** R's `tcrossprod` switches to `dgemv` when a bin has one gene; the port follows R's dispatch (and its own triple loop when NaN or Inf may be present).
-- **Memory.** R holds the full genes x cells residual matrix (37 GB for ghirsutum2's final run) and copies it while clipping; the port computes bins in parallel and keeps only the running best 3,000 genes' rows.
+- **Memory.** R holds the full genes x cells residual matrix (37 GB for ghirsutum2's final run) and copies it while clipping. The port makes one bin's product at a time, with R's `dgemm` call, into one of two reused buffers; shares the bin's genes among the threads; and keeps only the rows of the running best 3,000 genes.
 
 ## Plan corrections
 
@@ -471,7 +484,7 @@ The sources and the dumps settle these; plan B3a (and the brief's hazard list) s
 - **Corrected counts are not computed.** `do.correct.umi = TRUE` makes R also run `sctransform::correct()` for the SCT assay's counts; DoubletFinder never reads them, and `scrust sctransform` does not write them (the benchmark's R time includes them).
 - **Implemented, checked on R vectors, not reached in the data:** `weightedMedian` with interpolation (used by `loc_median_fit` when a bin has fewer genes than its window), glmGamPoi's narrow-data trend branch, `uniroot` failures, and the threshold selection of variable features (`variable_features_n = None`).
 - **`scale.data` of the light runs** (sscovelli, ghirsutum2) is not in R's dumps; their S2d check covers the residual mean and variance of every kept gene and the features, and the benchmark compares their final runs' `scale.data` with R's byte for byte.
-- **Validation labels.** The first full S2b run (`rust/m4b/`, M4b's code before it was committed) stopped on the ghirsutum2 gene above and is kept as a record. The passing runs of each sub-milestone are kept too: `rust/m4b-34cce6f/` (S2a-S2b, job 59759589), `rust/m4c-f9b645b/` (S2a-S2c, job 59763140), `rust/m4d-9e607ac/` (S2a-S2d teacher-forced, 16 of 24 runs: the job was cancelled because a rebuild during it would have changed the binary of its later runs; the wrapper now runs a pinned copy, `SCRUST_BIN`), `rust/m4d-3e810f1/` (teacher-forced and chained, all 24 runs, job 59767410). The tables above are from `rust/m4d-7a273be/`, the final code. A cancelled job left `soupx_tenx_10xmousebrain/rust/m4d-9e607ac/instrumented-portable-sapphirerapids.partial.59765712/`, an incomplete directory.
+- **Validation labels.** The first full S2b run (`rust/m4b/`, M4b's code before it was committed) stopped on the ghirsutum2 gene above and is kept as a record. The passing runs of each sub-milestone are kept too: `rust/m4b-34cce6f/` (S2a-S2b, job 59759589), `rust/m4c-f9b645b/` (S2a-S2c, job 59763140), `rust/m4d-9e607ac/` (S2a-S2d teacher-forced, 16 of 24 runs: the job was cancelled because a rebuild during it would have changed the binary of its later runs; the wrapper now runs a pinned copy, `SCRUST_BIN`), `rust/m4d-3e810f1/` (teacher-forced and chained, all 24 runs, job 59767410), `rust/m4d-7a273be/` (job 59770277, before the residual-memory change). The tables above are from `rust/m4-mem2/`, the final code (commit 2dc515e, binary sha256 f3e1d5f759cb). `rust/m4-mem/` (job 59864076, every check identical too) and `rust/m4-benchmark-mem/` (jobs 59864077 and 59864078) come from an earlier build of the change, which took one gene at a time at every size. A cancelled job left `soupx_tenx_10xmousebrain/rust/m4d-9e607ac/instrumented-portable-sapphirerapids.partial.59765712/`, an incomplete directory.
 - **The benchmark runs the portable profile** (Haswell kernels on Sapphire Rapids), the profile of the instrumented runs it compares with; production runs detect SapphireRapids kernels.
 
 ## Reproducing
