@@ -2,13 +2,14 @@
 //!
 //! Each tool is a library crate under `crates/` plus a subcommand here, so the repository ships
 //! as one binary: `doubletfinder` (milestone M3: on R's own embeddings), `knn` (the shared
-//! neighbour stage on its own), `sctransform` (SCTransform v2, milestone M4), `validate` (Rust
-//! against R, plan A4) and `fingerprint` (the
-//! environment fingerprint of plan A5b, which the R reference runs record too).
+//! neighbour stage on its own), `sctransform` (SCTransform v2, milestone M4), `pca` (RunPCA,
+//! milestone M5), `validate` (Rust against R, plan A4) and `fingerprint` (the environment
+//! fingerprint of plan A5b, which the R reference runs record too).
 
 mod cli;
 mod cmd_doubletfinder;
 mod cmd_knn;
+mod cmd_pca;
 mod cmd_sctransform;
 mod cmd_validate;
 mod fingerprint;
@@ -24,7 +25,10 @@ Commands:
   knn            Exact nearest neighbours as DoubletFinder ranks them
   sctransform    SCTransform v2 as Seurat 5.5.1 runs it (sctransform 0.4.3, glmGamPoi 1.22.0):
                  Pearson residuals, variable features and scale.data (milestone M4)
-  validate       Compare a Rust run with an R reference run (validate doubletfinder|sctransform)
+  pca            RunPCA as Seurat 5.5.1 runs it (irlba 2.4.1) on an SCTransform output
+                 (milestone M5)
+  validate       Compare a Rust run with an R reference run
+                 (validate doubletfinder|sctransform|pca)
   fingerprint    Print the environment fingerprint as JSON: node, CPU, OpenBLAS kernel
                  and threads, glibc (docs/PLAN.md A5b)
 
@@ -36,6 +40,8 @@ Options:
 ";
 
 fn main() -> ExitCode {
+    // R's reference runs use one OpenBLAS thread; the ports' products must too (rcompat::blas)
+    rcompat::blas::pin_single_thread();
     let Some(command) = std::env::args_os().nth(1) else {
         eprint!("{USAGE}");
         return ExitCode::from(2);
@@ -53,11 +59,12 @@ fn main() -> ExitCode {
             print!("{}", fingerprint::json());
             ExitCode::SUCCESS
         }
-        Some(cmd @ ("doubletfinder" | "knn" | "sctransform" | "validate")) => {
+        Some(cmd @ ("doubletfinder" | "knn" | "pca" | "sctransform" | "validate")) => {
             let rest: Vec<String> = std::env::args().skip(2).collect();
             let usage = match cmd {
                 "doubletfinder" => cmd_doubletfinder::USAGE,
                 "knn" => cmd_knn::USAGE,
+                "pca" => cmd_pca::USAGE,
                 "sctransform" => cmd_sctransform::USAGE,
                 _ => cmd_validate::USAGE,
             };
@@ -68,6 +75,7 @@ fn main() -> ExitCode {
             let result = match cmd {
                 "doubletfinder" => cmd_doubletfinder::main(&rest).map(|_| true),
                 "knn" => cmd_knn::main(&rest).map(|_| true),
+                "pca" => cmd_pca::main(&rest).map(|_| true),
                 "sctransform" => cmd_sctransform::main(&rest).map(|_| true),
                 _ => cmd_validate::main(&rest),
             };

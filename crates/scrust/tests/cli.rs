@@ -199,3 +199,34 @@ fn sctransform_matches_r_byte_for_byte() {
     assert_eq!(sha256_hex(&std::fs::read(out.join("scale_data.npy")).unwrap()), digest.trim(), "scale_data.npy differs from R's");
     assert!(out.join("summary.json").is_file());
 }
+
+/// `scrust pca` on `scrust sctransform`'s output for a tier-T object gives R's RunPCA() outputs
+/// (Seurat's default npcs = 50) byte for byte (validation/R/runpca_reference.R on R's
+/// SCTransform output; large files by their SHA-256). Its products are OpenBLAS calls, so it needs
+/// the reference's kernel (env.sh's OPENBLAS_CORETYPE=Haswell).
+#[test]
+fn pca_matches_r_byte_for_byte() {
+    if std::env::var("OPENBLAS_CORETYPE").ok().as_deref() != Some("Haswell") {
+        eprintln!("skipped: needs OPENBLAS_CORETYPE=Haswell (source env.sh)");
+        return;
+    }
+    let reference = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/pca/cli_soupx_tenx_test");
+    let sct = tmp("pca_sct");
+    let run = scrust(&[
+        "sctransform", "--counts", &fixture("soupx_tenx_test").join("input").display().to_string(),
+        "--out", &sct.display().to_string(), "--threads", "2",
+    ]);
+    assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
+    for threads in ["1", "3"] {
+        let out = tmp(&format!("pca_t{threads}"));
+        let run = scrust(&["pca", "--sct", &sct.display().to_string(), "--out", &out.display().to_string(), "--threads", threads]);
+        assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
+        let got = std::fs::read(out.join("stdev.tsv")).unwrap();
+        assert!(got == std::fs::read(reference.join("stdev.tsv")).unwrap(), "stdev.tsv differs from R's");
+        for f in ["embeddings.tsv", "loadings.tsv", "random_seed.txt"] {
+            let digest = std::fs::read_to_string(reference.join(format!("{f}.sha256"))).unwrap();
+            assert_eq!(sha256_hex(&std::fs::read(out.join(f)).unwrap()), digest.trim(), "{f} differs from R's ({threads} threads)");
+        }
+        assert!(out.join("summary.json").is_file());
+    }
+}

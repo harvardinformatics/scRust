@@ -199,6 +199,75 @@ impl Npy {
     }
 }
 
+/// Reads a `<f8` matrix (`nrow x ncol`) row by row: returns its elements in row-major order
+/// (row `r` at `r * ncol..`), with `(nrow, ncol)`. A column-major file (R's `npy_write`) is
+/// transposed while it streams in blocks of columns, so memory stays at about one copy of the
+/// matrix.
+pub fn read_f64_row_major(path: &Path) -> Result<(Vec<f64>, usize, usize), NpyError> {
+    use std::io::Read;
+    let mut file = fs::File::open(path).map_err(|e| bad(path, &e.to_string()))?;
+    let mut pre = [0u8; 12];
+    file.read_exact(&mut pre[..10]).map_err(|e| bad(path, &e.to_string()))?;
+    if &pre[..6] != b"\x93NUMPY" {
+        return Err(bad(path, "not a .npy file"));
+    }
+    let hlen = match pre[6] {
+        1 => u16::from_le_bytes([pre[8], pre[9]]) as usize,
+        2 | 3 => {
+            file.read_exact(&mut pre[10..12]).map_err(|e| bad(path, &e.to_string()))?;
+            u32::from_le_bytes(pre[8..12].try_into().unwrap()) as usize
+        }
+        v => return Err(bad(path, &format!("unsupported .npy version {v}"))),
+    };
+    let mut hbytes = vec![0u8; hlen];
+    file.read_exact(&mut hbytes).map_err(|e| bad(path, &e.to_string()))?;
+    let header = std::str::from_utf8(&hbytes).map_err(|_| bad(path, "header is not text"))?;
+    let descr = header_field(header, "descr").ok_or_else(|| bad(path, "no descr"))?;
+    if !descr.starts_with("'<f8'") {
+        return Err(bad(path, "not a <f8 array"));
+    }
+    let fortran = header_field(header, "fortran_order").ok_or_else(|| bad(path, "no fortran_order"))?.starts_with("True");
+    let shape_txt = header_field(header, "shape").ok_or_else(|| bad(path, "no shape"))?;
+    let close = shape_txt.find(')').ok_or_else(|| bad(path, "bad shape"))?;
+    let shape: Vec<usize> = shape_txt[1..close].split(',').map(str::trim).filter(|s| !s.is_empty()).map(|s| s.parse().map_err(|_| bad(path, "bad shape"))).collect::<Result<_, _>>()?;
+    if shape.len() != 2 {
+        return Err(bad(path, &format!("not a matrix: shape {shape:?}")));
+    }
+    let (nrow, ncol) = (shape[0], shape[1]);
+    let mut out = vec![0.0f64; nrow * ncol];
+    let mut reader = io::BufReader::with_capacity(1 << 22, file);
+    if !fortran {
+        let mut buf = vec![0u8; 8 * ncol.max(1)];
+        for r in 0..nrow {
+            reader.read_exact(&mut buf[..8 * ncol]).map_err(|e| bad(path, &e.to_string()))?;
+            for (c, b) in buf[..8 * ncol].chunks_exact(8).enumerate() {
+                out[r * ncol + c] = f64::from_le_bytes(b.try_into().unwrap());
+            }
+        }
+    } else {
+        // blocks of columns: each row's values of the block are written contiguously
+        let block = (1usize << 21).checked_div(8 * nrow.max(1)).unwrap_or(1).clamp(1, ncol.max(1));
+        let mut buf = vec![0u8; 8 * nrow * block];
+        let mut c0 = 0;
+        while c0 < ncol {
+            let nb = block.min(ncol - c0);
+            reader.read_exact(&mut buf[..8 * nrow * nb]).map_err(|e| bad(path, &e.to_string()))?;
+            for r in 0..nrow {
+                for k in 0..nb {
+                    let i = 8 * (k * nrow + r);
+                    out[r * ncol + c0 + k] = f64::from_le_bytes(buf[i..i + 8].try_into().unwrap());
+                }
+            }
+            c0 += nb;
+        }
+    }
+    let mut rest = [0u8; 1];
+    if reader.read(&mut rest).map_err(|e| bad(path, &e.to_string()))? != 0 {
+        return Err(bad(path, "more data than the shape holds"));
+    }
+    Ok((out, nrow, ncol))
+}
+
 fn header_bytes(dtype: Dtype, shape: &[usize]) -> Vec<u8> {
     let shape_txt = match shape {
         [n] => format!("({n},)"),
@@ -257,6 +326,11 @@ mod tests {
         write_i32(&q, &[7, -8], &[2]).unwrap();
         let b = Npy::read(&q).unwrap();
         assert_eq!((b.nrow(), b.ncol(), b.get_i32(1, 0)), (2, 1, -8));
+        // row-major streaming read of a column-major matrix
+        let (rm, nr, nc) = read_f64_row_major(&p).unwrap();
+        assert_eq!((nr, nc), (3, 2));
+        assert_eq!(rm, vec![1.0, 4.0, 2.0, 5.0, 3.0, 6.0]);
+        assert!(read_f64_row_major(&q).is_err());
         fs::remove_dir_all(&dir).unwrap();
     }
 }

@@ -44,3 +44,10 @@ After `cargo build --release -p scrust`, from the repository's top directory. Th
 - [`m3_benchmark.sbatch`](m3_benchmark.sbatch) `[<object>] [<run>]`: wall time and peak RSS under `/usr/bin/time -v` of `scrust knn` (the final run's neighbour search) and of the whole core, at 1 thread and at `SLURM_CPUS_PER_TASK` threads (default soupx_emptydrops_sscovelli, 32 CPUs), into `data/doubletfinder/<object>/rust/m3-benchmark/<job id>/`.
 
 Logs go to `<job name>-<job id>.sbatch.log` in the submit directory, which `.gitignore` excludes.
+
+## PCA (M5)
+
+After `cargo build --release -p scrust`, from the repository's top directory, with a pinned copy of the binary (`cp target/release/scrust data/doubletfinder/logs/bin/scrust-<label>`, passed as `SCRUST_BIN`), so that a rebuild cannot change what a queued job runs:
+
+- [`m5_pca.sbatch`](m5_pca.sbatch) `<label> <object>...`: for every instrumented reference run of each object, `scrust validate pca` (stage S3 in all 7 contexts, teacher-forced on R's PCA input and after Rust's own SCTransform) under that run's OpenBLAS profile, the core checked first, into `data/doubletfinder/<object>/rust/<label>/<run>/` (`validate.json`, `validate.md`, `sources.txt`, `fingerprint.json`, `time_v.txt`). OpenBLAS runs one thread; irlba's two large products are split across the job's CPUs only where that keeps R's bits, so the CPU count changes the time only. 8 CPUs and 48 GB cover every object.
+- [`m5_benchmark.sbatch`](m5_benchmark.sbatch) `rust|r <object> [<sct dir>]`: `scrust pca --npcs 10` at 1 thread and at `SLURM_CPUS_PER_TASK` threads (`--cpus-per-task=32 --mem=32G`), or R's `RunPCA()` through [`runpca_reference.R`](../R/runpca_reference.R) (`--cpus-per-task=1 --mem=48G`), under `/usr/bin/time -v`, on the same SCTransform output (default: R's own, from the M4 benchmark of the object's final run), in the portable profile; the outputs are compared byte for byte (`data/doubletfinder/<object>/rust/m5-benchmark/final/`).

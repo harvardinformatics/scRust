@@ -13,6 +13,8 @@
 //! - [`run`]: the call sequence over an [`run::EmbeddingSource`];
 //! - [`sct`]: SCTransform as DoubletFinder calls it (stage S2): the doublet-augmented input
 //!   and the comparison with R's stage dumps;
+//! - [`pca`]: RunPCA as DoubletFinder calls it (stage S3) and the comparison with R's dumps,
+//!   teacher-forced and chained after Rust's SCTransform;
 //! - [`stages`]: stage dumps in the instrumented R runs' layout, read (teacher forcing) and
 //!   written;
 //! - [`validate`]: comparison of a Rust run with an R reference run.
@@ -22,6 +24,7 @@
 
 pub mod pann;
 pub mod params;
+pub mod pca;
 pub mod run;
 pub mod sct;
 pub mod stages;
