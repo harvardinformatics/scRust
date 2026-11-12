@@ -10,7 +10,10 @@
 //!   seven contexts from Rust's own draws: nothing is read from R's run.
 //! - Against the saved workflow output (`saved/`): the doublet set, the kept cells' pANN, the
 //!   column names.
-//! - The results do not depend on the number of threads.
+//! - `singlets/` (M6b): the input's counts without the doublets, every stored entry as it is,
+//!   the saved output's kept cells in order, the input's feature lines. (The saved objects'
+//!   own counts are compared on `data/`, through `validation/slurm/m6_doubletfinder.sbatch`.)
+//! - The results do not depend on the number of threads, `singlets/` included.
 //!
 //! SCTransform's and RunPCA's products are OpenBLAS calls and the fixtures are the portable
 //! runs, so the tests need `OPENBLAS_CORETYPE=Haswell` (env.sh's default).
@@ -20,9 +23,38 @@ use doubletfinder::input::{read_counts, read_input};
 use doubletfinder::pann::NeighbourDumps;
 use doubletfinder::record::{DumpLevel, Recorder};
 use doubletfinder::run::{run, Output, Params};
+use doubletfinder::singlets::write_singlets;
 use doubletfinder::validate::{compare, compare_saved, Check, Status};
-use scio::{Json, Table};
+use scio::{tenx, Json, Table};
 use std::path::{Path, PathBuf};
+
+/// `singlets/` is the input's counts restricted to the cells the run keeps, in input order, each
+/// column exactly as stored; the cells are the saved workflow output's kept cells; the feature
+/// lines are the input's.
+fn check_singlets(object: &str, out: &Output, dir: &Path) {
+    let input = fixture(object).join("input");
+    let w = write_singlets(&input, out, dir, "scrust test", 2).unwrap();
+    let written = dir.join("singlets");
+    let m = scio::sparse::read_mtx(&input).unwrap();
+    let got = scio::sparse::read_mtx(&written).unwrap();
+    let keep: Vec<usize> = (0..m.ncol).filter(|&j| !out.doublet[j]).collect();
+    assert_eq!((got.nrow, got.ncol, got.nnz()), (m.nrow, keep.len(), w.nnz), "{object}");
+    let mut at = 0;
+    for (k, &j) in keep.iter().enumerate() {
+        let (rows, x) = m.col(j);
+        let (grows, gx) = got.col(k);
+        assert_eq!(rows, grows, "{object}: column {j}");
+        assert!(x.iter().zip(gx).all(|(a, b)| a.to_bits() == b.to_bits()), "{object}: column {j}");
+        at += x.len();
+    }
+    assert_eq!(at, got.nnz());
+    let kept = Table::read(&fixture(object).join("saved/cells.tsv")).unwrap();
+    let saved: Vec<String> = kept.rows.iter().map(|r| r[0].clone()).collect();
+    assert_eq!(tenx::read_barcodes(&written).unwrap(), saved, "{object}: kept cells");
+    let lines = |d: &Path| tenx::read_lines(&tenx::find(d, "features.tsv").unwrap()).unwrap();
+    assert_eq!(lines(&written), lines(&input), "{object}: features");
+    assert_eq!(w.field, tenx::read_mtx_header(&input).unwrap().field, "{object}");
+}
 
 const OBJECTS: [&str; 5] = [
     "soupx_tenx_test",
@@ -106,6 +138,9 @@ fn every_stage_from_the_counts_is_r_s() {
         let saved = compare_saved(&f.join("saved"), &dir).unwrap();
         bad += failures(object, &saved.checks);
         assert_eq!(saved.checks.iter().filter(|c| c.status == Status::Identical).count(), 6, "{object}: saved-output checks");
+        // the fixtures hold no exported singlets: that check is not applicable here
+        assert!(saved.checks.iter().any(|c| c.name == "singlets" && c.status == Status::NotApplicable), "{object}");
+        check_singlets(object, &out, &dir);
 
         let identical = |stage: &str| report.checks.iter().filter(|c| c.stage == stage && c.status == Status::Identical).count();
         // every result field, the final RNG state's digest included
@@ -155,5 +190,16 @@ fn independent_of_the_thread_count() {
     one.write_tables(&dir).unwrap();
     for file in ["cells.tsv", "sweep_stats.tsv", "bcmvn.tsv"] {
         assert!(std::fs::read(f.join(file)).unwrap() == std::fs::read(dir.join(file)).unwrap(), "{file}");
+    }
+    // singlets/, byte for byte, whatever the number of threads writing it
+    let input = fixture(object).join("input");
+    let files = |threads: usize| -> Vec<Vec<u8>> {
+        let d = out_dir(&format!("threads_singlets_{threads}"));
+        write_singlets(&input, &one, &d, "scrust test", threads).unwrap();
+        ["matrix.mtx.gz", "barcodes.tsv.gz", "features.tsv.gz"].iter().map(|f| std::fs::read(d.join("singlets").join(f)).unwrap()).collect()
+    };
+    let first = files(1);
+    for threads in [2, 7] {
+        assert!(files(threads) == first, "{threads} threads: singlets/ differs");
     }
 }

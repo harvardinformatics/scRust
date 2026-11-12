@@ -20,7 +20,8 @@
 //!   with rcompat from R's `.Random.seed` before them.
 //!
 //! [`compare_saved`] compares a run with the saved workflow output instead: the doublet set, the
-//! singlets' pANN as R wrote them, and the column names (so pK and nExp).
+//! singlets' pANN as R wrote them, the column names (so pK and nExp), and, where they were
+//! exported (M6b), the singlets' counts: barcodes, feature lines and every stored entry.
 //!
 //! Every criterion is exact (`validation/tolerances.toml`).
 
@@ -629,7 +630,8 @@ pub fn compare(reference: &Path, reference_stages: &Path, candidate: &Path, thre
 /// saved workflow output as exported (`saved/`: `cells.tsv` with the kept cells and their
 /// pANN as R wrote them, `doublets.txt`, `saved.json` with the column names, pK and nExp):
 /// plan B5's row for saved outputs. The kept cells' pANN are compared as text (17 significant
-/// digits, so bitwise).
+/// digits, so bitwise). With `saved/singlets/` (the saved object's RNA counts, M6b), the run's
+/// `singlets/` too ([`compare_singlets`]).
 pub fn compare_saved(saved: &Path, candidate: &Path) -> Result<Report, DfError> {
     let stage = "saved";
     let mut checks = Vec::new();
@@ -671,7 +673,56 @@ pub fn compare_saved(saved: &Path, candidate: &Path) -> Result<Report, DfError> 
         saved_singlets.len().max(run_singlets.len())
     };
     checks.push(check(stage, "singlet pANN", if nd == 0 { Status::Identical } else { Status::Differ }, saved_singlets.len(), nd, format!("{} kept cells, in order, barcode and pANN text", saved_singlets.len())));
+    compare_singlets(&saved.join(crate::singlets::DIR), &candidate.join(crate::singlets::DIR), &mut checks)?;
     Ok(Report { reference: saved.to_path_buf(), candidate: candidate.to_path_buf(), checks })
+}
+
+/// The run's singlets (`singlets/`) against the saved object's RNA counts as exported
+/// (`saved/singlets/`, `validation/R/export_doubletfinder_singlets.R`): the barcodes in order,
+/// the feature lines, and the matrix: its header field, dimensions, every stored entry (explicit
+/// zeros included) and every value, bit for bit. Not applicable when they were not exported.
+pub fn compare_singlets(saved: &Path, candidate: &Path, checks: &mut Vec<Check>) -> Result<(), DfError> {
+    use scio::tenx;
+    let stage = "saved";
+    if tenx::find(saved, "matrix.mtx").is_err() {
+        checks.push(check(stage, "singlets", Status::NotApplicable, 0, 0, "the saved output's singlets were not exported"));
+        return Ok(());
+    }
+    if tenx::find(candidate, "matrix.mtx").is_err() {
+        checks.push(check(stage, "singlets", Status::Missing, 0, 0, "the run wrote no singlets/"));
+        return Ok(());
+    }
+    let differ = |n: usize| if n == 0 { Status::Identical } else { Status::Differ };
+    let in_order = |a: &[String], b: &[String]| if a.len() == b.len() { a.iter().zip(b).filter(|(x, y)| x != y).count() } else { a.len().max(b.len()) };
+    let (rb, cb) = (tenx::read_barcodes(saved)?, tenx::read_barcodes(candidate)?);
+    let nd = in_order(&rb, &cb);
+    checks.push(check(stage, "singlets barcodes", differ(nd), rb.len(), nd, format!("{} saved, {} written, in order", rb.len(), cb.len())));
+    let lines = |d: &Path| -> Result<Vec<String>, DfError> { Ok(tenx::read_lines(&tenx::find(d, "features.tsv")?)?) };
+    let (rf, cf) = (lines(saved)?, lines(candidate)?);
+    let nd = in_order(&rf, &cf);
+    checks.push(check(stage, "singlets features", differ(nd), rf.len(), nd, format!("{} saved, {} written, lines in order", rf.len(), cf.len())));
+    let (rh, ch) = (tenx::read_mtx_header(saved)?, tenx::read_mtx_header(candidate)?);
+    let (rm, cm) = (scio::sparse::read_mtx(saved)?, scio::sparse::read_mtx(candidate)?);
+    let same_entries = rm.nrow == cm.nrow && rm.ncol == cm.ncol && rm.p == cm.p && rm.i == cm.i;
+    let nd = if same_entries { rm.x.iter().zip(&cm.x).filter(|(a, b)| !same_bits(**a, **b)).count() } else { rm.nnz().max(cm.nnz()) };
+    let nd = nd + (rh.field != ch.field) as usize;
+    let zeros = |x: &[f64]| x.iter().filter(|&&v| v == 0.0).count();
+    let detail = format!(
+        "saved {} x {}, {} entries ({} explicit zeros), {}; written {} x {}, {} entries ({} explicit zeros), {}{}",
+        rm.nrow,
+        rm.ncol,
+        rm.nnz(),
+        zeros(&rm.x),
+        rh.field,
+        cm.nrow,
+        cm.ncol,
+        cm.nnz(),
+        zeros(&cm.x),
+        ch.field,
+        if same_entries { "" } else { "; the stored entries differ" }
+    );
+    checks.push(check(stage, "singlets matrix", differ(nd), rm.nnz(), nd, detail));
+    Ok(())
 }
 
 /// Reads a `.npy` file (for callers outside this crate).

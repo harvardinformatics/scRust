@@ -4,8 +4,8 @@
 //! It reproduces the workflow's `doubletfinder.R` call sequence ([`run`]): `paramSweep` over
 //! the pN x pK grid, `summarizeSweep` and `find.pK` (the bimodality coefficient), nExp with the
 //! homotypic adjustment, and the final `doubletFinder` classification. It writes pANN and the
-//! classification for every cell, the sweep tables, and a `summary.json` that includes the
-//! column names R would write.
+//! classification for every cell, the sweep tables, a `summary.json` that includes the column
+//! names R would write, and the singlets' counts as a new 10x directory.
 //!
 //! - [`params`]: the pK and pN grids, and the values that pass through strings;
 //! - [`pann`]: stages S4 and S5 (neighbours through the [`knn`] crate, pANN) and S7 (calls);
@@ -22,6 +22,8 @@
 //! - [`stages`]: stage dumps in the instrumented R runs' layout, read (teacher forcing) and
 //!   written; [`record`]: a Rust run's dumps of every stage, S1 to S7, with the RNG
 //!   checkpoints and scalars;
+//! - [`singlets`]: the singlets' counts as a new 10x directory, the step's count-level result
+//!   (M6b);
 //! - [`validate`]: comparison of a Rust run with an R reference run, and with the saved
 //!   workflow output.
 //!
@@ -36,6 +38,7 @@ pub mod pca;
 pub mod record;
 pub mod run;
 pub mod sct;
+pub mod singlets;
 pub mod stages;
 pub mod summary;
 pub mod validate;

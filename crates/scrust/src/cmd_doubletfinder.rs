@@ -7,7 +7,9 @@
 //! the sweep subsample and the PCA embeddings come from an instrumented R run instead (teacher
 //! forcing, milestone M3). The outputs have the reference runs' layout (`cells.tsv`,
 //! `sweep_stats.tsv`, `bcmvn.tsv`, `summary.json`, and with `--dump-stages` the stage arrays),
-//! so runs compare file to file.
+//! so runs compare file to file. `singlets/` holds the counts without the doublets, as a new
+//! 10x directory (milestone M6b): the step's result at the level of the counts, which the next
+//! tool reads.
 
 use crate::cli::{self, Args, Phases};
 use doubletfinder::chain::{rng_digest, RustSource};
@@ -15,6 +17,7 @@ use doubletfinder::input::{read_counts, read_input};
 use doubletfinder::pann::NeighbourDumps;
 use doubletfinder::record::{DumpLevel, Recorder};
 use doubletfinder::run::{run, Params, PkChoice};
+use doubletfinder::singlets::{write_singlets, DIR as SINGLETS};
 use doubletfinder::stages::{stage_dumps, StageSource};
 use scio::Json;
 use std::cell::RefCell;
@@ -61,7 +64,10 @@ Outputs: cells.tsv (barcode, pANN and classification of every cell), sweep_stats
 BCreal), bcmvn.tsv (find.pK's table), summary.json (\"result\": pK and its label as R writes it,
 nExp_poi, the homotypic proportion, nExp, the doublets made, k, the column names R writes, the
 digest of the final .Random.seed; \"run\": parameters, versions, timings and peak memory per
-phase).
+phase), and singlets/: the counts without the doublets, as a new 10x directory (matrix.mtx.gz,
+barcodes.tsv.gz, features.tsv.gz): every singlet's column exactly as stored, in input order,
+and the input's feature lines. The counts are read again from --counts to write it, so that
+they need not stay in memory through the final run.
 ";
 
 pub fn main(argv: &[String]) -> Result<(), String> {
@@ -107,7 +113,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     if !(params.pn > 0.0 && params.pn < 1.0) {
         return Err(format!("--pn: expected a value in (0, 1), not {}", params.pn));
     }
-    if out.join("cells.tsv").exists() || out.join("summary.json").exists() {
+    if out.join("cells.tsv").exists() || out.join("summary.json").exists() || out.join(SINGLETS).exists() {
         return Err(format!("{}: holds a previous run; choose another --out", out.display()));
     }
 
@@ -143,6 +149,9 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     }
     let mut phases = phases.into_inner();
     phases.mark("write");
+    let software = format!("scrust {} doubletfinder", env!("CARGO_PKG_VERSION"));
+    let singlets = write_singlets(&counts, &output, &out, &software, threads).map_err(|e| format!("{}: {e}", out.join(SINGLETS).display()))?;
+    phases.mark("singlets");
 
     let fingerprint = Json::parse(&crate::fingerprint::json()).unwrap_or(Json::Null);
     let mode = match &stages {
@@ -178,6 +187,16 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         ),
         ("threads", Json::Int(threads as i64)),
         ("dump_stages", Json::Str(dump_arg.into())),
+        (
+            "singlets",
+            Json::obj(vec![
+                ("dir", Json::Str(SINGLETS.into())),
+                ("features", Json::Int(singlets.nrow as i64)),
+                ("cells", Json::Int(singlets.ncol as i64)),
+                ("entries", Json::Int(singlets.nnz as i64)),
+                ("field", Json::Str(singlets.field.into())),
+            ]),
+        ),
         ("start_time", Json::Str(start_time)),
         ("slurm_job_id", cli::env_json("SLURM_JOB_ID")),
         ("elapsed_s", Json::Num(phases.elapsed())),
@@ -189,12 +208,15 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     let summary = Json::obj(vec![("result", output.result_json(digest)), ("run", run_info)]);
     std::fs::write(out.join("summary.json"), scio::json::to_file_text(&summary)).map_err(|e| e.to_string())?;
     eprintln!(
-        "scrust doubletfinder: pK {} (BCmetric row {}), nExp {}, {} doublets of {} cells; {:.1} s, {} threads, peak RSS {:.2} GiB",
+        "scrust doubletfinder: pK {} (BCmetric row {}), nExp {}, {} doublets of {} cells; {}/: {} singlets, {} entries; {:.1} s, {} threads, peak RSS {:.2} GiB",
         output.pk_label,
         output.sweep.as_ref().map_or("-".into(), |s| (s.best_row + 1).to_string()),
         output.nexp,
         output.doublet.iter().filter(|&&d| d).count(),
         output.n_cells,
+        SINGLETS,
+        singlets.ncol,
+        singlets.nnz,
         phases.elapsed(),
         threads,
         cli::peak_rss_kib().unwrap_or(0) as f64 / 1048576.0
