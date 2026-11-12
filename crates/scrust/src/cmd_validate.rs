@@ -60,8 +60,13 @@ pub fn main(argv: &[String]) -> Result<bool, String> {
     for (stage, ok, bad, n, nd) in report.by_stage() {
         eprintln!("{stage:>7}: {ok} checks identical, {bad} differing; {nd} of {n} elements differ");
     }
-    for c in report.checks.iter().filter(|c| c.status != doubletfinder::validate::Status::Identical) {
+    use doubletfinder::validate::Status;
+    for c in report.checks.iter().filter(|c| matches!(c.status, Status::Differ | Status::Missing)) {
         eprintln!("  {} {}: {} {}", c.stage, c.name, c.status.as_str(), c.detail);
+    }
+    let na = report.checks.iter().filter(|c| c.status == Status::NotApplicable).count();
+    if na > 0 {
+        eprintln!("  {na} checks not applicable (R's structural checks of its own containers; stage dumps of a direct run; the RNG digest under teacher forcing)");
     }
     eprintln!("{}", if report.pass() { "pass: everything compared is identical" } else { "FAIL" });
     Ok(report.pass())
