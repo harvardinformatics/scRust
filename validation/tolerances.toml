@@ -7,7 +7,7 @@
 # M2) and says so in its report (A5b).
 #
 # The criteria are the plan's (B5) and the key names a proposal. Each stage is uncommented and
-# settled when its milestone lands (S0: M1; S1 and S4-S7: M3; S2a-S2d: M4). `scrust validate doubletfinder`
+# settled when its milestone lands (S0: M1; S1 and S4-S7: M3; S2a-S2d: M4; S3: M5). `scrust validate doubletfinder`
 # (crates/doubletfinder/src/validate.rs) applies the settled S1 and S4-S7 criteria: everything
 # it compares must be identical.
 
@@ -116,11 +116,30 @@ blas_dependent = true
 # must always match exactly.
 # Floor (M2): across kernels, sdev relative 7.3e-15, embeddings max|diff|/max|value| 2.5e-13
 # (components can flip sign); RNG states identical. The plan's 1e-10 leaves a margin of ~400.
-# [doubletfinder.S3]
-# criterion = "exact"
-# blas_dependent = true
-# otherwise = { criterion = "numeric", rel = 1e-10 }
-# rng_state = "exact"
+# Settled (M5): exact, signs included, under the run's own OpenBLAS kernel (Haswell for the
+# portable runs, SapphireRapids for the production runs, detected). In all 7 contexts of all 24
+# instrumented runs of the 10 objects, teacher-forced on R's PCA input (for the light runs, on
+# Rust's S2d, itself identical to R's) and chained after Rust's own SCTransform: irlba's d, the
+# standard deviations, the embeddings, the loadings, the PCA features (PrepDR's filter),
+# irlba's iterations and products, total.variance, and R's .Random.seed at RunPCA's entry, at
+# irlba's entry and exit and at RunPCA's exit (docs/validation/doubletfinder_m5.md). The results
+# do not depend on the number of threads. Under another kernel the comparison is not exact; the
+# fallback stays as proposed.
+[doubletfinder.S3]
+criterion = "exact"
+blas_dependent = true
+compare = ["S3_irlba_d", "S3_sdev", "S3_embeddings", "S3_loadings", "S2d_pca_features",
+           "irlba_iter", "irlba_mprod", "total_variance", "pca_n_features",
+           "rng_pca_entry", "rng_irlba_entry", "rng_irlba_exit", "rng_pca_exit"]
+otherwise = { criterion = "numeric", rel = 1e-10 }
+rng_state = "exact"
+
+# S3 chained (M5): RunPCA on Rust's own SCTransform of the counts and R's S1 draws, with the
+# generator SCTransform left; every S3 array, scalar and RNG checkpoint above. Settled: exact, in
+# all 24 runs (under each run's kernel).
+[doubletfinder.S3_chain]
+criterion = "exact"
+blas_dependent = true
 
 # S4 neighbours: the first `ind` (sweep) or k + 1 (final) order positions of every real cell.
 # Plan floor: identical for >= 99.99% of cells, each difference explained by a near-tie.
