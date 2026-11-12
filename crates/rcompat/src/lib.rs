@@ -25,7 +25,9 @@
 //! - [`fft`]: `fft()`, Singleton's mixed-radix transform, as R computes it;
 //! - [`normal::dnorm`] and [`approx`]: `dnorm()`, and `approx()`/`approxfun()` interpolation;
 //! - [`blas`]: the conda env's OpenBLAS through FFI (`dgemm`, `dgemv`, `ddot`, `dnrm2`) and R's
-//!   `tcrossprod`, so products round exactly as R's do on the same kernel (M4);
+//!   `tcrossprod`, so products round exactly as R's do on the same kernel (M4); R's `%*%`
+//!   (`matprod`) and `La.svd` (LAPACK `dgesdd` with R's workspace query), the OpenBLAS core
+//!   name and thread count (M5);
 //! - [`quantile`]: `quantile(type = 7)`, `IQR`, `median`, `mad` (M4);
 //! - [`density`]: `density()` with `bw = "nrd"` and its binning (M4);
 //! - [`gamma`]: R's `lgammafn`, `digamma`, `trigamma`, and glibc's `lgamma` (M4);
