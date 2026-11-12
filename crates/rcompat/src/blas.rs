@@ -149,12 +149,24 @@ pub fn may_have_nan_or_inf(x: &[f64]) -> bool {
 /// (`simple_tcrossprod`); otherwise `dgemv` when one of them has a single row, else
 /// `dgemm("N", "T")` with exactly R's arguments.
 pub fn tcrossprod(x: &[f64], nrx: usize, ncx: usize, y: &[f64], nry: usize, ncy: usize) -> Vec<f64> {
+    let mut z = vec![0.0; nrx * nry];
+    tcrossprod_into(x, nrx, ncx, y, nry, ncy, &mut z);
+    z
+}
+
+/// [`tcrossprod`] into `z` (`nrx * nry` elements), so that a caller can reuse one buffer for many
+/// products. What `z` held before does not matter: R's result is uninitialised memory too, which
+/// `dgemm` with `beta = 0` never reads (BLAS: "when BETA is supplied as zero then C need not be
+/// set on input"); `z` is cleared first for the other routes.
+pub fn tcrossprod_into(x: &[f64], nrx: usize, ncx: usize, y: &[f64], nry: usize, ncy: usize, z: &mut [f64]) {
     assert_eq!(ncx, ncy, "tcrossprod: non-conformable arguments");
     assert_eq!(x.len(), nrx * ncx, "tcrossprod: x has the wrong length");
     assert_eq!(y.len(), nry * ncy, "tcrossprod: y has the wrong length");
-    let mut z = vec![0.0; nrx * nry];
+    assert_eq!(z.len(), nrx * nry, "tcrossprod: z has the wrong length");
     if nrx == 0 || ncx == 0 || nry == 0 || ncy == 0 {
-        return z;
+        // zero-extent operations should return zeroes
+        z.fill(0.0);
+        return;
     }
     if may_have_nan_or_inf(x) || may_have_nan_or_inf(y) {
         for i in 0..nrx {
@@ -166,16 +178,17 @@ pub fn tcrossprod(x: &[f64], nrx: usize, ncx: usize, y: &[f64], nry: usize, ncy:
                 z[i + k * nrx] = sum;
             }
         }
-        return z;
+        return;
     }
     if nry == 1 {
-        dgemv(b'N', nrx, ncx, 1.0, x, nrx, y, 1, 0.0, &mut z, 1);
+        z.fill(0.0);
+        dgemv(b'N', nrx, ncx, 1.0, x, nrx, y, 1, 0.0, z, 1);
     } else if nrx == 1 {
-        dgemv(b'N', nry, ncy, 1.0, y, nry, x, 1, 0.0, &mut z, 1);
+        z.fill(0.0);
+        dgemv(b'N', nry, ncy, 1.0, y, nry, x, 1, 0.0, z, 1);
     } else {
-        dgemm(b'N', b'T', nrx, nry, ncx, 1.0, x, nrx, y, nry, 0.0, &mut z, nrx);
+        dgemm(b'N', b'T', nrx, nry, ncx, 1.0, x, nrx, y, nry, 0.0, z, nrx);
     }
-    z
 }
 
 #[cfg(test)]
@@ -193,6 +206,30 @@ mod tests {
         let mut y = [0.0];
         dgemv(b'T', 3, 1, 1.0, &[0.5, 0.25, 0.125], 3, &[1.0, 1.0, 1.0], 1, 0.0, &mut y, 1);
         assert_eq!(y[0], 0.875);
+    }
+
+    #[test]
+    fn products_into_a_used_buffer_ignore_its_contents() {
+        // dgemm (beta = 0) must not read C: a NaN left in the buffer would propagate
+        let (nrx, nry, k) = (37, 53, 2);
+        let x: Vec<f64> = (0..nrx * k).map(|i| (i as f64 * 0.37).sin() - 1.5).collect();
+        let y: Vec<f64> = (0..nry * k).map(|i| if i < nry { 1.0 } else { 2.0 + (i as f64 * 0.11).cos() }).collect();
+        let fresh = tcrossprod(&x, nrx, k, &y, nry, k);
+        let mut z = vec![f64::NAN; nrx * nry];
+        tcrossprod_into(&x, nrx, k, &y, nry, k, &mut z);
+        assert!(z.iter().zip(&fresh).all(|(a, b)| a.to_bits() == b.to_bits()));
+        // the dgemv routes (one row on either side) and the zero-extent case
+        let fresh = tcrossprod(&x[..k], 1, k, &y, nry, k);
+        let mut z = vec![f64::NAN; nry];
+        tcrossprod_into(&x[..k], 1, k, &y, nry, k, &mut z);
+        assert!(z.iter().zip(&fresh).all(|(a, b)| a.to_bits() == b.to_bits()));
+        let fresh = tcrossprod(&x, nrx, k, &y[..k], 1, k);
+        let mut z = vec![f64::NAN; nrx];
+        tcrossprod_into(&x, nrx, k, &y[..k], 1, k, &mut z);
+        assert!(z.iter().zip(&fresh).all(|(a, b)| a.to_bits() == b.to_bits()));
+        let mut z = vec![f64::NAN; nrx * nry];
+        tcrossprod_into(&[], nrx, 0, &[], nry, 0, &mut z);
+        assert!(z.iter().all(|&v| v == 0.0));
     }
 
     #[test]
