@@ -474,6 +474,8 @@ $R validation/R/sctransform_cli_reference.R tests/fixtures/doubletfinder/soupx_t
 $R validation/R/runpca_reference.R <sct dir> <out dir>
 ```
 
+The report's tables come from `validation/R/report_doubletfinder_m5.R m5-5e7cc8e` (it reads plain files only). SLURM logs of every M5 job are in `data/doubletfinder/logs/`.
+
 One context by hand, on a tier-T fixture (seconds):
 
 ```bash
