@@ -31,6 +31,7 @@ The steps:
 - **M4:** SCTransform v2 ([doubletfinder_m4.md](docs/validation/doubletfinder_m4.md)).
 - **M5:** RunPCA with irlba ([doubletfinder_m5.md](docs/validation/doubletfinder_m5.md)).
 - **M6:** the whole tool ([doubletfinder.md](docs/validation/doubletfinder.md)).
+- **M6b:** the singlets' counts as a new 10x directory, `singlets/` ([doubletfinder.md](docs/validation/doubletfinder.md#m6b-the-singlets-counts)).
 
 Next: M7, the comparison with the saved outputs of all 150 production objects. Substituting `scrust` into the preprocessing workflow is a separate, later change.
 
@@ -45,8 +46,15 @@ cargo build --release -p scrust
 target/release/scrust doubletfinder --counts <10x dir> --clusters <seurat_clusters.tsv> --out <dir> --threads 8
 ```
 
-- **Inputs.** `--counts` is a 10x Matrix Market directory. `--clusters` is a TSV with a header and each cell's barcode and cluster label, in the matrix's column order. The factor's level order is read from `--cluster-levels`, or `seurat_clusters_levels.txt` next to the clusters file.
-- **Outputs.** `cells.tsv` (barcode, pANN and classification of every cell), `sweep_stats.tsv`, `bcmvn.tsv` and `summary.json` (pK, nExp, the column names R writes, timings and peak memory). `scrust doubletfinder --help` lists the options: seed, PCs, pN, nExp rate, a fixed pK, threads, stage dumps.
+- **Inputs.** `--counts` is a 10x Matrix Market directory (Cell Ranger v3 layout, gzipped or not), such as the one the workflow's emptyDrops step writes. `--clusters` is a TSV with a header and each cell's barcode and cluster label, in the matrix's column order. The factor's level order is read from `--cluster-levels`, or `seurat_clusters_levels.txt` next to the clusters file.
+- **Outputs.**
+  - `singlets/`: the counts without the doublets, as a new 10x directory (`matrix.mtx.gz`, `barcodes.tsv.gz`, `features.tsv.gz`) that the next tool can read. Each singlet's column is written exactly as stored, and the feature lines are the input's.
+  - `cells.tsv`: the barcode, pANN and classification of every cell.
+  - `sweep_stats.tsv` and `bcmvn.tsv`.
+  - `summary.json`: pK, nExp, the column names R writes, timings and peak memory.
+
+  `scrust doubletfinder --help` lists the options: seed, PCs, pN, nExp rate, a fixed pK, threads and stage dumps.
+- **Count data in, count data out.** Every tool here that processes counts writes its result as a new 10x directory, so the tools chain on plain files ([docs/PLAN.md](docs/PLAN.md) A3).
 - **Thread count.** The results do not depend on it.
 - **The OpenBLAS kernel matters.** To reproduce the workflow's saved outputs, which were made on Sapphire Rapids nodes with the kernel OpenBLAS detects, run there with `OPENBLAS_CORETYPE=auto source env.sh` (which leaves the variable unset).
 
