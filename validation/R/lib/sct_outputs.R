@@ -12,8 +12,9 @@ sct_capture <- function() {
   env
 }
 
-# v: SCTransform.default's result; id_of: feature id by feature name.
-sct_write_outputs <- function(v, out, id_of) {
+# v: SCTransform.default's result; id_of: feature id by feature name. scale_data = FALSE leaves out
+# scale_data.npy and its checksum (M8's light dump level, for objects whose residuals are too large).
+sct_write_outputs <- function(v, out, id_of, scale_data = TRUE) {
   dir.create(out, recursive = TRUE, showWarnings = FALSE)
   tsv <- function(name, header, cols) {
     lines <- do.call(paste, c(cols, sep = "\t"))
@@ -36,7 +37,9 @@ sct_write_outputs <- function(v, out, id_of) {
   vf <- v$variable_features
   tsv("variable_features.tsv", c("id", "name"), list(id_of[vf], vf))
   if (!identical(rownames(v$y), vf)) stop("scale.data rows are not the variable features")
-  npy_write(file.path(out, "scale_data.npy"), unname(v$y))
-  writeLines(unname(tools::sha256sum(file.path(out, "scale_data.npy"))), file.path(out, "scale_data.npy.sha256"))
+  if (scale_data) {
+    npy_write(file.path(out, "scale_data.npy"), unname(v$y))
+    writeLines(unname(tools::sha256sum(file.path(out, "scale_data.npy"))), file.path(out, "scale_data.npy.sha256"))
+  }
   invisible(out)
 }
