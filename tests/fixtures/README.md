@@ -3,7 +3,7 @@
 Small fixtures committed to the repository, which `cargo test` checks on every change (docs/PLAN.md A1, A4 and A5b): tier-T data exported from the workflow's test data, and R-generated vectors for `rcompat` (stage S0).
 
 - **Size:** about 20 MB in total at most. Larger fixtures go to `data/` (gitignored) and are listed in `validation/manifest.toml`.
-- **Layout:** one directory per crate or tool, for example `rcompat/` (R vectors, M1) and `doubletfinder/<object>/` (inputs and stage references for the five test objects, M2).
+- **Layout:** one directory per crate or tool, for example `rcompat/` (R vectors, M1), `doubletfinder/<object>/` (inputs and stage references for the five test objects, M2) and `clustering/` (Step 2's K0 vectors and tier-T references, M8; [its README](clustering/README.md)).
 - **Provenance:** every file is listed in `validation/manifest.toml` with its sha256, size, the script that made it, and the env and profile it was made in. Regenerate fixtures from those recipes; never edit them by hand.
 - **Profile:** fixtures that depend on BLAS are made in the portable profile (`OPENBLAS_CORETYPE=Haswell`, one thread), so tests can check them exactly on any x86-64 CPU with AVX2 (A5b).
 - **From a crate's tests:** `concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures")`.
@@ -24,3 +24,7 @@ The five tier-T objects (the workflow's test data, plan B4), one directory each:
 The whole tool is checked on them end to end (milestone M6, `crates/doubletfinder/tests/m6_tier_t.rs` and `crates/scrust/tests/cli.rs`): `scrust doubletfinder` from `input/` must reproduce `reference/` byte for byte (the digest of the final `.Random.seed` included), every array, RNG checkpoint and scalar in `stages/`, and `saved/`. Its `singlets/` (milestone M6b) must be `input/`'s counts restricted to `saved/cells.tsv`'s kept cells, every stored entry as it is, with the input's feature lines. No fixture was added for this. The saved objects' own counts are compared on `data/`, where `export_doubletfinder_singlets.R` exported them.
 
 Doubles in the TSV and JSON files have 17 significant digits, so Rust's `str::parse::<f64>` gives back the exact value; `crates/doubletfinder/tests/m2_fixtures.rs` checks this against the `.npy` copies.
+
+## clustering/
+
+Step 2's committed reference data (milestone M8; [`docs/validation/clustering_m8.md`](../../docs/validation/clustering_m8.md)): the K0 vectors of the clustering chain's generators (`k0/`: Seurat's `JavaRandom`, RcppAnnoy's `Kiss64Random`, R's draw in GroupSingletons), and, for seven tier-T objects (the two base objects and the five DoubletFinder inputs, whose counts are the `doubletfinder/` fixtures above), the expected labels and scores of the portable profile and of the saved object and the instrumented optimizer's per-start results; for the two base objects also their counts and the stage references from R's own embeddings (the Annoy index, the neighbours, both graphs, silhouette's and purity's intermediates). Some files are gzipped (`gzip -n -9`) to stay near the size budget. Details in [clustering/README.md](clustering/README.md); the other 20 tier-T objects and the tier-P objects are in `data/clustering/`, listed in `validation/manifest.toml`.
