@@ -8,9 +8,9 @@
 #
 # The criteria are the plan's (B5) and the key names a proposal. Each stage is uncommented and
 # settled when its milestone lands (S0: M1; S1 and S4-S7: M3; S2a-S2d: M4; S3: M5; the end-to-end,
-# saved-output and performance rows: M6; the singlets row: M6b). `scrust validate doubletfinder`
-# (crates/doubletfinder/src/validate.rs) applies the settled criteria: everything it compares
-# must be identical.
+# saved-output and performance rows: M6; the singlets row: M6b; the full panel: M7).
+# `scrust validate doubletfinder` (crates/doubletfinder/src/validate.rs) applies the settled
+# criteria: everything it compares must be identical.
 
 # DoubletFinder -------------------------------------------------------------------------------
 
@@ -213,7 +213,8 @@ not_compared = ["summary.json run section (except the OpenBLAS kernel)", "R's st
 # (input barcodes minus the kept barcodes), the kept cells' pANN as R wrote them, pK and nExp
 # (from the column names). Settled (M6): exact. Rust's run of each of the 10 objects reproduces
 # its saved output in both profiles: the same doublet set, every kept cell's pANN identical as
-# 17-digit text (so bitwise), in order, the same pK label, nExp and column names.
+# 17-digit text (so bitwise), in order, the same pK label, nExp and column names. M7: the same on
+# all 150 production objects ([doubletfinder.full_panel]).
 [doubletfinder.saved_outputs]
 criterion = "exact"
 compare = ["doublet_set", "singlet_pANN", "pK_label", "nExp", "pANN_column", "classification_column"]
@@ -225,9 +226,29 @@ compare = ["doublet_set", "singlet_pANN", "pK_label", "nExp", "pANN_column", "cl
 # saved object's counts. Identical: the barcodes in order, the feature lines, the header field,
 # and every stored entry (explicit zeros included) and value, bit for bit; 409,874,942 entries.
 # On all 10 objects the saved counts equal the input's restricted to the kept cells, slot for slot.
+# M7: the same on all 150 production objects, 3,285,047,618 entries ([doubletfinder.full_panel]).
 [doubletfinder.singlets]
 criterion = "exact"
 compare = ["barcodes", "feature_lines", "header_field", "stored_entries", "values"]
+
+# The full panel (M7; docs/PLAN.md B4 to B6, docs/validation/doubletfinder_m7.md): all 150 production
+# DoubletFinder objects of the workflow (validation/doubletfinder_panel.tsv: 30 samples x 5 arms,
+# 1,120 to 79,409 cells), each against the output the workflow saved: the saved_outputs checks and
+# the singlets row above, nine checks per object. Each Rust run in the production profile, on the
+# CPU type of the object's workflow job (Sapphire Rapids for all 150, from sacct and the nodes'
+# SLURM features) with OpenBLAS detecting the kernel (SapphireRapids in all 150). An object
+# passes when all nine checks are made and identical. Settled (M7): exact, 150 of 150. Label
+# m7-b8c8a8c (array job 60163542, binary scrust-m7-b8c8a8c, 8 threads): 1,350 of 1,350 checks
+# identical; 353,762 doublets, 2,217,328 kept cells' pANN and 3,285,047,618 stored entries of the
+# singlets' counts compared, none differing. Main's binary (label m7-d95f7f7, job 60160715) gave
+# identical outputs, file for file. Peak RSS at most 6.64 GiB (soupx_emptydrops_amellifera).
+[doubletfinder.full_panel]
+criterion = "exact"
+objects = 150
+profile = "production"
+compare = ["pANN_column", "classification_column", "pK_label", "nExp", "doublet_set", "singlet_pANN",
+           "singlets_barcodes", "singlets_feature_lines", "singlets_matrix"]
+passed = 150
 
 # Performance: peak RSS and wall time below the direct R DoubletFinder run on the same input;
 # soupx_emptydrops_sscovelli <= 10 GiB. Settled (M6): met. `scrust doubletfinder` on the exported

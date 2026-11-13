@@ -13,11 +13,12 @@ Each reimplementation is validated against the original tool's outputs, exactly 
 6. SoupX
 7. CellBender
 
-**Status:** Step 1, DoubletFinder, is complete through milestone M6b. `scrust doubletfinder` runs DoubletFinder 2.0.6 as the workflow calls it, from a 10x counts directory and the cluster labels, every stage in Rust. It writes all of DoubletFinder's outputs. In addition, it writes the singlets' counts as a new 10x directory. It reproduces R bit for bit, under R's OpenBLAS kernel ([docs/validation/doubletfinder.md](docs/validation/doubletfinder.md)):
+**Status:** Step 1, DoubletFinder, is complete through milestone M7. `scrust doubletfinder` runs DoubletFinder 2.0.6 as the workflow calls it, from a 10x counts directory and the cluster labels, every stage in Rust. It writes all of DoubletFinder's outputs. In addition, it writes the singlets' counts as a new 10x directory. It reproduces R bit for bit, under R's OpenBLAS kernel ([docs/validation/doubletfinder.md](docs/validation/doubletfinder.md)):
 
 - **Instrumented R runs (24):** every stage, every random-number checkpoint and every scalar identical.
 - **Direct R runs (23):** every output file identical.
 - **Saved workflow outputs:** identical for all ten objects (the five test objects and five production objects). That covers the doublet set, the kept cells' pANN, pK and nExp, and, from M6b, the singlets' counts: every stored entry of the saved object's RNA counts.
+- **The full panel (M7):** identical for all 150 production objects of the workflow, the same checks against each saved output, on the CPU type of each workflow job ([docs/validation/doubletfinder_m7.md](docs/validation/doubletfinder_m7.md)). That is 1,350 of 1,350 checks and 3.3 billion values, none differing, with a peak of at most 6.6 GiB on 8 threads, where the workflow's jobs peaked at up to 137 GiB.
 
 On the largest object, soupx_emptydrops_sscovelli (79,409 cells), it takes 7 minutes 12 s on one thread and 54 s on 32, in 4.4–4.5 GiB. Writing `singlets/` is 34 s and 10 s of that. R's direct run takes 36 minutes and 127 GiB.
 
@@ -32,8 +33,9 @@ The steps:
 - **M5:** RunPCA with irlba ([doubletfinder_m5.md](docs/validation/doubletfinder_m5.md)).
 - **M6:** the whole tool ([doubletfinder.md](docs/validation/doubletfinder.md)).
 - **M6b:** the singlets' counts as a new 10x directory, `singlets/` ([doubletfinder.md](docs/validation/doubletfinder.md#m6b-the-singlets-counts)).
+- **M7:** the full panel, all 150 production objects against their saved workflow outputs ([doubletfinder_m7.md](docs/validation/doubletfinder_m7.md)).
 
-Next: M7, the comparison with the saved outputs of all 150 production objects. Substituting `scrust` into the preprocessing workflow is a separate, later change.
+Next, by the plan: the clustering crate ([docs/PLAN.md](docs/PLAN.md) A7b). Substituting `scrust` into the preprocessing workflow is a separate, later change.
 
 - Plan and validation framework: [docs/PLAN.md](docs/PLAN.md)
 - License: GPL-3.0 ([LICENSE](LICENSE)). Acknowledgements and upstream licenses: [NOTICE](NOTICE)
