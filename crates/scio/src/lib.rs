@@ -2,8 +2,9 @@
 //!
 //! Tools read and write plain files, never Seurat objects:
 //!
-//! - [`tenx`]: 10x Matrix Market directories (`matrix.mtx`, `barcodes.tsv`, `features.tsv`,
-//!   optionally gzipped, through [`gz`], a standard-library gzip reader);
+//! - [`tenx`]: 10x Matrix Market directories (`matrix.mtx`, `barcodes.tsv`, `features.tsv`),
+//!   read gzipped or not through [`gz`], a standard-library gzip reader, and written gzipped
+//!   (the cells a tool keeps, M6b) through [`deflate`], a standard-library gzip writer;
 //! - [`sparse`]: the counts matrix in R's `dgCMatrix` layout, read from `matrix.mtx` with every
 //!   stored entry kept, explicit zeros included (M4);
 //! - [`tsv`]: per-cell and per-parameter tables (cluster labels in; `cells.tsv` and the sweep
@@ -14,6 +15,7 @@
 //!   checkpoints;
 //! - [`sha256`]: SHA-256, the digest the R scripts record (`digest::digest`).
 
+pub mod deflate;
 pub mod gz;
 pub mod json;
 pub mod npy;

@@ -47,3 +47,16 @@ The Rust core runs on the instrumented runs' own embeddings and is compared with
 `scrust doubletfinder` runs from the counts, the cluster labels and the seed; it is compared with every direct and instrumented reference run of M2 and with the saved workflow outputs by `scrust validate doubletfinder` ([`../slurm/m6_doubletfinder.sbatch`](../slurm/m6_doubletfinder.sbatch)), and benchmarked against M2's direct production runs ([`../slurm/m6_benchmark.sbatch`](../slurm/m6_benchmark.sbatch)). No new R run was needed. Results: [`docs/validation/doubletfinder.md`](../../docs/validation/doubletfinder.md).
 
 - [`report_doubletfinder_m6.R`](report_doubletfinder_m6.R) `<label> <bench label>`: the report's tables from the M6 outputs (each Rust run's `vs_<R run>.json` and `vs_saved.json`, its `summary.json` and `time_v.txt`; the benchmark's runs and the direct R runs' `time_v.txt` and `summary.json`). Reads only plain files.
+
+## The singlets' counts (milestone M6b)
+
+`scrust doubletfinder` also writes `singlets/`: the counts without the doublets, as a new 10x directory (docs/PLAN.md A3 and B3). The workflow's equivalent is the RNA `counts` layer of its saved DoubletFinder output, since `doubletfinder.R` keeps the singlets with `subset()`.
+
+- [`export_doubletfinder_singlets.R`](export_doubletfinder_singlets.R): exports that layer from each saved output into `data/doubletfinder/<object>/saved/singlets/`, next to the M2 export: `matrix.mtx.gz`, `barcodes.tsv.gz`, `features.tsv.gz` (`lib/io.R`'s writer, with the input export's feature lines) and `export.json`. It checks three things:
+  - the `.rds` is the one M2 exported (sha256);
+  - its cells are the kept cells, in order;
+  - the directory reads back `identical()`.
+
+  It also records whether the layer equals the input export's counts restricted to the kept cells, slot for slot. Run it through [`../slurm/export_doubletfinder_singlets.sbatch`](../slurm/export_doubletfinder_singlets.sbatch).
+- `scrust validate doubletfinder --saved` compares `singlets/` with that export: the barcodes in order, the feature lines, and every stored entry and value of the matrix. [`../slurm/m6_doubletfinder.sbatch`](../slurm/m6_doubletfinder.sbatch) runs this check with the others.
+- [`read10x_singlets.R`](read10x_singlets.R) `<label> <profile> <object>...` reads the Rust runs' `singlets/` back with R's readers, as a downstream R step would: `lib/io.R`'s exact reader and `Seurat::Read10X()`. It compares each with the export, slot for slot, and records whether `Read10X` keeps every stored entry. It reads only plain files.

@@ -74,7 +74,8 @@ hash_of <- function(path) {
 # Files whose bytes depend on the run (time, node, job, plot timestamps) and are therefore never
 # compared by checksum across runs.
 run_specific <- c("summary.json", "find_pK.pdf", "time_v.txt", "fingerprint_wrapper.json",
-                  "export_run.json", "export_time_v.txt")
+                  "export_run.json", "export_time_v.txt", "export_singlets_run.json",
+                  "export_singlets_time_v.txt")
 
 out <- character()
 runs_out <- character()
@@ -92,28 +93,37 @@ for (k in seq_len(nrow(ds))) {
   exp_run <- if (file.exists(file.path(base, "export_run.json"))) jsonlite::fromJSON(file.path(base, "export_run.json")) else NULL
   exp_fp <- if (is.null(exp_run)) "unknown" else fp_string(exp_run$fingerprint, exp_run$slurm_job_id)
   exp_recipe <- sprintf("validation/slurm/export_doubletfinder.sbatch %s (validation/R/export_doubletfinder.R)", obj)
+  # M6b: the saved output's RNA counts (the singlets'), exported into saved/singlets/
+  sgl_run <- if (file.exists(file.path(base, "export_singlets_run.json"))) jsonlite::fromJSON(file.path(base, "export_singlets_run.json")) else NULL
+  sgl_fp <- if (is.null(sgl_run)) "unknown" else fp_string(sgl_run$fingerprint, sgl_run$slurm_job_id)
+  sgl_recipe <- sprintf("validation/slurm/export_doubletfinder_singlets.sbatch %s (validation/R/export_doubletfinder_singlets.R)", obj)
 
   out <- c(out, sprintf("# %s (tier %s, %s) %s", obj, tier, ds$role[k], strrep("-", max(3, 80 - nchar(obj) - nchar(tier) - nchar(ds$role[k]) - 14))), "")
   for (sub in c("input", "saved")) {
     d <- file.path(base, sub)
     if (!dir.exists(d)) next
     src <- if (sub == "input") sprintf("%s (sha256 %s)", src_input, exp_info$source_sha256) else sprintf("%s (sha256 %s)", src_saved, sav_info$source_sha256)
-    for (f in sort(list.files(d))) {
+    for (f in sort(list.files(d, recursive = TRUE))) {
       p <- file.path(d, f)
+      singlets <- startsWith(f, "singlets/")
       out <- c(out, table_lines("file", list(
         path = p, sha256 = hash_of(p), bytes = file.size(p), tool = "doubletfinder", dataset = obj,
         tier = tier, role = if (sub == "input") "input" else "saved-output", stage = "", profile = "none (no BLAS)",
-        source = src, recipe = exp_recipe, env = "envs/r-reference", fingerprint = exp_fp)))
+        source = src, recipe = if (singlets) sgl_recipe else exp_recipe, env = "envs/r-reference",
+        fingerprint = if (singlets) sgl_fp else exp_fp)))
       n_files <- n_files + 1
     }
   }
-  for (f in c("export_run.json", "export_time_v.txt")) {
+  for (f in c("export_run.json", "export_time_v.txt", "export_singlets_run.json", "export_singlets_time_v.txt")) {
     p <- file.path(base, f)
     if (!file.exists(p)) next
+    singlets <- grepl("singlets", f, fixed = TRUE)
     out <- c(out, table_lines("file", list(
       path = p, sha256 = hash_of(p), bytes = file.size(p), tool = "doubletfinder", dataset = obj,
-      tier = tier, role = "run-record", stage = "", profile = "none (no BLAS)", source = src_input,
-      recipe = exp_recipe, env = "envs/r-reference", fingerprint = exp_fp,
+      tier = tier, role = "run-record", stage = "", profile = "none (no BLAS)",
+      source = if (singlets) src_saved else src_input,
+      recipe = if (singlets) sgl_recipe else exp_recipe, env = "envs/r-reference",
+      fingerprint = if (singlets) sgl_fp else exp_fp,
       note = "run-specific (timings, node, job); not compared by checksum")))
     n_files <- n_files + 1
   }
@@ -225,7 +235,8 @@ header <- c(
   "#   input/   the counts DoubletFinder reads (RNA \"counts\" layer) as 10x Matrix Market, and",
   "#            seurat_clusters (export_doubletfinder.R); identical to the object's matrix, bit for bit",
   "#   saved/   the saved workflow output's compared fields: kept barcodes and singlet pANN, the",
-  "#            doublet set, column names (pK, nExp)",
+  "#            doublet set, column names (pK, nExp); saved/singlets/ (M6b): its RNA counts, the",
+  "#            singlets' (export_doubletfinder_singlets.R)",
   "#   runs/<mode>-<profile>-<cpu arch>/   reference runs: cells.tsv, sweep_stats.tsv, bcmvn.tsv,",
   "#            summary.json, find_pK.pdf, time_v.txt; instrumented runs add stages/ (index.tsv",
   "#            explains every array; conventions in validation/R/lib/doubletfinder_hooks.R)",

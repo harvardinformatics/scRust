@@ -81,14 +81,16 @@ Each tool's real inputs and outputs are sparse matrices and small per-cell table
 
 | Tool | Inputs | Outputs |
 |---|---|---|
-| emptyDrops | raw matrix | per-barcode statistics, called barcodes |
-| SoupX | raw and filtered matrices, cluster labels | contamination estimate, corrected matrix |
-| CellBender | raw matrix | cell probabilities, ambient profile, denoised matrix |
-| decontX | filtered matrix, cluster labels, raw matrix (background) | contamination per cell, decontaminated matrix |
-| DoubletFinder | counts matrix, cluster labels (for the homotypic adjustment) | pANN, classification, pK, nExp, sweep table |
+| emptyDrops | raw matrix | per-barcode statistics, called barcodes, **the called cells' matrix** |
+| SoupX | raw and filtered matrices, cluster labels | contamination estimate, **corrected matrix** |
+| CellBender | raw matrix | cell probabilities, ambient profile, **denoised matrix** |
+| decontX | filtered matrix, cluster labels, raw matrix (background) | contamination per cell, **decontaminated matrix** |
+| DoubletFinder | counts matrix, cluster labels (for the homotypic adjustment) | pANN, classification, pK, nExp, sweep table, **the singlets' matrix** |
 | Clustering (Seurat chain) | counts matrix, parameters | cluster labels; optionally the intermediates (SCTransform, PCA, neighbour graph) for reuse |
-| scDblFinder | counts matrix | score and class per cell |
+| scDblFinder | counts matrix | score and class per cell, **the singlets' matrix** |
 
+- **Every output of the original, and more.** A port keeps all of the original tool's outputs, such as DoubletFinder's per-barcode pANN and classification table and its sweep tables. The 10x count data below is written in addition to them, never instead. Ports expand the original tools' functionality and remove none of it.
+- **Count data out (the matrices in bold):** every tool that processes the counts writes its result as new 10x-style count data, whether it keeps cells (emptyDrops, DoubletFinder, scDblFinder) or changes values (SoupX, CellBender, decontX). The tools then chain on plain files, each reading the last one's directory, with no Seurat object between them. The directory is gzipped 10x Matrix Market (Cell Ranger v3 layout, which Seurat's `Read10X`, `DropletUtils` and scanpy read). It holds the entries exactly as stored, explicit zeros included, with values as `%.17g` writes them, so a correctly rounded reader recovers every double. The input's feature lines are carried over unchanged. DoubletFinder writes `singlets/` from M6b on (B3).
 - **Formats:** matrices in 10x Matrix Market (and 10x HDF5 later); tables as TSV; run metadata (parameters, seed, versions, timings) in `summary.json`.
 - **Where Seurat appears:**
   - In the workflow, Seurat objects are only containers, plus R's processing after each tool (SCTransform, clustering), which is not part of these tools.
@@ -311,7 +313,8 @@ scrust doubletfinder --counts <10x mtx dir> --clusters <tsv> --out <dir>
 - `cells.tsv`: barcode, pANN, classification, for every input cell;
 - `sweep_stats.tsv`: pN, pK, BCreal;
 - `bcmvn.tsv`;
-- `summary.json`: pK, pK label exactly as R formats it, nExp_poi, homotypic proportion, nExp, n_doublets, k, the column names R would write, versions, seed, timings, peak RSS.
+- `summary.json`: pK, pK label exactly as R formats it, nExp_poi, homotypic proportion, nExp, n_doublets, k, the column names R would write, versions, seed, timings, peak RSS;
+- `singlets/` (M6b; A3): the counts without the doublets as a new 10x directory (`matrix.mtx.gz`, `barcodes.tsv.gz`, `features.tsv.gz`). It is the workflow step's result at the level of the counts: `doubletfinder.R` keeps the singlets with `subset()` and passes the object on. Each singlet's column is written exactly as stored, in input order, with the input's feature lines. The counts are read again from the input directory once the calls are made, so the final run's memory peak does not grow.
 
 **Components:**
 - **`rcompat`:** all of A5.
@@ -439,6 +442,7 @@ This needs only a one-time export of the inputs and those fields; R is not re-ru
 | S6 sweep | BCreal; chosen pK | relative ≤ 1e-6; pK identical |
 | S7 calls | nExp; Doublet/Singlet set | nExp identical; target identical set, floor ≥ 99.9% agreement with every difference at the pANN cutoff |
 | Against saved workflow outputs (T, P, full panel) | doublet set, singlet pANN, pK and nExp as R writes them | set as in S7; pANN as in S5; pK and nExp identical |
+| Singlets' counts (M6b; T and P) | `singlets/` against the saved object's RNA counts: barcodes, feature lines, every stored entry and value | identical |
 | Performance | peak RSS and wall time against the direct R DoubletFinder run on the same input | lower memory and time; sscovelli ≤ 10 GiB |
 
 **How the comparisons work:** everything is compared as plain files. The harness compares:
@@ -462,6 +466,7 @@ This needs only a one-time export of the inputs and those fields; R is not re-ru
 | M4d | SCT residuals, variable features, `scale.data` | S2d exact when the BLAS kernel matches (teacher-forced) |
 | M5 | `pca` (irlba) port | S3 met; RNG checkpoint after PCA matches |
 | M6 | full `scrust doubletfinder` | S0–S7 and the saved-output checks met on T and the P objects; benchmarks in `docs/validation/doubletfinder.md` |
+| M6b | count data out (A3): `singlets/`, a new 10x directory, through a standard-library gzip writer; a one-time export of the saved objects' RNA counts | the singlets' counts identical to the saved objects' on T and P in both profiles; independent of the thread count; the memory peak unchanged |
 | M7 | full panel: all 150 production objects (sbatch array) | doublet sets, singlet pANN, pK and nExp meet the criteria for all 150, with a summary table |
 
 M3 comes first on purpose: it solves the memory problem and checks all the bookkeeping before the hard numerical ports.

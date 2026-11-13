@@ -1,7 +1,8 @@
 # Markdown tables for docs/validation/doubletfinder.md (milestone M6) from the M6 outputs:
 # - the validation (validation/slurm/m6_doubletfinder.sbatch), data/doubletfinder/<object>/rust/
 #   <label>/<profile>/: vs_<R run>.json (scrust validate doubletfinder against each reference
-#   run), vs_saved.json (the saved workflow output), run/summary.json, time_v.txt;
+#   run), vs_saved.json (the saved workflow output; from M6b on, singlets/ against the saved
+#   object's RNA counts too), run/summary.json, time_v.txt;
 # - the benchmark (validation/slurm/m6_benchmark.sbatch), data/doubletfinder/<object>/rust/
 #   <bench label>/t<threads>/, and the direct R runs it compares with (runs/direct-production-
 #   sapphirerapids: time_v.txt, summary.json).
@@ -152,11 +153,17 @@ for (obj in objects) for (p in profiles_of(obj)) {
   g <- function(name) Filter(function(c) c$name == name, v$checks)[[1]]
   cell <- function(name) { c <- g(name); if (c$status == "identical") sprintf("= (%s)", num(c$n)) else sprintf("**%s of %s differ**", num(c$n_differ), num(c$n)) }
   res <- js(file.path(d, "run", "summary.json"))$result
+  # M6b: singlets/ against the saved object's RNA counts (barcodes, feature lines, matrix)
+  sgl <- Filter(function(c) startsWith(c$name, "singlets "), v$checks)
+  singlets <- if (length(sgl) == 0) "-" else if (all(vapply(sgl, function(c) c$status == "identical", logical(1)))) {
+    sprintf("= (%s entries)", num(g("singlets matrix")$n))
+  } else "**differ**"
   rows[[length(rows) + 1]] <- data.frame(
     object = obj, `Rust run` = p, `doublet set` = cell("doublet set"), `singlet pANN` = cell("singlet pANN"),
     pK = if (g("pK_label")$status == "identical") res$pK_label else "**differs**",
     nExp = if (g("nExp")$status == "identical") num(res$nExp) else "**differs**",
     columns = if (g("pANN_column")$status == "identical" && g("classification_column")$status == "identical") sprintf("`%s`", res$pANN_column) else "**differ**",
+    `singlets' counts` = singlets,
     pass = if (s$pass) "yes" else "**no**", check.names = FALSE)
 }
 out(c("", "### Saved workflow outputs", ""))

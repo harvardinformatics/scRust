@@ -1,6 +1,6 @@
-# DoubletFinder in Rust (Step 1; milestone M6)
+# DoubletFinder in Rust (Step 1; milestones M6 and M6b)
 
-M6 puts the pieces of milestones M1 to M5 together into one command, `scrust doubletfinder`: DoubletFinder 2.0.6 as the workflow's `doubletfinder.R` calls it (docs/PLAN.md B1), from a 10x counts directory and the cells' cluster labels to the doublet calls, every stage computed by Rust. This is the report the plan names for Step 1. The full panel of 150 production objects (M7) comes next; substituting `scrust` into the Snakemake workflow is a later, separate change.
+M6 puts the pieces of milestones M1 to M5 together into one command, `scrust doubletfinder`: DoubletFinder 2.0.6 as the workflow's `doubletfinder.R` calls it (docs/PLAN.md B1), from a 10x counts directory and the cells' cluster labels to the doublet calls, every stage computed by Rust. This is the report the plan names for Step 1. M6b adds `singlets/`, the counts without the doublets as a new 10x directory, on top of the outputs M6 reports on ([M6b: the singlets' counts](#m6b-the-singlets-counts)). The full panel of 150 production objects (M7) comes next; substituting `scrust` into the Snakemake workflow is a later, separate change.
 
 ## Outcome
 
@@ -363,6 +363,85 @@ What remains could shrink further. Building the kept genes' rows straight from t
 - **The benchmark's R side is M2's direct run** (`runs/direct-production-sapphirerapids`, one CPU), on the same input files and CPU type, with the same OpenBLAS kernel. R was not rerun.
 - **No new fixtures.** The tier-T end-to-end tests use the M2 fixtures already in the manifest (`tests/fixtures/doubletfinder/<object>/{input,reference,stages,saved}`). The Rust runs' outputs under `data/` are validation outputs, not references.
 
+## M6b: the singlets' counts
+
+M6b adds one output to `scrust doubletfinder`: `singlets/`, the counts without the doublets, as a new 10x directory (`matrix.mtx.gz`, `barcodes.tsv.gz`, `features.tsv.gz`) that the next tool can read. It is written in addition to `cells.tsv`, `sweep_stats.tsv`, `bcmvn.tsv` and `summary.json`, which are unchanged. This follows two rules of plan A3:
+- every port keeps all of the original tool's outputs;
+- every tool that processes counts also writes its result as new 10x count data, so the tools chain on plain files.
+
+### Outcome
+
+| Done when (plan B6 M6b, B5) | Result |
+|---|---|
+| `singlets/` identical to the saved objects' RNA counts, on T and P, in both profiles | **Yes, all 20 runs.** Identical: the barcodes in order, the feature lines, the header field, and every stored entry and value. That is 409,874,942 entries, explicit zeros included. |
+| The other outputs unchanged | **Yes.** All 1,020 files of M6's validated runs (label `m6-bc1b48e`) are byte-identical in the new runs. The totals are M6's: 24 of 24 instrumented runs (13,396 checks, 2,646 RNG checkpoints, 1.58 billion values) and 23 of 23 direct runs. The saved-output comparisons, 20 of 20, now make 180 checks over 411,027,378 values, none differing. |
+| Independent of the thread count | **Yes.** The benchmark's runs at 1 and 32 threads are byte-identical, `singlets/` included. `cargo test` writes it at 1, 2 and 7 threads. |
+| The memory peak unchanged | **Yes, on the two largest objects:** 4.41 and 4.49 GiB on sscovelli, 4.02 and 4.08 GiB on ghirsutum2, as in M6. The counts are read again once the calls are made. |
+| R reads it as the saved counts | **Yes, all 10 objects** (production runs, [`read10x_singlets.R`](../../validation/R/read10x_singlets.R), job 60139710). Both `Seurat::Read10X()` and the exact reader of `lib/io.R` give the saved object's RNA counts slot for slot, every stored entry and explicit zero included. |
+| Tested and settled | `cargo test --workspace`: 160 tests (11 new), no warnings, in a fresh clone. The fresh clone's binary is byte-identical to the validated one, `scrust-m6b-13592a6` (sha256 `dfd3b9c697dcf263`). `tolerances.toml` gains `[doubletfinder.singlets]`. The manifest lists the 10 exports (60 new entries; no existing entry changed). |
+
+Validation label `m6b-13592a6` (jobs 60114423 and 60117195, 8 threads), benchmark label `m6b-bench-13592a6` (jobs 60114424 and 60114425), binary `scrust-m6b-13592a6`, built from commit 13592a6.
+
+### What the workflow's step leaves in the counts
+
+`doubletfinder.R` keeps the singlets with `subset(seurat, cells = ...)`. It then runs SCTransform and the clustering on them, which add assays and leave the RNA counts as they are, and saves the object. So the saved object's RNA `counts` layer is the step's result at the level of the counts.
+
+[`export_doubletfinder_singlets.R`](../../validation/R/export_doubletfinder_singlets.R) exports that layer into `data/doubletfinder/<object>/saved/singlets/`, next to M2's export. It first checks two things:
+- the `.rds` is the one M2 exported (sha256);
+- its cells are the kept cells, in order.
+
+It reads the directory back `identical()`. It also compares the layer with the input export's counts restricted to the kept cells, slot for slot. They are identical for all 10 objects, explicit zeros included: R's `subset()` keeps the stored entries as they are. So "the input without the doublets, every entry as stored" is exactly R's result.
+
+| object | singlets | features | entries | explicit zeros | equals the input restricted to the kept cells |
+|---|---|---|---|---|---|
+| soupx_tenx_test | 276 | 2,000 | 59,103 | 2,453 | yes |
+| soupx_emptydrops_test | 237 | 2,000 | 54,893 | 684 | yes |
+| decontx_raw_tenx_test | 273 | 2,000 | 52,332 | 0 | yes |
+| decontx_raw_emptydrops_test | 237 | 2,000 | 50,896 | 0 | yes |
+| cellbender_fromraw_test | 247 | 2,000 | 54,936 | 0 | yes |
+| soupx_tenx_SRR18256555 | 2,688 | 32,285 | 2,461,479 | 64,274 | yes |
+| soupx_tenx_10xmousebrain | 10,185 | 32,285 | 36,923,827 | 386,679 | yes |
+| soupx_emptydrops_4500871lane | 23,239 | 32,285 | 35,907,669 | 1,223,791 | yes |
+| soupx_emptydrops_sscovelli | 69,500 | 28,754 | 62,191,630 | 3,443,385 | yes |
+| cellbender_fromraw_ghirsutum2 | 52,554 | 99,452 | 67,180,706 | 0 | yes |
+
+The exports (jobs 60108830, 60108897, 60108900, 60108904, 60108908 and 60108910) took 1 s to 5.6 minutes each, with peaks of at most 5.1 GiB.
+
+### How `singlets/` is written
+
+- **The counts, read again.** The run frees the counts when it builds the final run's input, which keeps the peak down (M6). Once the calls are made, [`doubletfinder::singlets`](../../crates/doubletfinder/src/singlets.rs) reads them again from `--counts`. It keeps the singlets' columns in input order, each exactly as stored, and the input's feature lines as they are.
+- **The directory.** [`scio::tenx::write_columns`](../../crates/scio/src/tenx.rs) writes a Cell Ranger v3 directory, which Seurat's `Read10X`, `DropletUtils` and scanpy read. Values are written as `%.17g` writes them, integers as integers, so a correctly rounded reader recovers every double. The header says `integer` or `real` according to the values, and a `%metadata_json` line names the writer, as in Cell Ranger's files. The matrix text is cut into pieces of 131,072 entries, formatted and compressed on the run's threads. The bytes do not depend on the number of threads.
+- **gzip.** [`scio::deflate`](../../crates/scio/src/deflate.rs) is a gzip writer in the standard library only, the counterpart of the reader `scio::gz`:
+  - LZ77 with hash chains, then dynamic Huffman codes per block, limited to 15 bits by package-merge;
+  - each piece coded on its own and ended by an empty stored block, as zlib's `Z_SYNC_FLUSH` does, with the pieces' CRC-32s combined.
+
+  The files are 0.04% to 1% larger than R's zlib output for the same matrices: 0.04% to 0.23% for the four files above 100 MB, up to 1% for the test objects' 150 KB. Chains of 16 candidates were chosen on sscovelli's 66 million entries:
+
+  | candidates per position | one thread | size against `gzip -6` |
+  |---|---|---|
+  | 32 | 39.2 s | +0.05% |
+  | **16** | **27.8 s** | **+0.24%** |
+  | 8 | 17.0 s | +6.3% |
+  | 4 | 13.2 s | +8.3% |
+
+### Cost
+
+Production profile, Intel Xeon Platinum 8480CL, the same inputs as M6's benchmark. *Until the calls* is the run up to the calls, as in M6 (whose benchmark is the comparison). *Writing `singlets/`* re-reads the counts and writes the directory.
+
+| object | threads | M6 total | until the calls | writing `singlets/` | total | peak RSS GiB | vs R's direct run |
+|---|---|---|---|---|---|---|---|
+| soupx_emptydrops_sscovelli | 1 | 6:20.6 | 6:37.9 | 34.2 s | 7:12.1 | 4.41 | 5.0 times faster, 1/29 of the memory |
+| soupx_emptydrops_sscovelli | 32 | 43.5 s | 44.1 s | 9.9 s | 54.0 s | 4.49 | 40 times faster |
+| cellbender_fromraw_ghirsutum2 | 1 | 8:58.4 | 8:55.5 | 37.9 s | 9:33.4 | 4.02 | 3.5 times faster, 1/37 of the memory |
+| cellbender_fromraw_ghirsutum2 | 32 | 60.9 s | 58.0 s | 11.0 s | 69.0 s | 4.08 | 29 times faster |
+
+- **The new phase.** It reads the counts again, 8.4 to 9.4 s as at the start, and writes the directory, about 26 to 29 s on one thread and 1 to 2 s on 32.
+- **The run before it** is within 5% of M6's on other nodes.
+- **The memory peak** stays where M6 put it, in the final run's SCTransform. The re-read needs what loading needed, 1.8 to 2.0 GiB.
+- **Small objects.** In the validation runs of soupx_tenx_SRR18256555 (standard dumps), the re-read is the high-water mark in one of the two runs: 0.45 GiB, against 0.42 GiB in M6.
+- **The comparison is conservative.** R's direct run writes no count matrix.
+- **Keeping the counts in memory through the final run** instead would save the re-read at the cost of 0.74 GiB (sscovelli) to 0.82 GiB (ghirsutum2) on the peak.
+
 ## Reproducing
 
 From the repository's top directory, after `source env.sh`:
@@ -384,6 +463,18 @@ env -u R_LIBS_USER -u R_LIBS_SITE -u R_LIBS -u PERL5LIB PYTHONNOUSERSITE=1 "$R_E
 ```
 
 SLURM logs of the M6 jobs are in `data/doubletfinder/logs/`.
+
+M6b uses the same wrappers. First comes a one-time export of the saved outputs' RNA counts, which reads `.rds` files and needs no particular CPU type. Then come a validation and a benchmark with the new binary. Last, R's own readers read `singlets/` back. The logs are in `data/doubletfinder/logs/m6b/`.
+
+```bash
+O="soupx_tenx_test soupx_emptydrops_test decontx_raw_tenx_test decontx_raw_emptydrops_test cellbender_fromraw_test soupx_tenx_SRR18256555 soupx_tenx_10xmousebrain soupx_emptydrops_4500871lane soupx_emptydrops_sscovelli cellbender_fromraw_ghirsutum2"
+sbatch -p shared,sapphire validation/slurm/export_doubletfinder_singlets.sbatch $O
+cp target/release/scrust data/doubletfinder/logs/bin/scrust-m6b-$c
+SCRUST_BIN=$PWD/data/doubletfinder/logs/bin/scrust-m6b-$c sbatch --export=ALL validation/slurm/m6_doubletfinder.sbatch m6b-$c $O
+SCRUST_BIN=$PWD/data/doubletfinder/logs/bin/scrust-m6b-$c sbatch --export=ALL --cpus-per-task=32 --mem=32G validation/slurm/m6_benchmark.sbatch m6b-bench-$c soupx_emptydrops_sscovelli 1 32
+SCRUST_BIN=$PWD/data/doubletfinder/logs/bin/scrust-m6b-$c sbatch --export=ALL --cpus-per-task=32 --mem=32G validation/slurm/m6_benchmark.sbatch m6b-bench-$c cellbender_fromraw_ghirsutum2 1 32
+env -u R_LIBS_USER -u R_LIBS_SITE -u R_LIBS -u PERL5LIB PYTHONNOUSERSITE=1 "$R_ENV/bin/Rscript" validation/R/read10x_singlets.R m6b-$c production $O   # in a batch job: 5 minutes, 5.2 GiB
+```
 
 One object by hand, on a tier-T fixture (seconds, any x86-64 machine with AVX2, under env.sh's portable profile):
 

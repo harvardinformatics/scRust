@@ -25,8 +25,9 @@ fn version() {
 /// The whole tool from the counts and the cluster labels (milestone M6), on a tier-T fixture:
 /// the same files as R's direct reference run, byte for byte, the same `result` (the digest of
 /// R's final `.Random.seed` included), every stage array, RNG checkpoint and scalar of R's
-/// instrumented run, and the saved workflow output. The products are OpenBLAS calls and the
-/// fixtures are portable runs, so this needs `OPENBLAS_CORETYPE=Haswell` (env.sh's default).
+/// instrumented run, and the saved workflow output; `singlets/` (M6b) holds the saved output's
+/// kept cells. The products are OpenBLAS calls and the fixtures are portable runs, so this needs
+/// `OPENBLAS_CORETYPE=Haswell` (env.sh's default).
 #[test]
 fn doubletfinder_runs_every_stage_from_the_counts() {
     if std::env::var("OPENBLAS_CORETYPE").ok().as_deref() != Some("Haswell") {
@@ -63,6 +64,13 @@ fn doubletfinder_runs_every_stage_from_the_counts() {
         assert!(e.get("checks_identical").and_then(|v| v.as_f64()).unwrap() > 0.0, "{stage}");
         assert_eq!(e.get("checks_differing").and_then(|v| v.as_f64()), Some(0.0), "{stage}");
     }
+    // singlets/: the saved output's kept cells, a 10x directory any reader takes
+    let kept: Vec<String> = std::fs::read_to_string(f.join("saved/cells.tsv")).unwrap().lines().skip(1).map(|l| l.split('\t').next().unwrap().to_string()).collect();
+    let singlets = dir.join("singlets");
+    assert_eq!(scio::tenx::read_barcodes(&singlets).unwrap(), kept);
+    let m = scio::sparse::read_mtx(&singlets).unwrap();
+    assert_eq!((m.nrow, m.ncol), (2000, kept.len()));
+    assert!(summary.contains(&format!("\"cells\": {}", kept.len())), "summary.json's singlets record");
 }
 
 fn fixture(object: &str) -> PathBuf {
