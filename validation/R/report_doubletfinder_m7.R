@@ -149,8 +149,7 @@ rows <- lapply(recs, function(r) {
     wall = fmt_s(r$wall_s), `peak RSS GiB` = if (is.na(r$peak_rss_kib)) "" else fmt_gib(r$peak_rss_kib),
     pass = if (r$pass) "yes" else "**no**", check.names = FALSE)
 })
-out(c("### Per object", ""))
-out(md_table(do.call(rbind, rows)))
+per_object <- do.call(rbind, rows)   # printed last
 
 # 2. Totals ----------------------------------------------------------------------------------------
 tot_checks <- sum(fld("checks"))
@@ -218,8 +217,9 @@ out(md_table(data.frame(
 
 # 6. The exports -----------------------------------------------------------------------------------------
 eq <- fld("saved_equals_input_subset")
-out(c("", sprintf("Saved RNA counts equal to the input's restricted to the kept cells, slot for slot: %s of %s objects; explicit zeros among the singlets' stored entries: %s.",
-                  num(sum(eq, na.rm = TRUE)), num(sum(!is.na(eq))), num(sum(fld("singlet_explicit_zeros"), na.rm = TRUE)))))
+out(c("", "### The saved objects' RNA counts", "",
+      sprintf("Equal to the input's counts restricted to the kept cells, slot for slot: %s of %s objects. Explicit zeros among the singlets' stored entries: %s.",
+              num(sum(eq, na.rm = TRUE)), num(sum(!is.na(eq))), num(sum(fld("singlet_explicit_zeros"), na.rm = TRUE)))))
 
 # 7. The same objects run with another binary (--same-as) ---------------------------------------------
 same_files <- c("cells.tsv", "sweep_stats.tsv", "bcmvn.tsv", "singlets/matrix.mtx.gz", "singlets/barcodes.tsv.gz",
@@ -249,6 +249,10 @@ if (!is.na(same_as)) {
   differ <- vapply(recs[both], function(r) if (isTRUE(r$same_as)) NA_character_ else r$object, "")
   if (any(!is.na(differ))) out(c("", paste("Not identical:", paste(na.omit(differ), collapse = ", "))))
 }
+
+# 8. Per object (section 1's rows) ------------------------------------------------------------------------
+out(c("", "### Per object", ""))
+out(md_table(per_object))
 
 # One row per object, as TSV ----------------------------------------------------------------------------
 if (!is.na(tsv_out)) {

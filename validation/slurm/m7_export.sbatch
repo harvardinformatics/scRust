@@ -9,8 +9,9 @@
 #   2. export_doubletfinder_singlets.sbatch (validation/R/export_doubletfinder_singlets.R): the
 #      saved output's RNA counts, the singlets', into saved/singlets/, unless they are there.
 # Both read .rds files and need no particular CPU type, so `shared` (Cascade Lake) serves as well
-# as `sapphire`. 24 GB covers every object (the largest input .rds is 2.3 GB; the tier-P
-# exports peaked at 5.8 GB). From the repository's top directory, after
+# as `sapphire`. 24 GB covers every object: the exports peaked at 8.6 GiB and took at most
+# 9.7 minutes each (decontx_raw_emptydrops_amellifera, soupx_emptydrops_amellifera). From the
+# repository's top directory, after
 # `cargo build --release -p scrust` (the exports record `scrust fingerprint`):
 #   sbatch --array=1-150 [--output=<dir>/%x-%A_%a.sbatch.log] validation/slurm/m7_export.sbatch
 # The two wrappers run with bash inside this job, where their #SBATCH lines are comments; they
