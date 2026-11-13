@@ -338,3 +338,5 @@ env -u R_LIBS_USER -u R_LIBS_SITE -u R_LIBS -u PERL5LIB PYTHONNOUSERSITE=1 "$R_E
 ```
 
 The manifest: `validation/R/manifest_doubletfinder.R`, in a batch job (13 minutes). The SLURM logs of every M7 job, and the batch scripts of the report and the manifest, are in `data/doubletfinder/logs/m7/`.
+
+**A fresh clone** of the branch (commit 23e5321) passes `cargo test --workspace`: 160 tests, no warnings (job 60176266). Its release binary is byte-identical to `scrust-m7-b8c8a8c` when it is built against the same conda env path. The build scripts record `$CONDA_PREFIX/lib` as the binary's rpath, so a clone whose `.envs/rust-dev` lies at another path embeds that path instead. That changes the file's bytes, and its size by the path's length, but not the code.
