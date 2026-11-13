@@ -78,3 +78,16 @@ SCRUST_BIN=$PWD/data/doubletfinder/logs/bin/scrust-m7-$c sbatch --export=ALL --a
 ```
 
 `--dependency=aftercorr` starts each object's Rust run once its own export task has succeeded.
+
+## The clustering chain's reference data (M8)
+
+Submit from the repository's top directory. Objects, dump levels, pipeline paths and the earlier exports reused are in [`../clustering_datasets.tsv`](../clustering_datasets.tsv) (tiers T and P); every production object's workflow job, node and CPU type in [`../clustering_panel.tsv`](../clustering_panel.tsv), written by `Rscript validation/R/clustering_panel.R validation/clustering_panel.tsv <the two Snakemake logs of rerun #2>` (no `.rds`; a login node is enough). Outputs go to `data/clustering/<object>/` and are never overwritten. All 840 production jobs, and the 27 test-reference jobs, ran on Sapphire Rapids.
+
+- [`export_clustering.sbatch`](export_clustering.sbatch) `<object>...`: the one-time exports (reads `.rds`). No particular CPU type. Peak RSS at most 11.9 GiB (filtered_seurat_emptydrops_sscovelli) and at most 8 minutes per object, longest where the counts are written rather than linked; 4 GB covers tier T, 24 GB every P object.
+- [`reference_clustering.sbatch`](reference_clustering.sbatch) `<portable|production> <direct|instrumented> <object>...`: reference runs into `runs/<mode>-<profile>-<cpu arch>[-noumap][-v5]/`, under `/usr/bin/time -v`. The production profile stops unless the node has the CPU feature of the object's workflow job and OpenBLAS, left to detect the CPU, reports its core (`SapphireRapids`). Variants through the environment: `CL_UMAP=no` (no RunUMAP), `CL_ASSAY=v5` (the emptyDrops objects through the v5 path), `CL_LEVEL`, `CL_PURITY_LISTS`. Measured peaks (`/usr/bin/time -v`): at most 0.93 GiB on tier T, 2.5 to 23.4 GiB on the small and medium P objects, 55.6 to 62.2 GiB on the two 79,409-cell objects (the v5 path the most) and 104.1 GiB on cellbender_fromraw_ghirsutum2; ask for 6 GB, 32 GB, 96 GB and 160 GB. Several configurations can share one job: `sbatch --wrap "CL_UMAP=no bash validation/slurm/reference_clustering.sbatch production direct <objects>; ..."`.
+- [`markers_clustering.sbatch`](markers_clustering.sbatch) `<object>...`: the marker references (reads `.rds`; no BLAS, any CPU type).
+- [`optimizer_clustering.sbatch`](optimizer_clustering.sbatch) `<object>...`: the instrumented modularity optimizer on the saved SNN graph (no `.rds`; tier T runs with `bash` in seconds). Build it first: `bash validation/cpp/build.sh`.
+- [`compare_clustering.sbatch`](compare_clustering.sbatch) `<object>...`: every run against its saved object, and the pairs of runs M8 compares (instrumented against direct, Haswell against SapphireRapids kernels, Cascade Lake against Sapphire Rapids, without against with UMAP, v5 against v3), into `data/clustering/compare/<object>/`. Plain files only; tier T can run it with `bash`.
+- [`fixtures_clustering.sh`](fixtures_clustering.sh): copies the committed tier-T subset into `tests/fixtures/clustering/` (plain files; a login node is enough).
+
+During M8 the `sapphire` queue was held up by another run under the same account, so most Sapphire Rapids jobs ran on the `test` partition (Sapphire Rapids nodes; at most 5 jobs and 12 hours per job), and CPU-independent jobs on `shared` and `serial_requeue`.

@@ -10,7 +10,7 @@
 # Output: data/clustering/<object>/{input,saved}/ and export_run.json, written to
 # data/clustering/<object>.partial.<job>/ first and moved into place when complete; an existing
 # export is never overwritten. Exports need no particular CPU type (-p shared,sapphire starts
-# sooner); memory: tier T 4 GB, the small and medium P objects 32 GB, the large ones 96 GB.
+# sooner); peak RSS at most 11.9 GiB: 4 GB covers tier T, 24 GB every P object.
 #
 #SBATCH --job-name=scrust-cl-export
 #SBATCH -A informatics

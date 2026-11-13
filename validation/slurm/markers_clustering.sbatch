@@ -7,8 +7,9 @@
 # Objects and pipeline paths are in validation/clustering_datasets.tsv. Output:
 # data/clustering/<object>/markers/ (markers.json, the combined table, reference_markergenes.csv,
 # clusters/), written to a .partial directory first; an existing one is never overwritten.
-# FindMarkers uses no BLAS, so any CPU type will do (-p shared,sapphire starts sooner). Memory:
-# tier T 4 GB, the small and medium P objects 32 GB, the large ones 96 GB.
+# FindMarkers uses no BLAS, so any CPU type will do (-p shared,sapphire starts sooner). Peak RSS
+# at most 9.6 GiB (cellbender_fromraw_ghirsutum2) and 4 minutes per object: 4 GB covers tier T,
+# 16 GB every P object.
 #
 #SBATCH --job-name=scrust-cl-markers
 #SBATCH -A informatics

@@ -95,7 +95,7 @@ Each tool's real inputs and outputs are sparse matrices and small per-cell table
 - **Every output of the original, and more.** A port keeps all of the original tool's outputs, such as DoubletFinder's per-barcode pANN and classification table and its sweep tables. The 10x count data below is written in addition to them, never instead. Ports expand the original tools' functionality and remove none of it.
 - **Count data out (the matrices in bold):** every tool that processes the counts writes its result as new 10x-style count data, whether it keeps cells (the filters: emptyDrops, DoubletFinder, scDblFinder) or changes values (the ambient correctors: SoupX, CellBender, decontX). Their results stay on the raw count scale. The tools then chain on plain files, each reading the last one's directory, with no Seurat object between them. The directory is gzipped 10x Matrix Market (Cell Ranger v3 layout, which Seurat's `Read10X`, `DropletUtils` and scanpy read). It holds the entries exactly as stored, explicit zeros included, with values as `%.17g` writes them, so a correctly rounded reader recovers every double. The input's feature lines are carried over unchanged. DoubletFinder writes `singlets/` from M6b on (B3).
 - **Normalised data is the exception.** Data on another scale is never written as 10x count data. That covers SCTransform's corrected counts, their log1p and the residuals.
-  - The corrected counts are integers (`correct_counts` rounds them). A tool given them as a 10x directory would take them for raw counts without complaint.
+  - The corrected counts are integers (sctransform's `correct()` rounds them). A tool given them as a 10x directory would take them for raw counts without complaint.
   - Normalised matrices go into the export of C3f instead, next to the original counts and a per-cell metadata table. They are Matrix Market or `.npy` files under names that no 10x reader accepts, each marked with what it holds and how it was made.
   - The loaders (C3g) put them only into slots meant for normalised data.
 - **Formats:** count matrices in 10x Matrix Market (and 10x HDF5 later); normalised matrices in Matrix Market or `.npy` under other names; tables as TSV; run metadata (parameters, seed, versions, timings) in `summary.json`. From M13 on, `summary.json` also lists every output file with its role (C3f).
@@ -241,7 +241,7 @@ UMAP, which the workflow runs between PCA and the neighbour search, is not neede
 **New components:**
 - `neighbors`: Annoy as RcppAnnoy 0.0.23 builds it (Annoy 1.17.3), ported to Rust (C3a), with Seurat's insertion order and float conversion; Seurat's shared-nearest-neighbour (Jaccard) graph and pruning;
 - `cluster`: a port of Seurat's C++ modularity optimizer (Louvain algorithms 1–3) with its Java-style RNG, and Seurat's ordering of cluster IDs; bluster's silhouette and purity. Leiden can follow;
-- `sctransform` gains `correct_counts`, and `knn` gains the exact search that purity makes (C3e);
+- `sctransform` gains `correct()`, and `knn` gains the exact search that purity makes (C3e);
 - an export of the normalised data with the counts and metadata, built so it can't be mistaken for raw counts (C3f), and loaders that read it into Seurat, SingleCellExperiment and AnnData (C3g);
 - clustering on the fly: a tool that needs clusters and is given none computes them in-process (C3h).
 
@@ -560,7 +560,8 @@ obj <- add_silhouette_to_metadata(obj)  # the workflow's own, through bluster
      - `counts` holds the corrected counts, `data` their `log1p`, and `scale.data` the variable features' residuals, which RunPCA reads;
      - the model goes into the assay's `SCTModel`: feature and cell attributes, the regularised parameters, `median_umi`, the clip ranges and vst's arguments;
      - adding the assay to the object computes `nCount_SCT` (`Matrix::colSums`) and `nFeature_SCT` (the entries > 0).
-   - **The corrected counts** come from sctransform 0.4.3's `correct_counts` (`do.correct.umi = TRUE`, the default; C3f). It covers every gene in the model (those detected in at least 5 cells) and every cell. It rounds its results, so they are integers. Both assay paths call it the same way, on all of the cells.
+   - **The corrected counts** come from sctransform 0.4.3's `correct()`, which `vst()` calls on its own residuals (`return_corrected_umi = TRUE`, from `do.correct.umi = TRUE`, the default; C3f). It covers every gene in the model (those detected in at least 5 cells) and every cell. It rounds its results, so they are integers. Both assay paths call it the same way, on all of the cells.
+   - **Seurat passes `meta.data` to `vst()` as `cell_attr`.** vst would use a column named `umi`, `gene`, `log_umi`, `log_gene`, `umi_per_gene` or `log_umi_per_gene` instead of computing it; no saved object has one (M8's exports check), so the chain depends on the counts alone.
 2. **RunPCA** follows B3b's path with `npcs = 50` (Seurat's default), and `set.seed(12345)` before irlba's start vector.
    - irlba runs with `nv = 50` and `work = 66`; for small objects `work` is capped at min(m, n) − 2.
    - The variable features are SCTransform's 3,000, or every kept gene where fewer remain (tier T).
@@ -619,7 +620,7 @@ There are four generators. R's is reseeded before each stage that draws from it,
 | RunPCA | R's | `set.seed(12345)` | irlba's start vector, `rnorm(nfeatures)`; more only in irlba's rare branches (M5) |
 | RunUMAP | R's (uwot seeds its own PCG streams from it) | `set.seed(12345)` | not ported; nothing later reads R's stream before `set.seed(1)` |
 | Annoy build | `Kiss64Random`, one per index | the default seed, 1234567890987654321, because Seurat never calls `setSeed`. RcppAnnoy builds single-threaded, so one stream runs through all 50 trees | per split attempt: two `index()` draws for the starting pair, then 200 for the two-means iterations, then one `flip()` for each point whose margin is exactly 0; up to three attempts per node; in the fallback, one `flip()` per point per round |
-| Annoy search, SNN, `correct_counts`, silhouette, purity's sums | none | | |
+| Annoy search, SNN, `correct()`, silhouette, purity's sums | none | | |
 | Modularity optimizer | `JavaRandom`, java.util.Random's 48-bit LCG | created once per resolution, with `random.seed` (12345) | each local-moving pass draws a permutation of its network's nodes: n calls to `nextInt(n)`. This happens at every level of every iteration of every start, in one continuing stream |
 | GroupSingletons | R's | `set.seed(1)` before each candidate cluster's connectivity | one `sample(<tied clusters>, 1)` per singleton |
 | Purity's search index (KMKNN) | `std::mt19937_64`, in knncolle's k-means++ | the library's fixed seed, 6523 | k-means++'s draws for the index's ⌈√n⌉ centres. They decide only where the search looks, not what it finds (C3e) |
@@ -689,7 +690,7 @@ The clustering changes no counts, so it writes no new count data (A3). The expor
   - the modularity optimizer (C3c), FindClusters' result (C3d), `approxSilhouette`, and `neighborPurity`'s weights and sums (C3e);
   - the whole chain as one library entry point, for `scrust cluster` and for clustering on the fly: in DoubletFinder now, in the decontX and SoupX ports later (C3h);
   - Leiden (`algorithm = 4`, which goes through leidenbase) can follow later; it is not in Step 2.
-- **`sctransform`:** used as it is, with the workflow's parameters. New: `correct_counts` (C3f).
+- **`sctransform`:** used as it is, with the workflow's parameters. New: `correct()` (C3f).
 - **`pca`:** used as it is.
 - **`knn`:** new: the search `neighborPurity` makes, with knncolle's arithmetic (C3e).
 - **`rcompat`:** `set.seed` and `sample` for GroupSingletons; long-double `mean` and `sum`, whose accumulator R's `colMeans`, `colSums` and `rowSums` also use (small additions); R's `median`; R's number formatting for the `res.` names; and `order`.
@@ -706,7 +707,7 @@ The clustering changes no counts, so it writes no new count data (A3). The expor
 | Neighbours | Annoy, k = 20, 30 dims | DoubletFinder's exact distances (`knn`, `fields::rdist`), a different algorithm | everything: `neighbors` |
 | Clustering | Louvain | none | everything: `cluster` |
 | Silhouette and purity | `approxSilhouette`; `neighborPurity` through KMKNN | `knn`'s exact distances, the same sums as knncolle's (`fields::rdist`'s order), with DoubletFinder's selection | both scores: `cluster`; knncolle's squared comparisons, the 50th distance and the range query: `knn` (C3d, C3e) |
-| Corrected counts | `correct_counts`, as `do.correct.umi = TRUE` runs it | none: DoubletFinder reads only the residuals | the port (C3f): the residual code's products, plus the same at the median depth |
+| Corrected counts | `correct()`, as `do.correct.umi = TRUE` runs it inside `vst()` | none: DoubletFinder reads only the residuals | the port (C3f): vst's residuals before clipping, and the products at the median depth |
 | R semantics | `set.seed(1)` and `sample`, long-double `mean`, `round`, number formatting | all exact (M1) | `median`, `colSums`, `rowSums` (small additions) |
 
 The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat's result depends on its exact approximations. `knn` serves purity, whose search is exact.
@@ -798,14 +799,11 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
 
 **C3f. Corrected counts and the export.**
 
-*The corrected counts* port sctransform 0.4.3's `correct_counts`, as `SCTransform.default` calls it, with no `scale_factor`:
-- **The regressors:** each cell's `[1, log_umi]`, and the same with `log_umi` replaced by its median over all cells (R's `median`).
-- **For each bin of 500 model genes,** in the counts' gene order:
-  - μ is exp of the regularised parameters times the regressors (`tcrossprod`), through the same OpenBLAS `dgemm` call R makes, with the same shapes;
-  - the variance is μ + μ²/θ, which is μ where θ = ∞;
-  - the Pearson residual is (y − μ)/√variance. Unlike vst's residuals, it is neither clipped nor floored at `min_variance`;
-  - μ and the variance are computed again at the median depth, giving μ + residual·√variance.
-- **Rounding:** `round` (half to even), negatives set to 0, zeros dropped. The results are integer counts, stored sparse.
+*The corrected counts* port sctransform 0.4.3's `correct()`, which `vst()` itself calls when Seurat passes `return_corrected_umi = TRUE` (`do.correct.umi`, the default), with no `scale_factor`. (`correct_counts()`, which recomputes the residuals, serves only `SCTransform.default`'s `conserve.memory` path; M8 corrected this.)
+- **The residuals are vst's own:** the Pearson residuals of every model gene and cell, (y − μ)/√max(μ + μ²/θ, `min_variance`), as vst computes them in bins of 500 genes (B3a step 6). `correct()` reads them before vst clips them at ±√N, so they are floored at `min_variance` but not clipped. That matters: in `soupx_tenx_test`, 87 of the residuals `correct()` reads lie beyond the clip range (M8's instrumented runs count them).
+- **The regressors:** each cell's `[1, log_umi]` with `log_umi` replaced by its median over all cells (R's `median`, through `apply`).
+- **For each bin of 500 model genes,** in the counts' gene order: μ at the median depth is exp of the regularised parameters times those regressors (`tcrossprod`, the OpenBLAS `dgemm` call R makes, with the same shapes); its variance is μ + μ²/θ (μ where θ = ∞), not floored; the corrected value is μ + residual·√variance.
+- **Rounding:** `round(x, 0)` (half to even), negatives set to 0, zeros dropped (`make.sparse`). The results are integer counts, stored sparse.
 - **The rest of the assay:** `data` is their `log1p` (glibc's), and `nCount_SCT` and `nFeature_SCT` are their column sums and nonzero counts.
 - They are computed only for the export, because clustering doesn't need them.
 
@@ -858,8 +856,8 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
   - puts the corrected counts in SCT `counts` and their log1p in `data`;
   - keeps the model genes in the counts' order, since exact ties in FindMarkers' sorted output keep the feature order;
   - builds exactly one `SCTModel`;
-  - gives `seurat_clusters` its saved level order, which the combined table follows.
-- **The residuals** cover only the variable features, so they go where a different set of genes is allowed: Seurat's `scale.data`, an alternative experiment, an `obsm` table.
+  - gives `seurat_clusters` its saved level order (the clusters FindMarkers is run for). The combined table lists the clusters in the order the workflow combined their files, not in level order (C4, "Markers").
+- **The residuals** cover only the variable features, so they go where a different set of genes is allowed: Seurat's `scale.data`, an alternative experiment, an `obsm` table. Seurat keeps `scale.data`'s rows in the SCT assay's gene order, not in `VariableFeatures()` order (M8, every object and both assay paths); RunPCA reorders them, so the PCA's loadings follow `VariableFeatures()`. The Seurat loader keeps both orders.
 - **Other commands' outputs:** `scrust doubletfinder`'s calls become metadata columns, and `singlets/` loads as raw counts.
 - **Packaging:** an R package (Matrix, SeuratObject and jsonlite, plus Seurat or SingleCellExperiment for those objects) and a Python package (numpy, scipy, pandas, anndata). Each has a one-line command that writes `.rds` or `.h5ad`. Both are tested in hermetic envs (A2).
 - **Versions:** the Seurat loader builds Seurat 5.5.1's and SeuratObject 5.4.0's classes, and checks the installed versions. With other versions it carries on and warns that they are untested.
@@ -889,7 +887,7 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
 - **Purity:** the squared distances' summation order; the exact 50th distance, never an approximation; R's `median`; the radius squared in double and compared with `<=`; the long-double `rowSums`; and C3e's certificate.
 - **Corrected counts:**
   - the same `dgemm` calls as R, with the same bin shapes. The kernel's last bits can move a value across a .5 boundary, so exact checks use the reference's kernel;
-  - residuals that are neither clipped nor floored; θ = ∞; `round` half to even; glibc's `exp` and `log1p`.
+  - vst's residuals as `correct()` reads them, floored at `min_variance` but not yet clipped; θ = ∞; `round` half to even; glibc's `exp` and `log1p`.
 
 ### C4. Validation data
 
@@ -907,7 +905,7 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
   - every cell's neighbours and float distances;
   - both graphs;
   - purity's intermediates: each cell's 50th distance, the radius, and each cell's neighbour count; for T and the small P object, the neighbour lists too;
-  - `correct_counts`' median depth.
+  - `correct()`'s median depth, and how many of the residuals it reads lie beyond vst's clip range.
 
   A variant without RunUMAP shows that UMAP changes nothing downstream.
 - **An instrumented optimizer.** R returns only the final labels, but Seurat's `ModularityOptimizer.cpp` has a standalone mode with its own `main()`.
@@ -945,7 +943,7 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
 **Loader tests:** each loader's object is compared with the saved object: the counts, the SCT layers and model, the chain's metadata columns, the PCA and the graphs.
 - The R loaders (Seurat, SingleCellExperiment) are compared with the `.rds` directly, in batch jobs.
 - The Python loader is compared with T's and P's exports.
-- **Markers (the Seurat loader):** `markers_from_loader.R` runs the steps of the workflow's `find_markers.R` and `combine_markers.R` on the loaded object, cluster by cluster in level order, in the pinned env.
+- **Markers (the Seurat loader):** `markers_from_loader.R` runs the steps of the workflow's `find_markers.R` and `combine_markers.R` on the loaded object, cluster by cluster, in the pinned env. The rule `combine_markers` receives the per-cluster files in the order Snakemake's `glob_wildcards()` lists the manifest directory (`os.walk`: the filesystem's directory order, such as 3, 1, 2, 0), not in level order, so the clusters are combined in the order of the saved table (M8; clusters with no rows can go anywhere).
   - The steps are copied into `validation/R/`, with their source cited; the pipeline repo's scripts are not run from there.
   - The combined table must equal the saved `<prefix>_markergenes.csv` byte for byte. The references are the production run's tables for P, and the test data's 27 in `tests/reference_outputs/` for T.
   - M8 first checks the references: FindMarkers on each saved `.rds` must reproduce its saved table. Where one doesn't, FindMarkers on the saved `.rds` becomes the reference.
@@ -997,12 +995,12 @@ K3–K7 and K9 use no BLAS, so under teacher forcing they are exact on any machi
 
 | ID | Content | Done when |
 |---|---|---|
-| M8 | Sources and reference data:<br>- `fetch_sources.sh` adds RcppAnnoy 0.0.23, RcppEigen 0.3.4.0.2, bluster 1.20.0, BiocNeighbors 2.4.0 and assorthead 1.4.0 (knncolle's headers);<br>- the panel table;<br>- exports for T and P, the SCT assay included;<br>- direct and instrumented runs in both profiles (A5b), with purity's and `correct_counts`' intermediates, and the run without UMAP;<br>- the instrumented optimizer and the K0 vectors;<br>- the marker references checked on T and P (C4);<br>- the R-vs-R floor | every direct run reproduces its saved labels and levels, silhouette widths, purities and SCT layers; the run without UMAP gives identical graphs and labels; the marker reference of every T and P object settled; the instrumented optimizer reproduces R's labels; the floor, and R's memory and time for the chain, measured; fixtures in the manifest |
+| M8 | Sources and reference data:<br>- `fetch_sources.sh` adds RcppAnnoy 0.0.23, RcppEigen 0.3.4.0.2, bluster 1.20.0, BiocNeighbors 2.4.0 and assorthead 1.4.0 (knncolle's headers);<br>- the panel table;<br>- exports for T and P, the SCT assay included;<br>- direct and instrumented runs in both profiles (A5b), with purity's and `correct()`'s intermediates, and the run without UMAP;<br>- the instrumented optimizer and the K0 vectors;<br>- the marker references checked on T and P (C4);<br>- the R-vs-R floor | every direct run reproduces its saved labels and levels, silhouette widths, purities and SCT layers; the run without UMAP gives identical graphs and labels; the marker reference of every T and P object settled; the instrumented optimizer reproduces R's labels; the floor, and R's memory and time for the chain, measured; fixtures in the manifest |
 | M9 | `neighbors`: `Kiss64Random`; the Annoy build (Euclidean, Angular, Manhattan) and its file format; the search; the nn and SNN graphs; `scrust neighbors` | K0 (Kiss64) and K3–K6 exact on T and P from R's own embeddings; time and memory measured on the largest object |
 | M10 | `cluster`: `JavaRandom`; the network; algorithms 1–3 and modularity functions 1 and 2; the best start and the numbering; GroupSingletons; FindClusters' columns and levels; several resolutions; `scrust cluster --snn` | K0 (Java) and K7 exact on T and P from R's own SNN graphs, the objects with singletons included |
 | M11 | The chain at the workflow's settings:<br>- SCTransform with seed 12345 (v5 and v3 assays) and 50 PCs;<br>- `approxSilhouette`;<br>- `scrust cluster --counts` and the staged starts, with the parameters, the preset and the TOML file;<br>- `scrust validate cluster`;<br>- the benchmark | K1–K8 met on T and P in both profiles; the direct runs' files and the saved labels identical; independent of the thread count; the benchmark in `docs/validation/clustering.md` |
 | M12 | Neighbourhood purity: `knn`'s exact search with knncolle's arithmetic (the 50th distance, the radius, the range query) and the certificate; `neighborPurity`'s weights and sums; purity in `scrust cluster` | K9 on T and P, teacher-forced and end to end; the saved purities identical on T and P; time measured on the largest objects. **Decision point:** if the certificate flags any pair, port KMKNN (C3e) or agree with you how to treat the flagged cells |
-| M13 | Corrected counts and the export:<br>- the `correct_counts` port, the log1p, `nCount_SCT` and `nFeature_SCT`;<br>- `scrust sctransform --corrected-counts` and `scrust cluster --export`;<br>- the export's layout, comment lines and README;<br>- the manifest for every command, `scrust doubletfinder`'s included | K10 on T and P in both profiles; every file the manifest lists present and described; `Read10X` and `read_10x_mtx` fail on the export as designed; the export's memory and time measured |
+| M13 | Corrected counts and the export:<br>- the port of `correct()`, the log1p, `nCount_SCT` and `nFeature_SCT`;<br>- `scrust sctransform --corrected-counts` and `scrust cluster --export`;<br>- the export's layout, comment lines and README;<br>- the manifest for every command, `scrust doubletfinder`'s included | K10 on T and P in both profiles; every file the manifest lists present and described; `Read10X` and `read_10x_mtx` fail on the export as designed; the export's memory and time measured |
 | M14 | Loaders: the R package (Seurat, SingleCellExperiment) and the Python package (AnnData), with their commands, in `loaders/`; their tests in hermetic envs (A2) | K11 and K13 on T and P; the R loader ready for M17's comparisons |
 | M15 | Clustering on the fly: the chain as a library entry point in `cluster`, for later ports too (C3h); `scrust doubletfinder` given no `--clusters` (`--cluster-preset`, `--cluster-params`, `--cluster-stats`) | K12 on all 150 DoubletFinder inputs; the memory peak measured against M7's runs |
 | M16 | The parameter grid (C4) | every grid cell identical, or A7b's floor met with every difference traced |
