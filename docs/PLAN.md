@@ -461,7 +461,7 @@ This needs only a one-time export of the inputs and those fields (`export_double
 | S2d SCT residuals | residual variance, the 3,000 variable features (ordered), `scale.data`, given R's parameters | exact when the BLAS kernel matches (OpenBLAS through FFI, A5b); otherwise numeric tolerance |
 | S3 PCA | standard deviations; embeddings (up to sign per component); RNG state afterwards | identical when the BLAS kernel matches the fixture (A5b); otherwise relative ≤ 1e-10; RNG state always exact |
 | S4 neighbours | first `ind` order positions per real cell | identical for ≥ 99.99% of cells; each difference explained by a near-tie |
-| S5 pANN (sweep and final) | per cell | identical for ≥ 99.9%; otherwise |Δ| ≤ 2/k |
+| S5 pANN (sweep and final) | per cell | identical for ≥ 99.9%; otherwise \|Δ\| ≤ 2/k |
 | S6 sweep | BCreal; chosen pK | relative ≤ 1e-6; pK identical |
 | S7 calls | nExp; Doublet/Singlet set | nExp identical; target identical set, floor ≥ 99.9% agreement with every difference at the pANN cutoff |
 | Against saved workflow outputs (T, P, full panel) | doublet set, singlet pANN, pK and nExp as R writes them | set as in S7; pANN as in S5; pK and nExp identical |
