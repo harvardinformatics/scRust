@@ -41,6 +41,10 @@ BIOC=https://bioconductor.org/packages/3.22/bioc
 # per their conda recipes' host requirements; the env has RcppArmadillo 15.6.2-1 installed).
 # OpenBLAS (M5) is the library both envs load (libopenblasp-r0.3.34.so, conda-forge build
 # pthreads_hf13c14d_2); its sha256 is the one in that build's recipe (info/recipe/recipe.yaml).
+# Step 2, the clustering crate (milestone M8): RcppAnnoy 0.0.23 (Annoy 1.17.3) and RcppEigen
+# 0.3.4.0.2 (Eigen 3.4.0), the versions Seurat 5.5.1's conda build was compiled against; bluster
+# 1.20.0 (approxSilhouette, neighborPurity), BiocNeighbors 2.4.0 and assorthead 1.4.0 (knncolle's
+# headers, which BiocNeighbors and bluster were compiled against).
 SOURCES='
 R              4.5.3       R-4.5.3.tar.gz                  https://cran.r-project.org/src/base/R-4/R-4.5.3.tar.gz
 sctransform    0.4.3       sctransform_0.4.3.tar.gz        cran
@@ -61,6 +65,11 @@ parallelly     1.50.0      parallelly_1.50.0.tar.gz        cran
 MatrixGenerics 1.22.0      MatrixGenerics_1.22.0.tar.gz    bioc
 DelayedMatrixStats 1.32.0  DelayedMatrixStats_1.32.0.tar.gz  bioc
 OpenBLAS       0.3.34      OpenBLAS-0.3.34.tar.gz          https://github.com/OpenMathLib/OpenBLAS/archive/v0.3.34.tar.gz
+RcppAnnoy      0.0.23      RcppAnnoy_0.0.23.tar.gz         cran
+RcppEigen      0.3.4.0.2   RcppEigen_0.3.4.0.2.tar.gz      cran
+bluster        1.20.0      bluster_1.20.0.tar.gz           bioc
+BiocNeighbors  2.4.0       BiocNeighbors_2.4.0.tar.gz      bioc
+assorthead     1.4.0       assorthead_1.4.0.tar.gz         bioc
 '
 
 die() { echo "fetch_sources.sh: $*" >&2; exit 1; }
