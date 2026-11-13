@@ -28,7 +28,7 @@ The production profile must leave `OPENBLAS_CORETYPE` unset: env.sh unsets it wh
 
 ## DoubletFinder (M2)
 
-Submit from the repository's top directory. Objects and their pipeline paths are in [`../doubletfinder_datasets.tsv`](../doubletfinder_datasets.tsv); outputs go to `data/doubletfinder/<object>/` and are never overwritten.
+Submit from the repository's top directory. Objects and their pipeline paths are in [`../doubletfinder_datasets.tsv`](../doubletfinder_datasets.tsv) (tiers T and P) and, for the full panel's other objects, [`../doubletfinder_panel.tsv`](../doubletfinder_panel.tsv) (M7); the export wrappers look in both. Outputs go to `data/doubletfinder/<object>/` and are never overwritten.
 
 - [`export_doubletfinder.sbatch`](export_doubletfinder.sbatch) `<object>...`: exports inputs and saved-output fields (reads `.rds`).
 - [`export_doubletfinder_singlets.sbatch`](export_doubletfinder_singlets.sbatch) `<object>...` (M6b): exports the saved outputs' RNA counts, the singlets' counts, to `saved/singlets/`, next to an existing M2 export (reads `.rds`). It needs no particular CPU type, so `-p shared,sapphire` starts it sooner. 32 GB covers every object.
@@ -59,3 +59,22 @@ After `cargo build --release -p scrust`, from the repository's top directory, wi
 
 - [`m6_doubletfinder.sbatch`](m6_doubletfinder.sbatch) `<label> <object>...`: for each object and each OpenBLAS profile its reference runs use (portable, production), `scrust doubletfinder` from the export's counts and cluster labels, with stage dumps at the level of the profile's instrumented R run, then `scrust validate doubletfinder` against every reference run of that profile (instrumented: the final files, the `result` section, every stage array S1–S7, every `.Random.seed` checkpoint and scalar; direct: the final files and the `result` section) and against the saved workflow output, into `data/doubletfinder/<object>/rust/<label>/<profile>/` (`run/`, `vs_<R run>.{json,md}`, `vs_saved.{json,md}`, `fingerprint.json`, `time_v.txt`). The saved-output comparison includes `run/singlets/` against the export in `saved/singlets/` (M6b) wherever that export exists. The OpenBLAS core is checked before each run. 8 CPUs and 48 GB cover every object; the ten objects take about 20 minutes in one job.
 - [`m6_benchmark.sbatch`](m6_benchmark.sbatch) `<label> <object> <threads>...`: `scrust doubletfinder` without dumps at each thread count under `/usr/bin/time -v`, in the production profile (`--cpus-per-task=32 --mem=32G`), compared with the object's direct production R run (whose `time_v.txt` is R's wall time and peak RSS on the same input and CPU type) and the runs with each other, into `data/doubletfinder/<object>/rust/<label>/t<threads>/`.
+
+## The full panel (M7)
+
+All 150 production DoubletFinder objects of [`../doubletfinder_panel.tsv`](../doubletfinder_panel.tsv), one array task per object (task i: the table's data row i). The table records, for each object, its pipeline paths and the workflow job that wrote its saved output: the job, its Snakemake run, node, CPU type (the node's SLURM feature), time and peak RSS (sacct). From the repository's top directory:
+
+- [`m7_export.sbatch`](m7_export.sbatch): the one-time exports of an object, run with `bash` inside the task: `export_doubletfinder.sbatch` (inputs and compared fields), then `export_doubletfinder_singlets.sbatch` (the saved output's RNA counts), each unless already done. Exports need no particular CPU type (`--partition=shared,sapphire`); 1 CPU and 24 GB cover every object (peak 8.6 GiB).
+- [`m7_panel.sbatch`](m7_panel.sbatch) `<label>`: `scrust doubletfinder` without stage dumps on the object's export, then `scrust validate doubletfinder --saved` against the saved workflow output (the doublet set, the kept cells' pANN, the column names, so pK and nExp, and `singlets/` against the saved RNA counts), into `data/doubletfinder/<object>/rust/<label>/production/` (`run/`, `vs_saved.{json,md}`, `fingerprint.json`, `node_features.txt`, `time_v.txt`, `stderr.txt`). The production profile: the task runs on `sapphire`, stops unless the node has the CPU feature of the object's workflow job and OpenBLAS, left to detect the CPU, reports that CPU's core (`SapphireRapids`); it fails unless all nine checks are made and identical. 8 CPUs and 32 GB cover every object (peak 6.6 GiB, at most 2.4 minutes). With a pinned copy of the binary, as for M6.
+- [`doubletfinder_panel.sh`](doubletfinder_panel.sh) `<snakemake log>...`: writes the panel table to stdout from the pipeline's Snakemake logs (the DoubletFinder jobs' SLURM ids), sacct (node, state, elapsed time, peak RSS of step `.0`) and scontrol (the node's CPU-type feature). It reads no `.rds`, so a login node is enough; it stops if an object had more than one job or a job did not complete.
+
+```bash
+c=$(git rev-parse --short HEAD)
+cp target/release/scrust data/doubletfinder/logs/bin/scrust-m7-$c
+mkdir -p data/doubletfinder/logs/m7
+E=$(sbatch --parsable --array=1-150%50 --output=data/doubletfinder/logs/m7/%x-%A_%a.sbatch.log validation/slurm/m7_export.sbatch)
+SCRUST_BIN=$PWD/data/doubletfinder/logs/bin/scrust-m7-$c sbatch --export=ALL --array=1-150%50 --dependency=aftercorr:$E \
+    --output=data/doubletfinder/logs/m7/%x-%A_%a.sbatch.log validation/slurm/m7_panel.sbatch m7-$c
+```
+
+`--dependency=aftercorr` starts each object's Rust run once its own export task has succeeded.

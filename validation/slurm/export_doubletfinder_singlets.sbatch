@@ -2,7 +2,8 @@
 # Exports the singlets' counts of the workflow's saved DoubletFinder outputs (milestone M6b;
 # validation/R/export_doubletfinder_singlets.R) next to milestone M2's export of the same
 # objects, which must exist. Reads .rds files, so it runs only as a batch job. Objects and their
-# pipeline paths: validation/doubletfinder_datasets.tsv. From the repository's top directory:
+# pipeline paths: validation/doubletfinder_datasets.tsv (tiers T and P), else
+# validation/doubletfinder_panel.tsv (the full panel, M7). From the repository's top directory:
 #   sbatch [--mem=..] [--time=..] validation/slurm/export_doubletfinder_singlets.sbatch <object> [<object> ...]
 # Output: data/doubletfinder/<object>/saved/singlets/ (matrix.mtx.gz, barcodes.tsv.gz,
 # features.tsv.gz, export.json), export_singlets_run.json and export_singlets_time_v.txt. An
@@ -33,10 +34,19 @@ PIPELINE=/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preproces
 R_ENV=/n/holylfs05/LABS/informatics/Users/afreedman/smk-conda-envs/d3ca7f730a70e6f748bb65a12a5ed3f9_
 status=0
 
+# lookup <object> <column>: the column of the object's row, by header name, from the datasets
+# table, else the full panel's
+lookup() {
+    local t
+    for t in validation/doubletfinder_datasets.tsv validation/doubletfinder_panel.tsv; do
+        awk -F'\t' -v o="$1" -v c="$2" 'NR == 1 { for (i = 1; i <= NF; i++) h[$i] = i; next }
+            $1 == o && (c in h) { print $h[c]; found = 1; exit } END { exit !found }' "$t" && return 0
+    done
+    return 1
+}
+
 for obj in "$@"; do
-    row=$(awk -F'\t' -v o="$obj" '$1 == o' validation/doubletfinder_datasets.tsv)
-    [ -n "$row" ] || { echo "unknown object $obj" >&2; status=2; continue; }
-    saved=$(cut -f6 <<< "$row")
+    saved=$(lookup "$obj" saved) || { echo "unknown object $obj" >&2; status=2; continue; }
     base=data/doubletfinder/$obj
     if [ ! -f "$base/saved/saved.json" ] || [ ! -f "$base/input/export.json" ]; then
         echo "$base: no M2 export (validation/slurm/export_doubletfinder.sbatch)" >&2

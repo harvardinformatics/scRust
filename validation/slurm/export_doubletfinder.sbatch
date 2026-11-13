@@ -1,7 +1,8 @@
 #!/bin/bash
 # Exports DoubletFinder's inputs and the compared fields of the workflow's saved outputs to plain
 # files (validation/R/export_doubletfinder.R; docs/PLAN.md A4 and B4). Reads .rds files, so it
-# runs only as a batch job. Objects and their pipeline paths: validation/doubletfinder_datasets.tsv.
+# runs only as a batch job. Objects and their pipeline paths: validation/doubletfinder_datasets.tsv
+# (tiers T and P), else validation/doubletfinder_panel.tsv (the full panel, M7).
 # Submit from the repository's top directory:
 #   sbatch [--mem=..] [--time=..] validation/slurm/export_doubletfinder.sbatch <object> [<object> ...]
 # Output: data/doubletfinder/<object>/{input,saved}/ and export_run.json; an existing export is
@@ -33,11 +34,19 @@ PIPELINE=/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preproces
 R_ENV=/n/holylfs05/LABS/informatics/Users/afreedman/smk-conda-envs/d3ca7f730a70e6f748bb65a12a5ed3f9_
 [ -x target/release/scrust ] || { echo "build scrust first: cargo build --release -p scrust" >&2; exit 2; }
 
+# lookup <object> <column>: the column of the object's row, by header name, from the datasets
+# table, else the full panel's
+lookup() {
+    local t
+    for t in validation/doubletfinder_datasets.tsv validation/doubletfinder_panel.tsv; do
+        awk -F'\t' -v o="$1" -v c="$2" 'NR == 1 { for (i = 1; i <= NF; i++) h[$i] = i; next }
+            $1 == o && (c in h) { print $h[c]; found = 1; exit } END { exit !found }' "$t" && return 0
+    done
+    return 1
+}
+
 for obj in "$@"; do
-    row=$(awk -F'\t' -v o="$obj" '$1 == o' validation/doubletfinder_datasets.tsv)
-    [ -n "$row" ] || { echo "unknown object $obj" >&2; exit 2; }
-    input=$(cut -f5 <<< "$row")
-    saved=$(cut -f6 <<< "$row")
+    input=$(lookup "$obj" input) && saved=$(lookup "$obj" saved) || { echo "unknown object $obj" >&2; exit 2; }
     out=data/doubletfinder/$obj
     if [ -e "$out/input" ] || [ -e "$out/saved" ]; then
         echo "$out already has an export; not overwriting" >&2

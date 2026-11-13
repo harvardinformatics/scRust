@@ -1,6 +1,6 @@
 # DoubletFinder in Rust (Step 1; milestones M6 and M6b)
 
-M6 puts the pieces of milestones M1 to M5 together into one command, `scrust doubletfinder`: DoubletFinder 2.0.6 as the workflow's `doubletfinder.R` calls it (docs/PLAN.md B1), from a 10x counts directory and the cells' cluster labels to the doublet calls, every stage computed by Rust. This is the report the plan names for Step 1. M6b adds `singlets/`, the counts without the doublets as a new 10x directory, on top of the outputs M6 reports on ([M6b: the singlets' counts](#m6b-the-singlets-counts)). The full panel of 150 production objects (M7) comes next; substituting `scrust` into the Snakemake workflow is a later, separate change.
+M6 puts the pieces of milestones M1 to M5 together into one command, `scrust doubletfinder`: DoubletFinder 2.0.6 as the workflow's `doubletfinder.R` calls it (docs/PLAN.md B1), from a 10x counts directory and the cells' cluster labels to the doublet calls, every stage computed by Rust. This is the report the plan names for Step 1. M6b adds `singlets/`, the counts without the doublets as a new 10x directory, on top of the outputs M6 reports on ([M6b: the singlets' counts](#m6b-the-singlets-counts)). The full panel of 150 production objects (M7) has its own report, [doubletfinder_m7.md](doubletfinder_m7.md); substituting `scrust` into the Snakemake workflow is a later, separate change.
 
 ## Outcome
 

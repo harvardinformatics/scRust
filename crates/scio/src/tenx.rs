@@ -227,8 +227,10 @@ fn format_piece(m: &CscMatrix, cols: &[usize], starts: &[usize], a: usize, b: us
     while c < cols.len() && starts[c] < b {
         let (lo, hi) = (a.max(starts[c]), b.min(starts[c + 1]));
         let j = cols[c];
-        let base = m.p[j] - starts[c];
-        for idx in base + lo..base + hi {
+        // output entries lo..hi of column c are the input column's entries from m.p[j] on;
+        // starts[c] <= lo <= hi, while m.p[j] may be smaller than starts[c] when the columns are
+        // written out of input order
+        for idx in m.p[j] + (lo - starts[c])..m.p[j] + (hi - starts[c]) {
             push_uint(&mut out, m.i[idx] as u64 + 1);
             out.push(b' ');
             push_uint(&mut out, c as u64 + 1);

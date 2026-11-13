@@ -129,7 +129,7 @@ Each tool's real inputs and outputs are sparse matrices and small per-cell table
   - `agreement`: fraction identical, correlation.
 
   The R-vs-R floor sets realistic tolerances: the same tool re-run on another CPU type. Earlier work found R bit-identical for the same CPU type and thread count, and about 1e-11 apart in PCA across CPU types.
-- **CPU type:** OpenBLAS chooses its kernels by CPU, so each production job's node CPU type is recorded (sacct `NodeList` → node features). Production-profile runs use `--constraint` for the same CPU type. All 150 production DoubletFinder jobs ran on Sapphire Rapids nodes (38 nodes, AVX-512), so validation jobs use `--constraint=sapphirerapids`.
+- **CPU type:** OpenBLAS chooses its kernels by CPU, so each production job's node CPU type is recorded (sacct `NodeList` → node features). Production-profile runs use `--constraint` for the same CPU type. All 150 production DoubletFinder jobs ran on Sapphire Rapids nodes (38 nodes, AVX-512), so validation jobs use `--constraint=sapphirerapids`. M7 records each saved output's job, node and CPU type in `validation/doubletfinder_panel.tsv`.
 - **Harness:**
   - Tier-T checks run in `cargo test`.
   - Tier-P and full-panel checks run through `scrust validate <tool> --reference <dir> --candidate <dir>` (sbatch), which writes a markdown and JSON report to `docs/validation/`.
@@ -419,12 +419,13 @@ scrust doubletfinder --counts <10x mtx dir> --clusters <tsv> --out <dir>
 | large | soupx_emptydrops_sscovelli | 79,409 | 125.4 GiB / 41 min | memory benchmark; pK = 0.19, read off the find.pK plot that R saved (`Rplots.pdf`) |
 | memory outlier | cellbender_fromraw_ghirsutum2 | 59,323 | 137.1 GiB / 44 min | 57,899 genes |
 
-**Full panel:** all 150 production DoubletFinder runs (1,120–79,409 cells), compared against their saved outputs:
+**Full panel:** all 150 production DoubletFinder runs (30 samples × 5 arms; 1,120–79,409 cells), compared against their saved outputs:
 - the doublet set (input barcodes minus output barcodes);
 - singlet pANN;
-- pK and nExp, from the column names.
+- pK and nExp, from the column names;
+- the singlets' counts (from M6b on): `singlets/` against the saved object's RNA counts, the barcodes, the feature lines and every stored entry and value.
 
-This needs only a one-time export of the inputs and those fields; R is not re-run.
+This needs only a one-time export of the inputs and those fields (`export_doubletfinder.R`), and of the saved objects' RNA counts (`export_doubletfinder_singlets.R`); R is not re-run. `validation/doubletfinder_panel.tsv` lists the 150 objects with their pipeline paths and the workflow job that wrote each saved output: its node and CPU type (from sacct and the node's SLURM features), time and peak RSS. Each Rust run uses that CPU type, with the kernel OpenBLAS detects there (M7).
 
 ### B5. Acceptance criteria (in `tolerances.toml`)
 
@@ -442,7 +443,7 @@ This needs only a one-time export of the inputs and those fields; R is not re-ru
 | S6 sweep | BCreal; chosen pK | relative ≤ 1e-6; pK identical |
 | S7 calls | nExp; Doublet/Singlet set | nExp identical; target identical set, floor ≥ 99.9% agreement with every difference at the pANN cutoff |
 | Against saved workflow outputs (T, P, full panel) | doublet set, singlet pANN, pK and nExp as R writes them | set as in S7; pANN as in S5; pK and nExp identical |
-| Singlets' counts (M6b; T and P) | `singlets/` against the saved object's RNA counts: barcodes, feature lines, every stored entry and value | identical |
+| Singlets' counts (M6b: T and P; M7: full panel) | `singlets/` against the saved object's RNA counts: barcodes, feature lines, every stored entry and value | identical |
 | Performance | peak RSS and wall time against the direct R DoubletFinder run on the same input | lower memory and time; sscovelli ≤ 10 GiB |
 
 **How the comparisons work:** everything is compared as plain files. The harness compares:
@@ -467,7 +468,7 @@ This needs only a one-time export of the inputs and those fields; R is not re-ru
 | M5 | `pca` (irlba) port | S3 met; RNG checkpoint after PCA matches |
 | M6 | full `scrust doubletfinder` | S0–S7 and the saved-output checks met on T and the P objects; benchmarks in `docs/validation/doubletfinder.md` |
 | M6b | count data out (A3): `singlets/`, a new 10x directory, through a standard-library gzip writer; a one-time export of the saved objects' RNA counts | the singlets' counts identical to the saved objects' on T and P in both profiles; independent of the thread count; the memory peak unchanged |
-| M7 | full panel: all 150 production objects (sbatch array) | doublet sets, singlet pANN, pK and nExp meet the criteria for all 150, with a summary table |
+| M7 | full panel: all 150 production objects (sbatch arrays): a one-time export of each object's inputs, compared fields and RNA counts; the Rust run on the CPU type of the object's workflow job | doublet sets, singlet pANN, pK and nExp meet the criteria, and the singlets' counts are identical to the saved objects' (M6b), for all 150, with a summary table |
 
 M3 comes first on purpose: it solves the memory problem and checks all the bookkeeping before the hard numerical ports.
 
