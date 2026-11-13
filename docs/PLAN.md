@@ -89,6 +89,7 @@ Each tool's real inputs and outputs are sparse matrices and small per-cell table
 | Clustering (Seurat chain) | counts matrix, parameters | cluster labels; optionally the intermediates (SCTransform, PCA, neighbour graph) for reuse |
 | scDblFinder | counts matrix | score and class per cell, **the singlets' matrix** |
 
+- **Every output of the original, and more.** A port keeps all of the original tool's outputs, such as DoubletFinder's per-barcode pANN and classification table and its sweep tables. The 10x count data below is written in addition to them, never instead. Ports expand the original tools' functionality and remove none of it.
 - **Count data out (the matrices in bold):** every tool that processes the counts writes its result as new 10x-style count data, whether it keeps cells (emptyDrops, DoubletFinder, scDblFinder) or changes values (SoupX, CellBender, decontX). The tools then chain on plain files, each reading the last one's directory, with no Seurat object between them. The directory is gzipped 10x Matrix Market (Cell Ranger v3 layout, which Seurat's `Read10X`, `DropletUtils` and scanpy read). It holds the entries exactly as stored, explicit zeros included, with values as `%.17g` writes them, so a correctly rounded reader recovers every double. The input's feature lines are carried over unchanged. DoubletFinder writes `singlets/` from M6b on (B3).
 - **Formats:** matrices in 10x Matrix Market (and 10x HDF5 later); tables as TSV; run metadata (parameters, seed, versions, timings) in `summary.json`.
 - **Where Seurat appears:**

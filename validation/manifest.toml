@@ -647,7 +647,8 @@ note = "SHA-256 of .Random.seed after RunPCA() (set.seed(42), then irlba's draws
 #   input/   the counts DoubletFinder reads (RNA "counts" layer) as 10x Matrix Market, and
 #            seurat_clusters (export_doubletfinder.R); identical to the object's matrix, bit for bit
 #   saved/   the saved workflow output's compared fields: kept barcodes and singlet pANN, the
-#            doublet set, column names (pK, nExp)
+#            doublet set, column names (pK, nExp); saved/singlets/ (M6b): its RNA counts, the
+#            singlets' (export_doubletfinder_singlets.R)
 #   runs/<mode>-<profile>-<cpu arch>/   reference runs: cells.tsv, sweep_stats.tsv, bcmvn.tsv,
 #            summary.json, find_pK.pdf, time_v.txt; instrumented runs add stages/ (index.tsv
 #            explains every array; conventions in validation/R/lib/doubletfinder_hooks.R)
@@ -800,6 +801,66 @@ env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32607, job 59637727"
 
 [[file]]
+path = "data/doubletfinder/soupx_tenx_test/saved/singlets/barcodes.tsv.gz"
+sha256 = "c32245ae1dfde85b8c70fea3e3478289a5c2db71e3a9016fcd657857326ef194"
+bytes = 1605
+tool = "doubletfinder"
+dataset = "soupx_tenx_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_tenx_test.rds (sha256 b0598725da418f0bcc33b9ae49befd0c44b0eb7c243fc215c8485acbe6c35ee8)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_test/saved/singlets/export.json"
+sha256 = "9d46046a35f526e14d47faf39e67c2b8275a903a0b1294fa4107fe43349e318d"
+bytes = 882
+tool = "doubletfinder"
+dataset = "soupx_tenx_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_tenx_test.rds (sha256 b0598725da418f0bcc33b9ae49befd0c44b0eb7c243fc215c8485acbe6c35ee8)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_test/saved/singlets/features.tsv.gz"
+sha256 = "9c62c608b9fb66044951c360bc59a211ecb47fd835a58355a7e2296541cea6e2"
+bytes = 15037
+tool = "doubletfinder"
+dataset = "soupx_tenx_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_tenx_test.rds (sha256 b0598725da418f0bcc33b9ae49befd0c44b0eb7c243fc215c8485acbe6c35ee8)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_test/saved/singlets/matrix.mtx.gz"
+sha256 = "21026ad50133fd5fdbf90f18448d88fb73aba7cc6087cda3f68920e47d9ff6bb"
+bytes = 171123
+tool = "doubletfinder"
+dataset = "soupx_tenx_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_tenx_test.rds (sha256 b0598725da418f0bcc33b9ae49befd0c44b0eb7c243fc215c8485acbe6c35ee8)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
 path = "data/doubletfinder/soupx_tenx_test/export_run.json"
 sha256 = "2626bb2f13f419b0b12061b83e4cf781e1f5d8ca462711683c11838d0942da11"
 bytes = 2682
@@ -829,6 +890,38 @@ source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/soupx/
 recipe = "validation/slurm/export_doubletfinder.sbatch soupx_tenx_test (validation/R/export_doubletfinder.R)"
 env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32607, job 59637727"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_test/export_singlets_run.json"
+sha256 = "bb88e1253e2eacada01928f9b4100a20526dba076ac97b58d31ec6669eeae4b0"
+bytes = 2714
+tool = "doubletfinder"
+dataset = "soupx_tenx_test"
+tier = "T"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_tenx_test.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_test/export_singlets_time_v.txt"
+sha256 = "7697ece5f3f0ef6f95154e5a5484664aa03d09d7a5d25abe2aa59c96d3a0992b"
+bytes = 1229
+tool = "doubletfinder"
+dataset = "soupx_tenx_test"
+tier = "T"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_tenx_test.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
 note = "run-specific (timings, node, job); not compared by checksum"
 
 [[file]]
@@ -3970,6 +4063,66 @@ env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32607, job 59637727"
 
 [[file]]
+path = "data/doubletfinder/soupx_emptydrops_test/saved/singlets/barcodes.tsv.gz"
+sha256 = "539fe301f8e3079e70364aaae29e0ad231970b8448294511e1c7c811e19c4b0a"
+bytes = 1397
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_test.rds (sha256 5b329ad5138b833535bc6ff49839c0cd75bd2f1e10b5ce7977190b9411dd2e11)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_test/saved/singlets/export.json"
+sha256 = "0f57518d98aad9d5ed8021ee6c7a000e43966c6ddc21ced0bd71199fd35119e3"
+bytes = 891
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_test.rds (sha256 5b329ad5138b833535bc6ff49839c0cd75bd2f1e10b5ce7977190b9411dd2e11)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_test/saved/singlets/features.tsv.gz"
+sha256 = "9c62c608b9fb66044951c360bc59a211ecb47fd835a58355a7e2296541cea6e2"
+bytes = 15037
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_test.rds (sha256 5b329ad5138b833535bc6ff49839c0cd75bd2f1e10b5ce7977190b9411dd2e11)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_test/saved/singlets/matrix.mtx.gz"
+sha256 = "3be8c4060bb02e933cc0ad23f8997395421e65f787076b2b2a7312697e462b84"
+bytes = 157576
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_test.rds (sha256 5b329ad5138b833535bc6ff49839c0cd75bd2f1e10b5ce7977190b9411dd2e11)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
 path = "data/doubletfinder/soupx_emptydrops_test/export_run.json"
 sha256 = "bd7f67e0df2347d39c500aada258aabd7782f021bd8cd40dcaa245b1ae8ed413"
 bytes = 2684
@@ -3999,6 +4152,38 @@ source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/soupx/
 recipe = "validation/slurm/export_doubletfinder.sbatch soupx_emptydrops_test (validation/R/export_doubletfinder.R)"
 env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32607, job 59637727"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_test/export_singlets_run.json"
+sha256 = "7afce019adeb4d7bf53cf7ce2aeab0ee0f73b582d646b64ff445afa6fdc1850f"
+bytes = 2713
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_test"
+tier = "T"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_test.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_test/export_singlets_time_v.txt"
+sha256 = "c47b651f45848625516ae87128cfc245effd639286483b7c749767ba2918dc71"
+bytes = 1248
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_test"
+tier = "T"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_test.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
 note = "run-specific (timings, node, job); not compared by checksum"
 
 [[file]]
@@ -7140,6 +7325,66 @@ env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32607, job 59637727"
 
 [[file]]
+path = "data/doubletfinder/decontx_raw_tenx_test/saved/singlets/barcodes.tsv.gz"
+sha256 = "318afce7b943014da0d58943ce290e965abe9ff6d917e37054b047fd9f89fd16"
+bytes = 1586
+tool = "doubletfinder"
+dataset = "decontx_raw_tenx_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_tenx_test.rds (sha256 44efbaef9ea22351a6985cc564456a65aa34376502bbb0f09e7b17b59043dfec)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch decontx_raw_tenx_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/decontx_raw_tenx_test/saved/singlets/export.json"
+sha256 = "bcfbb39fd13000ab37354cd6b6924a744bd05cbc55636e72a6677495669fb88f"
+bytes = 885
+tool = "doubletfinder"
+dataset = "decontx_raw_tenx_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_tenx_test.rds (sha256 44efbaef9ea22351a6985cc564456a65aa34376502bbb0f09e7b17b59043dfec)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch decontx_raw_tenx_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/decontx_raw_tenx_test/saved/singlets/features.tsv.gz"
+sha256 = "9c62c608b9fb66044951c360bc59a211ecb47fd835a58355a7e2296541cea6e2"
+bytes = 15037
+tool = "doubletfinder"
+dataset = "decontx_raw_tenx_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_tenx_test.rds (sha256 44efbaef9ea22351a6985cc564456a65aa34376502bbb0f09e7b17b59043dfec)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch decontx_raw_tenx_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/decontx_raw_tenx_test/saved/singlets/matrix.mtx.gz"
+sha256 = "55e1bdde1992d36b93b1ebc5597628ab46b998a6dd1fbf08a648f61f8384188f"
+bytes = 145920
+tool = "doubletfinder"
+dataset = "decontx_raw_tenx_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_tenx_test.rds (sha256 44efbaef9ea22351a6985cc564456a65aa34376502bbb0f09e7b17b59043dfec)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch decontx_raw_tenx_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
 path = "data/doubletfinder/decontx_raw_tenx_test/export_run.json"
 sha256 = "1430dc3994a12f120e68f25a9654011fbee3a8996b297e2aefa4a19b00364daa"
 bytes = 2684
@@ -7169,6 +7414,38 @@ source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/decont
 recipe = "validation/slurm/export_doubletfinder.sbatch decontx_raw_tenx_test (validation/R/export_doubletfinder.R)"
 env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32607, job 59637727"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/decontx_raw_tenx_test/export_singlets_run.json"
+sha256 = "bd43a75f24abb1815b1253a099668f6de0b8082887dd222f9bd9cc47d6a15edd"
+bytes = 2715
+tool = "doubletfinder"
+dataset = "decontx_raw_tenx_test"
+tier = "T"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_tenx_test.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch decontx_raw_tenx_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/decontx_raw_tenx_test/export_singlets_time_v.txt"
+sha256 = "e9f8e84d3c2c40121b1213fd274afabf0206a46cc569de8d028db7846ec532c8"
+bytes = 1248
+tool = "doubletfinder"
+dataset = "decontx_raw_tenx_test"
+tier = "T"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_tenx_test.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch decontx_raw_tenx_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
 note = "run-specific (timings, node, job); not compared by checksum"
 
 [[file]]
@@ -10310,6 +10587,66 @@ env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32607, job 59637727"
 
 [[file]]
+path = "data/doubletfinder/decontx_raw_emptydrops_test/saved/singlets/barcodes.tsv.gz"
+sha256 = "f7999e657430875b721e283fd13b7113101d5421350f5711255b7e45a6cf2b2d"
+bytes = 1395
+tool = "doubletfinder"
+dataset = "decontx_raw_emptydrops_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_emptydrops_test.rds (sha256 68c7eaf613dec99cc1fc815cc757dca4b4b55c9e0be5f52b6ec20ac5e234a41e)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch decontx_raw_emptydrops_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/decontx_raw_emptydrops_test/saved/singlets/export.json"
+sha256 = "0fa22f93d9c093b7e9ca6f74d4d4d21d21bc0e10d6bbe5d2d62b9b654004e3cb"
+bytes = 897
+tool = "doubletfinder"
+dataset = "decontx_raw_emptydrops_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_emptydrops_test.rds (sha256 68c7eaf613dec99cc1fc815cc757dca4b4b55c9e0be5f52b6ec20ac5e234a41e)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch decontx_raw_emptydrops_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/decontx_raw_emptydrops_test/saved/singlets/features.tsv.gz"
+sha256 = "9c62c608b9fb66044951c360bc59a211ecb47fd835a58355a7e2296541cea6e2"
+bytes = 15037
+tool = "doubletfinder"
+dataset = "decontx_raw_emptydrops_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_emptydrops_test.rds (sha256 68c7eaf613dec99cc1fc815cc757dca4b4b55c9e0be5f52b6ec20ac5e234a41e)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch decontx_raw_emptydrops_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/decontx_raw_emptydrops_test/saved/singlets/matrix.mtx.gz"
+sha256 = "c985b132afc1a842aae15517719a86eb582c689bfa9249dba28ba58b2a9e3994"
+bytes = 141934
+tool = "doubletfinder"
+dataset = "decontx_raw_emptydrops_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_emptydrops_test.rds (sha256 68c7eaf613dec99cc1fc815cc757dca4b4b55c9e0be5f52b6ec20ac5e234a41e)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch decontx_raw_emptydrops_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
 path = "data/doubletfinder/decontx_raw_emptydrops_test/export_run.json"
 sha256 = "29ad846bae6310862e2435eec79951267d6950a45a587584232d05878ff10aeb"
 bytes = 2683
@@ -10339,6 +10676,38 @@ source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/decont
 recipe = "validation/slurm/export_doubletfinder.sbatch decontx_raw_emptydrops_test (validation/R/export_doubletfinder.R)"
 env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32607, job 59637727"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/decontx_raw_emptydrops_test/export_singlets_run.json"
+sha256 = "161615c962be9716b37da440a02472eeee7cff293c6183d5992534928987bc81"
+bytes = 2715
+tool = "doubletfinder"
+dataset = "decontx_raw_emptydrops_test"
+tier = "T"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_emptydrops_test.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch decontx_raw_emptydrops_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/decontx_raw_emptydrops_test/export_singlets_time_v.txt"
+sha256 = "6736d65c61679fd48c91a79788cf357188e8748df16474c6d130e3bd658edd7e"
+bytes = 1272
+tool = "doubletfinder"
+dataset = "decontx_raw_emptydrops_test"
+tier = "T"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_decontx_raw_emptydrops_test.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch decontx_raw_emptydrops_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
 note = "run-specific (timings, node, job); not compared by checksum"
 
 [[file]]
@@ -13480,6 +13849,66 @@ env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32607, job 59637727"
 
 [[file]]
+path = "data/doubletfinder/cellbender_fromraw_test/saved/singlets/barcodes.tsv.gz"
+sha256 = "75273a9f335e738b799334292833f4d62d19e050a0684d36de76a601b92d5490"
+bytes = 1547
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_test.rds (sha256 6926d303f01ff953d0c1314c1b4769fe67c1f7e38f01aed42e5d14081dbc130c)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch cellbender_fromraw_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/cellbender_fromraw_test/saved/singlets/export.json"
+sha256 = "3fbf87169358a957cda82a9a473de094048e437c12cbb58c462f3758bbd12f8e"
+bytes = 889
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_test.rds (sha256 6926d303f01ff953d0c1314c1b4769fe67c1f7e38f01aed42e5d14081dbc130c)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch cellbender_fromraw_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/cellbender_fromraw_test/saved/singlets/features.tsv.gz"
+sha256 = "9c62c608b9fb66044951c360bc59a211ecb47fd835a58355a7e2296541cea6e2"
+bytes = 15037
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_test.rds (sha256 6926d303f01ff953d0c1314c1b4769fe67c1f7e38f01aed42e5d14081dbc130c)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch cellbender_fromraw_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
+path = "data/doubletfinder/cellbender_fromraw_test/saved/singlets/matrix.mtx.gz"
+sha256 = "cf21957d8b5830b94ad9c5dc184cfe49db916f9fcc009269479804ee688ea4ea"
+bytes = 155479
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_test"
+tier = "T"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_test.rds (sha256 6926d303f01ff953d0c1314c1b4769fe67c1f7e38f01aed42e5d14081dbc130c)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch cellbender_fromraw_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+
+[[file]]
 path = "data/doubletfinder/cellbender_fromraw_test/export_run.json"
 sha256 = "3f5b7b82ab9128cd9d74f2ef8dafef76bc5031aa610401475a12ec80f62cdb03"
 bytes = 2684
@@ -13509,6 +13938,38 @@ source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/cellbe
 recipe = "validation/slurm/export_doubletfinder.sbatch cellbender_fromraw_test (validation/R/export_doubletfinder.R)"
 env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32607, job 59637727"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/cellbender_fromraw_test/export_singlets_run.json"
+sha256 = "73774c42e3a28865920a9f1cff041c273e8f84c962e6221e8e4e97ae85a7983d"
+bytes = 2715
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_test"
+tier = "T"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_test.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch cellbender_fromraw_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/cellbender_fromraw_test/export_singlets_time_v.txt"
+sha256 = "6f1ea71eebe2490ed037945037b1331e7f7c82f2236f932a50631fb11feb9623"
+bytes = 1256
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_test"
+tier = "T"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/tests/reference_outputs/testdata/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_test.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch cellbender_fromraw_test (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26601, job 60108830"
 note = "run-specific (timings, node, job); not compared by checksum"
 
 [[file]]
@@ -16650,6 +17111,66 @@ env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32607, job 59637878"
 
 [[file]]
+path = "data/doubletfinder/soupx_tenx_SRR18256555/saved/singlets/barcodes.tsv.gz"
+sha256 = "e5b51aa7d031956573aebb567d36724eb6808317ddd51f49d2ab79303c5b6c40"
+bytes = 11827
+tool = "doubletfinder"
+dataset = "soupx_tenx_SRR18256555"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_tenx_SRR18256555.rds (sha256 635be1fcc6cd9baed4c7642c58431c0da8f6d1ba9642f2d3891631183148234f)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_SRR18256555 (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26502, job 60108897"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_SRR18256555/saved/singlets/export.json"
+sha256 = "9b6da6f72204909dea83d69d5a38179f87b3ceff390d982a11a98457519ba7f1"
+bytes = 876
+tool = "doubletfinder"
+dataset = "soupx_tenx_SRR18256555"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_tenx_SRR18256555.rds (sha256 635be1fcc6cd9baed4c7642c58431c0da8f6d1ba9642f2d3891631183148234f)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_SRR18256555 (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26502, job 60108897"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_SRR18256555/saved/singlets/features.tsv.gz"
+sha256 = "59b8c2b21fbadfded6146da5f3fbb9c1311e16bac2984a476b075c7200b69338"
+bytes = 232193
+tool = "doubletfinder"
+dataset = "soupx_tenx_SRR18256555"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_tenx_SRR18256555.rds (sha256 635be1fcc6cd9baed4c7642c58431c0da8f6d1ba9642f2d3891631183148234f)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_SRR18256555 (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26502, job 60108897"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_SRR18256555/saved/singlets/matrix.mtx.gz"
+sha256 = "77478544427c6514ae552b5bedaae3c14f9111634fb0914b3a48aacca633283d"
+bytes = 7873413
+tool = "doubletfinder"
+dataset = "soupx_tenx_SRR18256555"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_tenx_SRR18256555.rds (sha256 635be1fcc6cd9baed4c7642c58431c0da8f6d1ba9642f2d3891631183148234f)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_SRR18256555 (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26502, job 60108897"
+
+[[file]]
 path = "data/doubletfinder/soupx_tenx_SRR18256555/export_run.json"
 sha256 = "9fc6efe8d8c95693403733285feffb385fa2ce0417bd83f4beae5ba010fc46a0"
 bytes = 2679
@@ -16679,6 +17200,38 @@ source = "scRNAseq-preprocessing/results/soupx/seurat_soupx_tenx_SRR18256555.rds
 recipe = "validation/slurm/export_doubletfinder.sbatch soupx_tenx_SRR18256555 (validation/R/export_doubletfinder.R)"
 env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32607, job 59637878"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_SRR18256555/export_singlets_run.json"
+sha256 = "7d9aa5976517ba8efaadff9fbef8edfe5486847c3f9b59bdbc1505cd4c250f27"
+bytes = 2709
+tool = "doubletfinder"
+dataset = "soupx_tenx_SRR18256555"
+tier = "P"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_tenx_SRR18256555.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_SRR18256555 (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26502, job 60108897"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_SRR18256555/export_singlets_time_v.txt"
+sha256 = "8eac1d2f2dfa54fce0f20fafcc1a52977584d474920a764b0cc65f77a95599c4"
+bytes = 1226
+tool = "doubletfinder"
+dataset = "soupx_tenx_SRR18256555"
+tier = "P"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_tenx_SRR18256555.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_SRR18256555 (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26502, job 60108897"
 note = "run-specific (timings, node, job); not compared by checksum"
 
 [[file]]
@@ -18773,6 +19326,66 @@ env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32606, job 59637884"
 
 [[file]]
+path = "data/doubletfinder/soupx_tenx_10xmousebrain/saved/singlets/barcodes.tsv.gz"
+sha256 = "87dc8020b9bc3b62af3dff29d68cb5ea0d6a8cbc13943db2bc693416b5bd1424"
+bytes = 43051
+tool = "doubletfinder"
+dataset = "soupx_tenx_10xmousebrain"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_tenx_10xmousebrain.rds (sha256 92ec560ba6defc822c8d940adfd19edfbf8d3a1e016acfead18b386e21c85a4e)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_10xmousebrain (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24604, job 60108900"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_10xmousebrain/saved/singlets/export.json"
+sha256 = "b2fa56b16ac625562e92b2585c0274d7537a86cf270123ae6a20b6a80c296fad"
+bytes = 888
+tool = "doubletfinder"
+dataset = "soupx_tenx_10xmousebrain"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_tenx_10xmousebrain.rds (sha256 92ec560ba6defc822c8d940adfd19edfbf8d3a1e016acfead18b386e21c85a4e)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_10xmousebrain (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24604, job 60108900"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_10xmousebrain/saved/singlets/features.tsv.gz"
+sha256 = "59b8c2b21fbadfded6146da5f3fbb9c1311e16bac2984a476b075c7200b69338"
+bytes = 232193
+tool = "doubletfinder"
+dataset = "soupx_tenx_10xmousebrain"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_tenx_10xmousebrain.rds (sha256 92ec560ba6defc822c8d940adfd19edfbf8d3a1e016acfead18b386e21c85a4e)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_10xmousebrain (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24604, job 60108900"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_10xmousebrain/saved/singlets/matrix.mtx.gz"
+sha256 = "df8a15235fc08daea277557dd4be45c1dc9c374074b732ec2b8c3268fa8aba02"
+bytes = 112660628
+tool = "doubletfinder"
+dataset = "soupx_tenx_10xmousebrain"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_tenx_10xmousebrain.rds (sha256 92ec560ba6defc822c8d940adfd19edfbf8d3a1e016acfead18b386e21c85a4e)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_10xmousebrain (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24604, job 60108900"
+
+[[file]]
 path = "data/doubletfinder/soupx_tenx_10xmousebrain/export_run.json"
 sha256 = "8cf34718d35d1b4f0514838c60bbe5c2e2b26a33a87c3c988da664102353acba"
 bytes = 2658
@@ -18802,6 +19415,38 @@ source = "scRNAseq-preprocessing/results/soupx/seurat_soupx_tenx_10xmousebrain.r
 recipe = "validation/slurm/export_doubletfinder.sbatch soupx_tenx_10xmousebrain (validation/R/export_doubletfinder.R)"
 env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32606, job 59637884"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_10xmousebrain/export_singlets_run.json"
+sha256 = "be5ae52b4f01f6b1f020641bc109484b1e4cd57e6efbfdf27acef132cb777e63"
+bytes = 2698
+tool = "doubletfinder"
+dataset = "soupx_tenx_10xmousebrain"
+tier = "P"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_tenx_10xmousebrain.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_10xmousebrain (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24604, job 60108900"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/soupx_tenx_10xmousebrain/export_singlets_time_v.txt"
+sha256 = "c9e918d433b5a49d4b78a50b14ef626bd52f377fc49de10d645e586b98d35448"
+bytes = 1243
+tool = "doubletfinder"
+dataset = "soupx_tenx_10xmousebrain"
+tier = "P"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_tenx_10xmousebrain.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_tenx_10xmousebrain (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24604, job 60108900"
 note = "run-specific (timings, node, job); not compared by checksum"
 
 [[file]]
@@ -20803,6 +21448,66 @@ env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32606, job 59637886"
 
 [[file]]
+path = "data/doubletfinder/soupx_emptydrops_4500871lane/saved/singlets/barcodes.tsv.gz"
+sha256 = "5c64ca30bf9f708308d66455b7e6bd43147e6d5dec408783f19ccfa3e08fa7b8"
+bytes = 92625
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_4500871lane"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_4500871lane.rds (sha256 d9343951348e26653d09811b024581e9f8c81b75330f30f188d91a16cb571508)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_4500871lane (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24603, job 60108904"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_4500871lane/saved/singlets/export.json"
+sha256 = "8364787de2313b767d434e31908f77a9bab8997cce40947509b39e797457f00d"
+bytes = 899
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_4500871lane"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_4500871lane.rds (sha256 d9343951348e26653d09811b024581e9f8c81b75330f30f188d91a16cb571508)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_4500871lane (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24603, job 60108904"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_4500871lane/saved/singlets/features.tsv.gz"
+sha256 = "59b8c2b21fbadfded6146da5f3fbb9c1311e16bac2984a476b075c7200b69338"
+bytes = 232193
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_4500871lane"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_4500871lane.rds (sha256 d9343951348e26653d09811b024581e9f8c81b75330f30f188d91a16cb571508)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_4500871lane (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24603, job 60108904"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_4500871lane/saved/singlets/matrix.mtx.gz"
+sha256 = "78b9e011b0322ee33d879cf6d09644b7bb94f48ceb9d9d481b6eef908642fc52"
+bytes = 112256048
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_4500871lane"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_4500871lane.rds (sha256 d9343951348e26653d09811b024581e9f8c81b75330f30f188d91a16cb571508)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_4500871lane (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24603, job 60108904"
+
+[[file]]
 path = "data/doubletfinder/soupx_emptydrops_4500871lane/export_run.json"
 sha256 = "6a89cc3536b011802f6b99ddab3faaf992f92ad3370c9d73e2b2ef3150dba0e7"
 bytes = 2680
@@ -20832,6 +21537,38 @@ source = "scRNAseq-preprocessing/results/soupx/seurat_soupx_emptydrops_4500871la
 recipe = "validation/slurm/export_doubletfinder.sbatch soupx_emptydrops_4500871lane (validation/R/export_doubletfinder.R)"
 env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32606, job 59637886"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_4500871lane/export_singlets_run.json"
+sha256 = "3e5a88897d114342235b8c638aa1050ccc744a6ae5f4c0211d6b28e265e9e0ae"
+bytes = 2687
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_4500871lane"
+tier = "P"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_4500871lane.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_4500871lane (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24603, job 60108904"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_4500871lane/export_singlets_time_v.txt"
+sha256 = "788407fde5c4f78646c0890ee27624b522c015deeb26487d62008f17e63c77aa"
+bytes = 1256
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_4500871lane"
+tier = "P"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_4500871lane.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_4500871lane (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24603, job 60108904"
 note = "run-specific (timings, node, job); not compared by checksum"
 
 [[file]]
@@ -22679,6 +23416,66 @@ env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32605, job 59637890"
 
 [[file]]
+path = "data/doubletfinder/soupx_emptydrops_sscovelli/saved/singlets/barcodes.tsv.gz"
+sha256 = "6415f828f50836e06d485dd46a080a6fbf40925ecfc93af39ded635540c1a571"
+bytes = 260865
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_sscovelli"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_sscovelli.rds (sha256 969a455526382543be5e08ad656f91925fdbf1d185c665578e20d6379a35cebc)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_sscovelli (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24603, job 60108908"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_sscovelli/saved/singlets/export.json"
+sha256 = "c2f1c9655deba71de2883baa0ee8ca36ac12a58a75544586ac7fde7fd3b5aad0"
+bytes = 897
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_sscovelli"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_sscovelli.rds (sha256 969a455526382543be5e08ad656f91925fdbf1d185c665578e20d6379a35cebc)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_sscovelli (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24603, job 60108908"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_sscovelli/saved/singlets/features.tsv.gz"
+sha256 = "8f0f5f4352558bd81649c4c27de6c105247675dcaf7eb761b23eb296fc28e06d"
+bytes = 204381
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_sscovelli"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_sscovelli.rds (sha256 969a455526382543be5e08ad656f91925fdbf1d185c665578e20d6379a35cebc)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_sscovelli (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24603, job 60108908"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_sscovelli/saved/singlets/matrix.mtx.gz"
+sha256 = "33e3e8e8ecdc11475436369c1d3e1d65cc64f65a24bd4e49f443547f353f9a41"
+bytes = 197101740
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_sscovelli"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_sscovelli.rds (sha256 969a455526382543be5e08ad656f91925fdbf1d185c665578e20d6379a35cebc)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_sscovelli (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24603, job 60108908"
+
+[[file]]
 path = "data/doubletfinder/soupx_emptydrops_sscovelli/export_run.json"
 sha256 = "5b51caac83e04c07ed44587e6b08387f45d21505bc0f6cf80302f1bde8d678e1"
 bytes = 2668
@@ -22708,6 +23505,38 @@ source = "scRNAseq-preprocessing/results/soupx/seurat_soupx_emptydrops_sscovelli
 recipe = "validation/slurm/export_doubletfinder.sbatch soupx_emptydrops_sscovelli (validation/R/export_doubletfinder.R)"
 env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32605, job 59637890"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_sscovelli/export_singlets_run.json"
+sha256 = "e18fd0b00ab9aa639fea933cb9c15b54248dc6cf7165adefe3165719a3b90c80"
+bytes = 2698
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_sscovelli"
+tier = "P"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_sscovelli.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_sscovelli (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24603, job 60108908"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/soupx_emptydrops_sscovelli/export_singlets_time_v.txt"
+sha256 = "ba2660d40609119e41d200968cf9a4e021d8cd4d0b87c60328eb7ed0ad44f5af"
+bytes = 1249
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_sscovelli"
+tier = "P"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_soupx_emptydrops_sscovelli.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch soupx_emptydrops_sscovelli (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy7c24603, job 60108908"
 note = "run-specific (timings, node, job); not compared by checksum"
 
 [[file]]
@@ -23651,6 +24480,66 @@ env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32605, job 59637892"
 
 [[file]]
+path = "data/doubletfinder/cellbender_fromraw_ghirsutum2/saved/singlets/barcodes.tsv.gz"
+sha256 = "1ab2e589cc4c0dcc68a79b062eab14b3596b198012224c308c57c452fb031073"
+bytes = 291056
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_ghirsutum2"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_ghirsutum2.rds (sha256 1a4c6c53a2e599071606316c573e54491207074856389b1e399ec27fbb937e9c)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch cellbender_fromraw_ghirsutum2 (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26502, job 60108910"
+
+[[file]]
+path = "data/doubletfinder/cellbender_fromraw_ghirsutum2/saved/singlets/export.json"
+sha256 = "23d4ff899b39f17ba87116db7b243da3f215ac86f32db8b32be60815c90640f3"
+bytes = 884
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_ghirsutum2"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_ghirsutum2.rds (sha256 1a4c6c53a2e599071606316c573e54491207074856389b1e399ec27fbb937e9c)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch cellbender_fromraw_ghirsutum2 (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26502, job 60108910"
+
+[[file]]
+path = "data/doubletfinder/cellbender_fromraw_ghirsutum2/saved/singlets/features.tsv.gz"
+sha256 = "6c33b1706da5d58ed535868c3c6cc35ac85f13ab1dfc2cec343741550c367c40"
+bytes = 607352
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_ghirsutum2"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_ghirsutum2.rds (sha256 1a4c6c53a2e599071606316c573e54491207074856389b1e399ec27fbb937e9c)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch cellbender_fromraw_ghirsutum2 (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26502, job 60108910"
+
+[[file]]
+path = "data/doubletfinder/cellbender_fromraw_ghirsutum2/saved/singlets/matrix.mtx.gz"
+sha256 = "241a8752307c2cfe5b0a7a0ea9f2a2c7eca1f3a54b2fa8856c98d479fc192310"
+bytes = 215355966
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_ghirsutum2"
+tier = "P"
+role = "saved-output"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_ghirsutum2.rds (sha256 1a4c6c53a2e599071606316c573e54491207074856389b1e399ec27fbb937e9c)"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch cellbender_fromraw_ghirsutum2 (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26502, job 60108910"
+
+[[file]]
 path = "data/doubletfinder/cellbender_fromraw_ghirsutum2/export_run.json"
 sha256 = "7ae1530d69734b145306210bdf9c26a39b8e41f7d9c4a8d38138e5ecc79b680c"
 bytes = 2668
@@ -23680,6 +24569,38 @@ source = "scRNAseq-preprocessing/results/cellbender_fromraw/seurat_cellbender_fr
 recipe = "validation/slurm/export_doubletfinder.sbatch cellbender_fromraw_ghirsutum2 (validation/R/export_doubletfinder.R)"
 env = "envs/r-reference"
 fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a32605, job 59637892"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/cellbender_fromraw_ghirsutum2/export_singlets_run.json"
+sha256 = "0ae74782c80ea811c228d1b2dd6e8280937073e869bc8441c2939571157a4c7f"
+bytes = 2699
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_ghirsutum2"
+tier = "P"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_ghirsutum2.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch cellbender_fromraw_ghirsutum2 (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26502, job 60108910"
+note = "run-specific (timings, node, job); not compared by checksum"
+
+[[file]]
+path = "data/doubletfinder/cellbender_fromraw_ghirsutum2/export_singlets_time_v.txt"
+sha256 = "ed87e7afd68750e36bfb8ea8491e78d9ef322c4acda8807a767aaa0cae2d75b2"
+bytes = 1262
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_ghirsutum2"
+tier = "P"
+role = "run-record"
+stage = ""
+profile = "none (no BLAS)"
+source = "scRNAseq-preprocessing/results/doubletfinder/seurat_doubletfinder_cellbender_fromraw_ghirsutum2.rds"
+recipe = "validation/slurm/export_doubletfinder_singlets.sbatch cellbender_fromraw_ghirsutum2 (validation/R/export_doubletfinder_singlets.R)"
+env = "envs/r-reference"
+fingerprint = "Intel(R) Xeon(R) Platinum 8480CL; OpenBLAS Haswell, 1 thread(s); glibc 2.28; R 4.5.3; holy8a26502, job 60108910"
 note = "run-specific (timings, node, job); not compared by checksum"
 
 [[file]]

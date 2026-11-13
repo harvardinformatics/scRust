@@ -8,7 +8,7 @@
 #
 # The criteria are the plan's (B5) and the key names a proposal. Each stage is uncommented and
 # settled when its milestone lands (S0: M1; S1 and S4-S7: M3; S2a-S2d: M4; S3: M5; the end-to-end,
-# saved-output and performance rows: M6). `scrust validate doubletfinder`
+# saved-output and performance rows: M6; the singlets row: M6b). `scrust validate doubletfinder`
 # (crates/doubletfinder/src/validate.rs) applies the settled criteria: everything it compares
 # must be identical.
 
@@ -218,6 +218,17 @@ not_compared = ["summary.json run section (except the OpenBLAS kernel)", "R's st
 criterion = "exact"
 compare = ["doublet_set", "singlet_pANN", "pK_label", "nExp", "pANN_column", "classification_column"]
 
+# The singlets' counts (M6b; docs/PLAN.md A3, B3 and B5): `singlets/`, the counts without the
+# doublets as a new 10x directory, written in addition to the outputs above. It is compared with
+# the saved workflow output's RNA counts layer (validation/R/export_doubletfinder_singlets.R).
+# Settled (M6b): exact. All 20 Rust runs (10 objects, both profiles; label m6b-13592a6) write the
+# saved object's counts. Identical: the barcodes in order, the feature lines, the header field,
+# and every stored entry (explicit zeros included) and value, bit for bit; 409,874,942 entries.
+# On all 10 objects the saved counts equal the input's restricted to the kept cells, slot for slot.
+[doubletfinder.singlets]
+criterion = "exact"
+compare = ["barcodes", "feature_lines", "header_field", "stored_entries", "values"]
+
 # Performance: peak RSS and wall time below the direct R DoubletFinder run on the same input;
 # soupx_emptydrops_sscovelli <= 10 GiB. Settled (M6): met. `scrust doubletfinder` on the exported
 # input, production profile, Intel Xeon Platinum 8480CL, against the direct production R run of
@@ -235,4 +246,13 @@ measured = [
   { object = "cellbender_fromraw_ghirsutum2", side = "R", threads = 1, wall_s = 2033.0, peak_rss_gib = 150.41 },
   { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, wall_s = 538.4, peak_rss_gib = 4.02 },
   { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, wall_s = 60.9, peak_rss_gib = 4.08 },
+]
+# M6b: the same benchmark with singlets/ written too. The counts are read again after the calls,
+# then written as a new 10x directory. Peak RSS is unchanged (jobs 60114424 and 60114425, binary
+# scrust-m6b-13592a6; singlets_s is the time that phase took):
+measured_m6b = [
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 1, wall_s = 432.1, peak_rss_gib = 4.41, singlets_s = 34.2 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 32, wall_s = 54.0, peak_rss_gib = 4.49, singlets_s = 9.9 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, wall_s = 573.4, peak_rss_gib = 4.02, singlets_s = 37.9 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, wall_s = 69.0, peak_rss_gib = 4.08, singlets_s = 11.0 },
 ]

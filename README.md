@@ -13,13 +13,13 @@ Each reimplementation is validated against the original tool's outputs, exactly 
 6. SoupX
 7. CellBender
 
-**Status:** Step 1, DoubletFinder, is complete through milestone M6. `scrust doubletfinder` runs DoubletFinder 2.0.6 as the workflow calls it, from a 10x counts directory and the cluster labels, every stage in Rust. It reproduces R bit for bit, under R's OpenBLAS kernel ([docs/validation/doubletfinder.md](docs/validation/doubletfinder.md)):
+**Status:** Step 1, DoubletFinder, is complete through milestone M6b. `scrust doubletfinder` runs DoubletFinder 2.0.6 as the workflow calls it, from a 10x counts directory and the cluster labels, every stage in Rust. It writes all of DoubletFinder's outputs. In addition, it writes the singlets' counts as a new 10x directory. It reproduces R bit for bit, under R's OpenBLAS kernel ([docs/validation/doubletfinder.md](docs/validation/doubletfinder.md)):
 
 - **Instrumented R runs (24):** every stage, every random-number checkpoint and every scalar identical.
 - **Direct R runs (23):** every output file identical.
-- **Saved workflow outputs:** identical for all ten objects (the five test objects and five production objects): the doublet set, the kept cells' pANN, pK and nExp.
+- **Saved workflow outputs:** identical for all ten objects (the five test objects and five production objects). That covers the doublet set, the kept cells' pANN, pK and nExp, and, from M6b, the singlets' counts: every stored entry of the saved object's RNA counts.
 
-On the largest object, soupx_emptydrops_sscovelli (79,409 cells), it takes 6 minutes 21 s on one thread and 44 s on 32, in 4.4–4.5 GiB. R's direct run takes 36 minutes and 127 GiB.
+On the largest object, soupx_emptydrops_sscovelli (79,409 cells), it takes 7 minutes 12 s on one thread and 54 s on 32, in 4.4–4.5 GiB. Writing `singlets/` is 34 s and 10 s of that. R's direct run takes 36 minutes and 127 GiB.
 
 The steps:
 
@@ -48,13 +48,13 @@ target/release/scrust doubletfinder --counts <10x dir> --clusters <seurat_cluste
 
 - **Inputs.** `--counts` is a 10x Matrix Market directory (Cell Ranger v3 layout, gzipped or not), such as the one the workflow's emptyDrops step writes. `--clusters` is a TSV with a header and each cell's barcode and cluster label, in the matrix's column order. The factor's level order is read from `--cluster-levels`, or `seurat_clusters_levels.txt` next to the clusters file.
 - **Outputs.**
-  - `singlets/`: the counts without the doublets, as a new 10x directory (`matrix.mtx.gz`, `barcodes.tsv.gz`, `features.tsv.gz`) that the next tool can read. Each singlet's column is written exactly as stored, and the feature lines are the input's.
   - `cells.tsv`: the barcode, pANN and classification of every cell.
   - `sweep_stats.tsv` and `bcmvn.tsv`.
   - `summary.json`: pK, nExp, the column names R writes, timings and peak memory.
+  - In addition, `singlets/`: the counts without the doublets, as a new 10x directory (`matrix.mtx.gz`, `barcodes.tsv.gz`, `features.tsv.gz`) that the next tool can read. Each singlet's column is written exactly as stored, and the feature lines are the input's.
 
   `scrust doubletfinder --help` lists the options: seed, PCs, pN, nExp rate, a fixed pK, threads and stage dumps.
-- **Count data in, count data out.** Every tool here that processes counts writes its result as a new 10x directory, so the tools chain on plain files ([docs/PLAN.md](docs/PLAN.md) A3).
+- **Every output of the original, plus count data out.** Each port keeps all of the original tool's outputs and adds none at their expense. Every tool here that processes counts also writes its result as a new 10x directory, so the tools chain on plain files ([docs/PLAN.md](docs/PLAN.md) A3).
 - **Thread count.** The results do not depend on it.
 - **The OpenBLAS kernel matters.** To reproduce the workflow's saved outputs, which were made on Sapphire Rapids nodes with the kernel OpenBLAS detects, run there with `OPENBLAS_CORETYPE=auto source env.sh` (which leaves the variable unset).
 
