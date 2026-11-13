@@ -8,7 +8,8 @@
 #
 # The criteria are the plan's (B5) and the key names a proposal. Each stage is uncommented and
 # settled when its milestone lands (S0: M1; S1 and S4-S7: M3; S2a-S2d: M4; S3: M5; the end-to-end,
-# saved-output and performance rows: M6; the singlets row: M6b; the full panel: M7).
+# saved-output and performance rows: M6; the singlets row: M6b; the full panel: M7). The
+# clustering crate's criteria (plan C5) follow DoubletFinder's, from M8 on.
 # `scrust validate doubletfinder` (crates/doubletfinder/src/validate.rs) applies the settled
 # criteria: everything it compares must be identical.
 
@@ -277,3 +278,77 @@ measured_m6b = [
   { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, wall_s = 573.4, peak_rss_gib = 4.02, singlets_s = 37.9 },
   { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, wall_s = 69.0, peak_rss_gib = 4.08, singlets_s = 11.0 },
 ]
+
+# Clustering (Step 2, plan C5) ----------------------------------------------------------------
+#
+# The criteria are the plan's (C5): K0-K13, the saved outputs, the parameter grid, threads and
+# performance, each settled at its milestone (K0 and K3-K6: M9; K7: M10; K1, K2 and K8: M11;
+# K9: M12; K10: M13; K11 and K13: M14; K12: M15; the grid: M16; the full panel: M17). M8 settles
+# only what its own checks need: the reference runs against the saved objects, the marker
+# references and the instrumented optimizer, all exact, and the R-vs-R floor, as measurements
+# (docs/validation/clustering_m8.md).
+
+# Saved objects (M8): a direct run of the workflow's chain on the object's exported counts, in
+# the production profile (OpenBLAS detecting SapphireRapids on Sapphire Rapids, the CPU type of
+# every workflow job), reproduces its saved object exactly. Settled (M8): exact in every file,
+# for every production-profile run of the 27 tier-T and 7 tier-P objects (direct, instrumented,
+# without RunUMAP, and through the v5 assay path for the emptyDrops objects): 104 runs.
+# Portable-profile runs (Haswell kernel) are not held to this: their differences from the saved
+# objects belong to the floor (below; output by output in docs/validation/clustering_m8_floor.tsv),
+# as A5b, K8 and C3i say, and as C6's M8 row states.
+[clustering.saved_objects]
+criterion = "exact"
+profile = "production"
+compare = ["SCT_snn_res.0.8", "seurat_clusters", "levels", "silhouette_width", "neighborhood_purity",
+           "nCount_SCT", "nFeature_SCT", "sct_counts", "sct_data", "sct_scale_data", "sct_model",
+           "variable_features", "pca", "SCT_nn", "SCT_snn"]
+runs = 104
+
+# Marker references (M8): the workflow's find_markers.R and combine_markers.R steps on each saved
+# object reproduce its saved <prefix>_markergenes.csv byte for byte, the clusters combined in the
+# saved table's order (Snakemake's directory order, not level order). Settled (M8): exact, 34 of
+# 34 tier-T and tier-P objects, so every reference is the saved table.
+[clustering.marker_references]
+criterion = "exact"
+objects = 34
+reference = "the saved table"
+
+# Instrumented optimizer (M8): Seurat's ModularityOptimizer.cpp standalone, patched only to print,
+# on R's own SNN graph: its final partition equals R's optimizer result (before GroupSingletons),
+# and its printed nodes, edges, maximum modularity (%.4f) and communities equal R's and the
+# workflow logs'. Settled (M8): exact, 34 of 34.
+[clustering.instrumented_optimizer]
+criterion = "exact"
+objects = 34
+
+# R-vs-R floor (M8): how far R itself moves when only the machine changes. Measurements; the
+# stage criteria are settled at their milestones.
+#
+# Same kernel, different CPU types: OPENBLAS_CORETYPE=Haswell (the portable profile) on Sapphire
+# Rapids (Xeon Platinum 8480CL) and Cascade Lake (Xeon Platinum 8268), all 27 tier-T objects and
+# soupx_tenx_SRR18256555, direct and instrumented runs: every file, stage array, RNG checkpoint and
+# the Annoy index identical.
+[clustering.floor.cpu_type]
+all_stages = "identical"
+
+# Different kernels, same CPU type: Haswell against SapphireRapids (detected) on Sapphire Rapids,
+# instrumented runs of all 27 tier-T and 7 tier-P objects. Identical in every object:
+# SCTransform's S2a-S2c and variable features, every RNG checkpoint (so irlba's draw count), the
+# corrected counts and their log1p (K10), the neighbour ids (K5), both graphs (K6), the
+# optimizer's result, the labels and levels (K7). The rest, as maxima over the objects (T: 27
+# objects, 5,904 cells; P: 7 objects, 271,509 cells); embeddings after aligning each component's
+# sign; max_scaled is max|a - b| / max|a| within one array; S2d identical on tier T. scale.data
+# on tier P: the four objects whose runs dumped it, and the three light-level objects measured by
+# validation/R/floor_scale_data.R against their saved objects, which the production runs reproduce:
+[clustering.floor.kernel]
+S2d_residual_stats = { max_abs = 1.5e-14, max_scaled = 3.2e-17 }
+S2d_scale_data = { max_abs = 4.3e-14, max_fraction_differing = 0.0072 }
+S3_sdev = { max_abs = 1.9e-13, max_scaled = 3.6e-14 }
+S3_embeddings_dims_1_30 = { max_abs = 1.6e-10, max_scaled = 2.4e-12 }
+S3_embeddings_dims_31_50 = { max_abs = 4.3e-6, note = "trailing components of the smallest tier-T objects" }
+K3_items = { values_differing = 121, cells_differing = 121, max_abs = 9.6e-7, float_ulps = "116 values 1, 3 values 2-4, 2 values near 0 more" }
+K5_nn_dist = { cells_differing = 10, max_abs = 1.9e-6 }
+K8_silhouette_width = { max_abs = 3.3e-13, fraction_differing = 0.99 }
+K9_dist50 = { max_abs = 6.5e-11, max_scaled = 2.8e-13 }
+K9_neighbor_count = { cells_differing = 22, objects = 11 }
+K9_purity = { cells_differing = 19, objects = 10, max_abs = 0.019 }

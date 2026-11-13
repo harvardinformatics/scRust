@@ -1,0 +1,18 @@
+--- a/src/ModularityOptimizer.cpp
++++ b/src/ModularityOptimizer.cpp
+@@ -971,6 +971,15 @@
+           std::printf("Modularity: %.4f\n", modularity);
+       }
+       while ((j < nIterations) && update);
++      // scRust (docs/PLAN.md C4, milestone M8): each start's iterations, modularity (%.17g) and
++      // partition (the clustering's own ids, before orderClustersByNNodes), on one line.
++      {
++        std::shared_ptr<Clustering> startClustering = vosClusteringTechnique.getClustering();
++        std::printf("SCRUST_START %d %d %.17g", i + 1, j, modularity);
++        for (int node = 0; node < startClustering->getNNodes(); node++)
++          std::printf(" %d", startClustering->getCluster(node));
++        std::printf("\n");
++      }
+       
+       if (modularity > maxModularity)
+       {
