@@ -1,6 +1,7 @@
 # Writes the clustering part of validation/manifest.toml (docs/PLAN.md A4, A5b and C4; milestone M8)
-# from the files on disk: every export, reference run, marker check, instrumented-optimizer run and
-# comparison under data/clustering/<object>/ for the objects of validation/clustering_datasets.tsv,
+# from the files on disk: every export, reference run, marker check, instrumented-optimizer run,
+# comparison and floor measurement under data/clustering/<object>/ for the objects of
+# validation/clustering_datasets.tsv,
 # the K0 vectors (data/clustering/k0/), the C++ build record (data/clustering/bin/build.json) and the
 # committed fixtures under tests/fixtures/clustering/. Reads only plain files.
 #
@@ -11,7 +12,8 @@
 # so this section sits before it). Anything else in the manifest is kept as is.
 #
 # Format (a compact form of the manifest's [[file]] schema, documented in the section's header):
-# one [[run]] table per run, export, marker check, optimizer run or comparison set, holding what
+# one [[run]] table per run, export, marker check, optimizer run, comparison set or floor
+# measurement, holding what
 # its files share (recipe, profile, node, CPU, OpenBLAS core, job, peak RSS, wall time), and one
 # [[file]] table per distinct file: path, sha256, bytes, role, stage, the run it belongs to, and
 # identical_on, the other runs of the same object whose file at the same relative path has the
@@ -77,7 +79,7 @@ role_of <- function(kind, rel) {
   if (rel %in% c("summary.json", "time_v.txt", "fingerprint_wrapper.json", "export_run.json") ||
       grepl("time_v\\.txt$|stdout\\.txt$", rel)) return("run-record")
   switch(kind, export = if (startsWith(rel, "input/")) "input" else "saved-output",
-         markers = "reference", optimizer = "reference", compare = "check", "reference")
+         markers = "reference", optimizer = "reference", compare = "check", floor = "check", "reference")
 }
 fp_fields <- function(fp) {
   if (is.null(fp) || !is.null(fp$error)) return(list())
@@ -100,7 +102,7 @@ for (i in seq_len(nrow(ds))) {
   tier <- ds$tier[i]
   base <- file.path("data", "clustering", obj)
   if (!dir.exists(file.path(base, "saved"))) next
-  # Every unit of this object: export, runs, markers, optimizer, comparisons
+  # Every unit of this object: export, runs, markers, optimizer, comparisons, floor measurement
   units <- list()
   ex <- jsonlite::fromJSON(file.path(base, "input", "export.json"), simplifyVector = FALSE)
   er <- jsonlite::fromJSON(file.path(base, "export_run.json"), simplifyVector = FALSE)
@@ -161,6 +163,19 @@ for (i in seq_len(nrow(ds))) {
       fields = list(tool = "clustering", kind = "compare", dataset = obj, tier = tier,
                     recipe = sprintf("validation/slurm/compare_clustering.sbatch %s (validation/R/compare_clustering.R)", obj),
                     env = "envs/r-reference (plain files)"))
+  }
+  fj_path <- file.path(base, "floor", "scale_data_portable.json")
+  if (file.exists(fj_path)) {
+    fj <- jsonlite::fromJSON(fj_path, simplifyVector = FALSE)
+    tv <- parse_time_v(file.path(base, "floor", "time_v.txt"))
+    units[[length(units) + 1]] <- list(id = paste0("clustering/", obj, "/floor"), kind = "floor", dir = file.path(base, "floor"),
+      files = list.files(file.path(base, "floor"), recursive = TRUE),
+      fields = c(list(tool = "clustering", kind = "floor", dataset = obj, tier = tier, profile = fj$profile,
+                      recipe = sprintf("validation/slurm/floor_scale_data.sbatch %s (validation/R/floor_scale_data.R)", obj),
+                      source = ex$source, source_sha256 = ex$source_sha256,
+                      slurm_job_id = fj$slurm_job_id, env = "envs/r-reference"),
+                 fp_fields(fj$fingerprint),
+                 list(max_rss_kib = tv$max_rss_kib, elapsed = tv$elapsed)))
   }
 
   # Files: each listed once; later units' byte-identical copies at the same relative path go to
@@ -268,6 +283,8 @@ header <- c(
   "#               validation/R/lib/clustering_hooks.R)",
   "#   markers/    the marker steps on the saved .rds and reference_markergenes.csv",
   "#   optimizer/  the instrumented modularity optimizer on saved/graphs/snn.mtx.gz",
+  "#   floor/      floor_scale_data.R: the portable profile's scale.data against the saved object's,",
+  "#               where the runs kept it only as a digest (and soupx_tenx_SRR18256555, a cross-check)",
   "# data/clustering/compare/<object>/: compare_clustering.R's checks. data/clustering/k0/: the K0",
   "# vectors. tests/fixtures/clustering/: the committed subset cargo test uses (its README).",
   "#",

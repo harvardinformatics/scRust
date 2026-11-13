@@ -4,19 +4,24 @@ M8 builds the R reference data that Step 2's clustering crate (milestones M9–M
 
 ## Outcome
 
-All of plan C6's M8 criteria are met, with the first read per profile (below).
+All of plan C6's M8 criteria are met. The first criterion applies to the production profile, as the plan's M8 row now states (below).
 
 | Criterion | Result |
 |---|---|
-| Every direct run reproduces its saved labels and levels, silhouette widths, purities and SCT layers | **Yes, in the production profile, the saved objects' own:** all 104 production-profile runs of the 34 objects (27 T, 7 P; direct, instrumented, without RunUMAP, and through the v5 assay path) reproduce their saved object in every file: labels and levels, silhouette widths and purities bit for bit, `nCount_SCT` and `nFeature_SCT`, the SCT layers and model, the PCA and both graphs. The 118 portable-profile runs (Haswell kernel) keep every label, level and graph, the corrected counts everywhere and, on tier T, every SCT layer; the PCA's last bits move, and with them the silhouette widths' last bits and, in 28 runs, a few purities (R-vs-R floor). |
+| Every production-profile direct run reproduces its saved labels and levels, silhouette widths, purities and SCT layers, and the portable runs' differences from the saved objects are reported in the floor | **Yes:** all 104 production-profile runs of the 34 objects (27 T, 7 P; direct, instrumented, without RunUMAP, and through the v5 assay path) reproduce their saved object in every file: labels and levels, silhouette widths and purities bit for bit, `nCount_SCT` and `nFeature_SCT`, the SCT layers and model, the PCA and both graphs. The floor reports the 118 portable-profile runs (Haswell kernel) against the saved objects, output by output ([Portable runs against the saved objects](#portable-runs-against-the-saved-objects)). Every label, level and graph and the corrected counts are identical in all of them. The PCA's last bits move, and with them nearly every silhouette width's last bits and, in 28 runs of 10 objects, one or two purities (by up to 0.019). On tier P, scale.data and the model's residual statistics also move in the last bits; that happens upstream of the PCA, in the residuals' BLAS product. |
 | The run without UMAP gives identical graphs and labels | **Yes, 34 of 34 objects:** every result file identical, not only the graphs and labels; only the digests of `.Random.seed` after RunUMAP differ. |
 | The marker reference of every T and P object settled | **Yes:** the workflow's marker steps on each saved `.rds` reproduce its saved `<prefix>_markergenes.csv` byte for byte, 34 of 34, once the clusters are combined in the saved table's order (the workflow's is the filesystem's, not the level order). Every reference is the saved table. |
 | The instrumented optimizer reproduces R's labels | **Yes, 34 of 34:** on each saved SNN graph its partition equals R's optimizer result (before GroupSingletons), and the saved labels themselves for the 30 objects without singletons; its printed nodes, edges, maximum modularity and communities equal R's and, for the 7 production objects, the workflow job's log. It also gives every start's modularity as a double. |
-| The floor measured | **Yes:** the same kernel on two CPU types changes nothing (27 T objects and the small P object, every file, stage array and RNG checkpoint). The Haswell and SapphireRapids kernels on one CPU type (all 34 objects) never change a label, a neighbour id or a graph entry; the PCA's first 30 dimensions move by at most 1.5e-10, which moves 121 float item values (116 by one float ulp, at most 9.5e-7), 10 cells' neighbour distances, every silhouette width in the last bits, 19 purities (by up to 0.019), and on tier P scale.data in the last bits. |
+| The floor measured | **Yes:** the same kernel on two CPU types changes nothing (27 T objects and the small P object, every file, stage array and RNG checkpoint). The Haswell and SapphireRapids kernels on one CPU type (all 34 objects) never change a label, a neighbour id or a graph entry. The PCA's first 30 dimensions move by at most 1.5e-10, which moves 121 float item values (116 by one float ulp, at most 9.5e-7), 10 cells' neighbour distances, nearly every silhouette width in the last bits, and 19 purities (by up to 0.019). On tier P, scale.data and the residual statistics also move in the last bits, upstream of the PCA. Against the saved objects, the 118 portable runs' outputs show the same differences: the PCA, the silhouette widths, the same 19 purities, and on tier P scale.data and the residual statistics. They are reported output by output in [`clustering_m8_floor.tsv`](clustering_m8_floor.tsv). |
 | R's memory and time for the chain measured | **Yes,** on the 7 P objects with and without RunUMAP: the chain takes 0.4 to 14.6 minutes and peaks at 2.5 to 104.1 GiB, in SCTransform (RunPCA on the two largest objects); RunUMAP adds 0.2 to 2.0 minutes and no memory. |
-| Fixtures in the manifest | **Yes:** every export, run, check, K0 vector and committed fixture of M8 is listed in `validation/manifest.toml` with its sha256: 5,629 file entries, which record 7,847 byte-identical copies in other runs, and 359 run tables. |
+| Fixtures in the manifest | **Yes:** every export, run, check, floor measurement, K0 vector and committed fixture of M8 is listed in `validation/manifest.toml` with its sha256: 5,664 file entries, which record 7,847 byte-identical copies in other runs, and 363 run tables. |
 
-**How the first criterion was read.** A saved object's silhouette widths come from its PCA, and the PCA's last bits depend on OpenBLAS's kernel (A5b), so only the saved objects' own kernel (SapphireRapids, detected on Sapphire Rapids) can reproduce them bit for bit. Plan K8 says the same ("identical under the reference's kernel"). The criterion was therefore checked on every production-profile run, which all pass in every file; the portable-profile runs, which are the references for portable-profile Rust runs, are compared with the saved objects as part of the floor. This reading was put to the coordinating session as a question during M8; no answer had arrived when this report was written.
+**How the first criterion reads.** A saved object's silhouette widths come from its PCA, and the PCA's last bits depend on OpenBLAS's kernel (A5b). Only the saved objects' own kernel can reproduce them bit for bit: SapphireRapids, detected on Sapphire Rapids. So the exact criterion applies to the production-profile direct runs, and the portable runs' comparison with the saved objects belongs to the R-vs-R floor. This is the plan's own rule, not a change:
+
+- A5b's mechanism 3 runs exact checks only when the fingerprint's BLAS fields match, and otherwise switches to the floor.
+- K8 asks for results "identical under the reference's kernel". C3i says end-to-end runs "use the reference's profile", and that exact checks of the corrected counts "use the reference's kernel".
+
+The coordinating session confirmed this reading during M8, and the M8 row of [docs/PLAN.md](../PLAN.md) now states it: "every production-profile direct run reproduces its saved labels and levels, silhouette widths, purities and SCT layers, and the portable runs' differences from the saved objects are reported in the floor". The portable runs remain the portable-profile references for cargo test and CI (A5b mechanisms 2 and 7). Within each profile, the direct and instrumented runs agree exactly, in every result file and in `summary.json`'s `result` section (90 pairs: 34 in the production profile, 56 in the portable profile on Sapphire Rapids and Cascade Lake; [Runs against runs](#runs-against-runs)). So the instrumentation does not change the results.
 
 ## What was run
 
@@ -81,7 +86,7 @@ entries: stored entries of the RNA counts; explicit zeros: stored entries equal 
 | instrumented-production-sapphirerapids-v5 | 1 | 1 |
 
 - **Tier T,** all 27 objects: direct and instrumented runs in both profiles on Sapphire Rapids, the portable ones also on Cascade Lake (`shared`, Xeon Platinum 8268), and a production direct run without RunUMAP; the emptyDrops object also through the v5 path.
-- **Tier P,** all 7 objects: direct production runs with and without RunUMAP (the cross-check and the memory and time baseline), instrumented runs in both profiles; for the small object also direct portable runs and both portable runs on Cascade Lake; the emptyDrops object also through the v5 path. The portable instrumented runs stand in for portable direct runs, as in M2: instrumented and direct runs agree file for file in all 63 pairs (next sections).
+- **Tier P,** all 7 objects: direct production runs with and without RunUMAP (the cross-check and the memory and time baseline), instrumented runs in both profiles; for the small object also direct portable runs and both portable runs on Cascade Lake; the emptyDrops object also through the v5 path. The portable instrumented runs stand in for portable direct runs, as in M2: instrumented and direct runs agree file for file in all 90 pairs (next sections).
 - **Dump levels:** full on tier T (every array, the clipped residual matrix, purity's neighbour lists), standard on the small and medium P objects (scale.data; the small object also purity's lists), light on the three large ones (no residual-sized matrix; digests of the log1p data and scale.data).
 
 **Queues.** During M8 the `sapphire` partition was held up by another run under the same account (more than 100 jobs pending). Every Sapphire Rapids job of M8 therefore ran on the `test` partition (Sapphire Rapids nodes, Xeon Platinum 8480CL, at most 5 jobs per user), several configurations or objects per job; jobs that need no particular CPU went to `shared` and `serial_requeue`.
@@ -125,7 +130,7 @@ Objects whose run reproduces the saved object, per check:
 
 Every one of the 104 production-profile runs reproduces its saved object in every file.
 
-Portable-profile runs (118): labels and levels identical in 118, SCT layers and model in 108, both graphs in 118, purities in 90; silhouette widths differ in the last bits in 118, the PCA in 118 (see the floor).
+Portable-profile runs (118): labels and levels identical in 118, SCT layers and model in 108, both graphs in 118, purities in 90; silhouette widths differ in the last bits in 118, the PCA in 118. The floor reports these differences output by output ([Portable runs against the saved objects](#portable-runs-against-the-saved-objects)).
 
 On tier P, the portable runs' SCT corrected counts are identical to the saved ones in every object; what differs is scale.data and the model's residual statistics, in the last bits, as M2 saw on the larger DoubletFinder objects (S2d). Per-comparison details: [`clustering_m8.tsv`](clustering_m8.tsv) (one row per comparison) and `data/clustering/compare/`.
 
@@ -133,7 +138,7 @@ On tier P, the portable runs' SCT corrected counts are identical to the saved on
 
 | comparison | tier | pairs | every result file identical | summary result identical | stage arrays identical | RNG checkpoints identical | Annoy index identical |
 |---|---|---|---|---|---|---|---|
-| instr_vs_direct | T | 54 | 54 | 54 |  |  |  |
+| instr_vs_direct | T | 81 | 81 | 81 |  |  |  |
 | instr_vs_direct | P | 9 | 9 | 9 |  |  |  |
 | noumap_vs_umap | T | 27 | 27 | 0 |  |  |  |
 | noumap_vs_umap | P | 7 | 7 | 0 |  |  |  |
@@ -142,16 +147,106 @@ On tier P, the portable runs' SCT corrected counts are identical to the saved on
 | cascadelake_vs_sapphirerapids | T | 54 | 54 | 54 | 1161 / 1161 | 27 | 27 |
 | cascadelake_vs_sapphirerapids | P | 2 | 2 | 2 | 44 / 44 | 1 | 1 |
 
-- **Instrumented against direct** (63 pairs, both profiles, every object with both): every result file and the `result` section of `summary.json` identical, which includes the digests of `.Random.seed` after every step. The hooks change nothing.
+- **Instrumented against direct** (90 pairs, every object and CPU type with both runs: 34 in the production profile, 28 + 28 in the portable profile on Sapphire Rapids and Cascade Lake): every result file and the `result` section of `summary.json` identical, which includes the digests of `.Random.seed` after every step. The hooks change nothing.
 - **Without RunUMAP** (34 objects, production direct runs): every result file identical. The `result` sections differ only in the digests of `.Random.seed` after RunUMAP and later steps; GroupSingletons reseeds before it draws, so even objects with singletons are unaffected.
 - **v5 against v3** (the two emptyDrops objects, production instrumented runs): every result file, every stage array and RNG checkpoint, every stage scalar and the Annoy index identical; the `result` sections differ only in the recorded assay class. C3i's check holds.
 - **Cascade Lake against Sapphire Rapids,** portable profile: identical in every respect, the `result` sections included.
 
 ## R-vs-R floor
 
-**Same kernel, different CPU types.** OpenBLAS's Haswell kernel on Cascade Lake (Xeon Platinum 8268) and Sapphire Rapids (8480CL), all 27 tier-T objects and soupx_tenx_SRR18256555, direct and instrumented: every file, all 1,205 stage arrays, every RNG checkpoint and the Annoy index identical (previous section). The portable references can be regenerated on another CPU type and checked by checksum, as A5b intends; as in M2, an AMD machine remains untested.
+### Portable runs against the saved objects
 
-**Different kernels, same CPU type.** Haswell (portable) against SapphireRapids (production) on Sapphire Rapids, instrumented runs of all 34 objects, block by block (`data/clustering/compare/<object>/portable_vs_production.json`):
+The saved objects were made with OpenBLAS's SapphireRapids kernel. The exact criterion is therefore checked on the production-profile runs (previous sections), and the 118 portable-profile runs (Haswell kernel; 108 on tier T, 10 on tier P) are compared with the saved objects here. The main question is whether a portable run changes any label, level, graph or purity.
+
+[`floor_clustering.R`](../../validation/R/floor_clustering.R) compares each portable run with its saved object, output by output. For each output it gives:
+
+- whether it is identical;
+- if not, how many values differ, the largest absolute difference, and the largest difference relative to the saved value;
+- beside each, the PCA's own largest difference over the 30 dimensions that the neighbour search, silhouette and purity read (embeddings, each component's sign aligned).
+
+One row per run and output: [`clustering_m8_floor.tsv`](clustering_m8_floor.tsv). An object's portable runs (direct and instrumented, on Sapphire Rapids and Cascade Lake) are byte-identical to each other ([Runs against runs](#runs-against-runs)). So they all differ from the saved object in the same way, which the script checks, and each object gets one row below that names its runs.
+
+The three light-level objects kept scale.data only as a digest. For them, [`floor_scale_data.R`](../../validation/R/floor_scale_data.R) reran the chain's SCTransform call in the portable profile; the new scale.data's digest equals the portable run's, and the script compared it with the saved object's element by element. On soupx_tenx_SRR18256555, whose runs kept scale.data in full, the same measurement reproduces the element-by-element numbers exactly (54,882 of 9,324,000 values; at most 5.3e-15).
+
+**Runs whose labels, levels, graphs or purities differ from the saved object: 28 of the 118, in purity only.** Each of these runs differs in one or two cells' purities. No portable run changes a label, a level or a graph entry. One row per object; its runs differ in the same way:
+
+| object | portable runs | output | values differing | max abs | max rel | PCA max abs, dims 1:30 |
+|---|---|---|---|---|---|---|
+| filtered_seurat_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | neighborhood_purity | 2 of 267 | 0.014 | 0.02 | 7e-12 |
+| doubletfinder_cellbender_fromraw_test | 4: direct, instrumented; cascadelake, sapphirerapids | neighborhood_purity | 2 of 247 | 0.013 | 0.026 | 2.4e-11 |
+| posthocfilt_threshold_doubletfinder_soupx_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | neighborhood_purity | 2 of 137 | 0.0049 | 0.0069 | 1.4e-11 |
+| posthocfilt_threshold_scdblfinder_soupx_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | neighborhood_purity | 2 of 161 | 0.0074 | 0.014 | 1.2e-11 |
+| posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test | 4: direct, instrumented; cascadelake, sapphirerapids | neighborhood_purity | 2 of 87 | 0.0076 | 0.017 | 5.5e-12 |
+| posthocfilt_threshold_scdblfinder_cellbender_fromraw_test | 4: direct, instrumented; cascadelake, sapphirerapids | neighborhood_purity | 1 of 163 | 0.0015 | 0.0017 | 8.2e-12 |
+| filtered_seurat_tenx_10xmousebrain | 1: instrumented; sapphirerapids | neighborhood_purity | 2 of 11,831 | 0.019 | 0.049 | 1.7e-11 |
+| soupx_emptydrops_sscovelli | 1: instrumented; sapphirerapids | neighborhood_purity | 2 of 79,409 | 0.0056 | 0.0077 | 1.1e-10 |
+| filtered_seurat_emptydrops_sscovelli | 1: instrumented; sapphirerapids | neighborhood_purity | 2 of 79,409 | 0.0046 | 0.0053 | 4.8e-11 |
+| cellbender_fromraw_ghirsutum2 | 1: instrumented; sapphirerapids | neighborhood_purity | 2 of 59,323 | 0.0036 | 0.0047 | 2.6e-11 |
+
+**Identical in all 118 portable runs:**
+
+- the labels (`seurat_clusters`, `SCT_snn_res.0.8`) and the three levels files;
+- both graphs (`SCT_nn`, `SCT_snn`), every stored entry and value;
+- the SCT corrected counts, their log1p, `nCount_SCT` and `nFeature_SCT`;
+- the SCTModel's cell attributes and the rest of its slots (`model.json`);
+- the variable features.
+
+On tier T, scale.data and the feature attributes are identical too.
+
+**Every portable run, by object.** Each cell gives the values that differ, out of all of them; the largest absolute difference; and, in parentheses, the largest difference relative to the saved value. = means identical. The PCA's columns are compared after aligning each component's sign. The last column is the PCA's largest difference over dimensions 1 to 30:
+
+| object | portable runs | silhouette_width | neighborhood_purity | sct_scale_data | sct_feature_attributes | pca_embeddings | pca_loadings | pca_stdev | PCA max abs, dims 1:30 |
+|---|---|---|---|---|---|---|---|---|---|
+| filtered_seurat_tenx_test | 4: direct, instrumented; cascadelake, sapphirerapids | 296 of 300; 2.7e-15 (5.8e-13) | = | = | = | 14,959 of 15,000; 9.9e-12 (2.6e-09) | 40,931 of 41,050; 2.4e-13 (9.8e-08) | 48 of 50; 1.8e-14 (9.2e-15) | 6.8e-12 |
+| filtered_seurat_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | 263 of 267; 4.5e-15 (3.6e-12) | 2 of 267; 0.014 (0.02) | = | = | 13,308 of 13,350; 3.1e-10 (1.8e-07) | 40,934 of 41,050; 1.3e-09 (1.3e-05) | 50 of 50; 1.5e-14 (7.5e-15) | 7e-12 |
+| soupx_tenx_test | 4: direct, instrumented; cascadelake, sapphirerapids | 298 of 300; 6.3e-15 (7.4e-13) | = | = | = | 14,951 of 15,000; 1.1e-11 (3.6e-09) | 40,570 of 40,750; 2.8e-13 (1.4e-08) | 50 of 50; 1.8e-14 (9.6e-15) | 1.1e-11 |
+| soupx_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | 267 of 267; 2.1e-14 (2.1e-12) | = | = | = | 13,300 of 13,350; 6.7e-10 (6.7e-08) | 40,761 of 40,900; 3.3e-10 (1.7e-06) | 48 of 50; 1.5e-14 (7.5e-15) | 3.3e-11 |
+| decontx_raw_tenx_test | 4: direct, instrumented; cascadelake, sapphirerapids | 298 of 300; 6e-15 (1.8e-13) | = | = | = | 14,948 of 15,000; 1.1e-11 (6.4e-09) | 38,929 of 39,100; 2.7e-13 (2.2e-08) | 50 of 50; 2.3e-14 (1.3e-14) | 1.1e-11 |
+| decontx_raw_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | 265 of 267; 1.9e-14 (2.9e-12) | = | = | = | 13,293 of 13,350; 1.1e-10 (5.1e-09) | 39,507 of 39,700; 5.1e-11 (2.6e-07) | 40 of 50; 8.9e-15 (4.6e-15) | 1.3e-11 |
+| cellbender_fromraw_test | 4: direct, instrumented; cascadelake, sapphirerapids | 277 of 278; 3e-15 (1.7e-12) | = | = | = | 13,848 of 13,900; 3e-11 (8.8e-09) | 40,931 of 41,050; 2.4e-11 (5.2e-08) | 47 of 50; 1.4e-14 (7.5e-15) | 1.8e-11 |
+| doubletfinder_soupx_tenx_test | 4: direct, instrumented; cascadelake, sapphirerapids | 274 of 276; 3.3e-15 (8.6e-12) | = | = | = | 13,760 of 13,800; 1.8e-11 (2.1e-09) | 39,995 of 40,100; 3.7e-13 (6.4e-08) | 50 of 50; 2.7e-14 (1.4e-14) | 7.2e-12 |
+| doubletfinder_soupx_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | 236 of 237; 6e-15 (4.7e-13) | = | = | = | 11,808 of 11,850; 4.4e-07 (3.5e-05) | 39,808 of 39,950; 1.4e-08 (0.00051) | 49 of 50; 1.8e-14 (1e-14) | 2.4e-11 |
+| doubletfinder_decontx_raw_tenx_test | 4: direct, instrumented; cascadelake, sapphirerapids | 271 of 273; 4.1e-15 (8.9e-13) | = | = | = | 13,616 of 13,650; 3.7e-11 (1.9e-08) | 38,686 of 38,800; 1.1e-12 (1.9e-07) | 49 of 50; 1.8e-14 (1.1e-14) | 3.7e-11 |
+| doubletfinder_decontx_raw_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | 237 of 237; 8.5e-15 (2.1e-12) | = | = | = | 11,822 of 11,850; 1.7e-07 (1e-05) | 39,207 of 39,300; 6.2e-09 (0.0014) | 46 of 50; 1.6e-14 (8.6e-15) | 2.3e-11 |
+| doubletfinder_cellbender_fromraw_test | 4: direct, instrumented; cascadelake, sapphirerapids | 247 of 247; 3.8e-15 (1.8e-12) | 2 of 247; 0.013 (0.026) | = | = | 12,308 of 12,350; 5.6e-08 (1.1e-06) | 39,711 of 39,800; 2.9e-09 (1e-05) | 49 of 50; 1.5e-14 (6.8e-15) | 2.4e-11 |
+| scdblfinder_soupx_tenx_test | 4: direct, instrumented; cascadelake, sapphirerapids | 291 of 292; 5.2e-15 (1.9e-11) | = | = | = | 14,573 of 14,600; 1.4e-11 (1.7e-08) | 40,489 of 40,600; 2.5e-13 (4.8e-07) | 50 of 50; 2e-14 (1e-14) | 1.4e-11 |
+| scdblfinder_soupx_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | 264 of 264; 1.1e-14 (8.5e-12) | = | = | = | 13,164 of 13,200; 4.2e-07 (6.1e-05) | 40,803 of 40,900; 1e-08 (7.6e-05) | 48 of 50; 2.6e-14 (1.4e-14) | 7.1e-12 |
+| scdblfinder_decontx_raw_tenx_test | 4: direct, instrumented; cascadelake, sapphirerapids | 295 of 296; 8.9e-15 (7.9e-13) | = | = | = | 14,767 of 14,800; 1.3e-11 (9e-10) | 38,955 of 39,050; 3.4e-13 (2.5e-08) | 49 of 50; 1.9e-14 (1e-14) | 1.3e-11 |
+| scdblfinder_decontx_raw_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | 261 of 262; 4.1e-15 (2.7e-13) | = | = | = | 13,062 of 13,100; 1.8e-08 (7.2e-07) | 39,463 of 39,550; 6.3e-10 (5.9e-05) | 48 of 50; 2e-14 (1e-14) | 1.6e-11 |
+| scdblfinder_cellbender_fromraw_test | 4: direct, instrumented; cascadelake, sapphirerapids | 277 of 278; 3e-15 (1.7e-12) | = | = | = | 13,848 of 13,900; 3e-11 (8.8e-09) | 40,931 of 41,050; 2.4e-11 (5.2e-08) | 47 of 50; 1.4e-14 (7.5e-15) | 1.8e-11 |
+| posthocfilt_threshold_doubletfinder_soupx_tenx_test | 4: direct, instrumented; cascadelake, sapphirerapids | 140 of 142; 5.5e-15 (4.8e-13) | = | = | = | 7,083 of 7,100; 2.9e-06 (6.2e-05) | 38,312 of 38,400; 1.2e-07 (0.00012) | 49 of 50; 1.3e-13 (6.8e-14) | 1.4e-11 |
+| posthocfilt_threshold_doubletfinder_soupx_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | 137 of 137; 7.4e-15 (6.9e-13) | 2 of 137; 0.0049 (0.0069) | = | = | 6,818 of 6,850; 4e-06 (0.00012) | 38,151 of 38,300; 9.2e-08 (0.092) | 48 of 50; 1.8e-13 (9.7e-14) | 1.4e-11 |
+| posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test | 4: direct, instrumented; cascadelake, sapphirerapids | 80 of 80; 1.6e-15 (7.3e-13) | = | = | = | 3,990 of 4,000; 1.1e-07 (1.7e-06) | 34,591 of 34,700; 4.7e-09 (2.9e-05) | 49 of 50; 1.3e-14 (5.7e-15) | 2.3e-12 |
+| posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | 92 of 92; 4.9e-15 (3.3e-14) | = | = | = | 4,584 of 4,600; 2.9e-06 (1.7e-05) | 35,760 of 35,900; 8e-08 (0.0011) | 47 of 50; 1.2e-13 (6.5e-14) | 7.6e-12 |
+| posthocfilt_threshold_doubletfinder_cellbender_fromraw_test | 4: direct, instrumented; cascadelake, sapphirerapids | 133 of 135; 3.8e-15 (4.3e-14) | = | = | = | 6,735 of 6,750; 4.3e-06 (0.00078) | 37,716 of 37,800; 1.1e-07 (0.002) | 50 of 50; 9.9e-14 (5.2e-14) | 1.6e-11 |
+| posthocfilt_threshold_scdblfinder_soupx_tenx_test | 4: direct, instrumented; cascadelake, sapphirerapids | 152 of 154; 2.4e-14 (2.2e-12) | = | = | = | 7,692 of 7,700; 4e-06 (0.00049) | 38,699 of 38,800; 1.1e-07 (0.001) | 48 of 50; 1.2e-13 (6.2e-14) | 1.5e-11 |
+| posthocfilt_threshold_scdblfinder_soupx_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | 161 of 161; 1.3e-14 (3.7e-12) | 2 of 161; 0.0074 (0.014) | = | = | 8,027 of 8,050; 1.6e-06 (0.00016) | 39,244 of 39,350; 4.6e-08 (0.00014) | 48 of 50; 1.6e-14 (7e-15) | 1.2e-11 |
+| posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test | 4: direct, instrumented; cascadelake, sapphirerapids | 86 of 87; 6e-15 (1.2e-12) | 2 of 87; 0.0076 (0.017) | = | = | 4,349 of 4,350; 2e-07 (9.9e-06) | 35,024 of 35,100; 1.2e-08 (9.3e-05) | 48 of 50; 1.1e-14 (4.7e-15) | 5.5e-12 |
+| posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test | 4: direct, instrumented; cascadelake, sapphirerapids | 111 of 112; 3.3e-15 (2.6e-14) | = | = | = | 5,592 of 5,600; 1.1e-06 (0.00022) | 36,801 of 36,900; 3.2e-08 (0.00066) | 49 of 50; 1.6e-14 (8.3e-15) | 8.5e-12 |
+| posthocfilt_threshold_scdblfinder_cellbender_fromraw_test | 4: direct, instrumented; cascadelake, sapphirerapids | 162 of 163; 2.1e-14 (3.5e-13) | 1 of 163; 0.0015 (0.0017) | = | = | 8,129 of 8,150; 5e-07 (4.8e-06) | 39,553 of 39,650; 1.4e-08 (0.00011) | 48 of 50; 2.1e-14 (1.1e-14) | 8.2e-12 |
+| soupx_tenx_SRR18256555 | 4: direct, instrumented; cascadelake, sapphirerapids | 3,028 of 3,108; 1.1e-14 (6.3e-12) | = | 54,882 of 9,324,000; 5.3e-15 (1.2e-12) | 150 of 183,072; 6.7e-16 (1e-13) | 154,814 of 155,400; 1.5e-10 (3.5e-08) | 149,411 of 150,000; 7.5e-13 (4.8e-08) | 48 of 50; 2.3e-14 (9.8e-15) | 1.5e-10 |
+| soupx_tenx_10xmousebrain | 1: instrumented; sapphirerapids | 11,578 of 11,831; 7.9e-15 (2.2e-10) | = | 171,104 of 35,493,000; 1.4e-14 (5.5e-12) | 206 of 251,112; 3.6e-15 (1.1e-13) | 589,833 of 591,550; 2.3e-11 (2.1e-08) | 149,474 of 150,000; 1.6e-13 (7.4e-09) | 46 of 50; 4.4e-14 (6.9e-15) | 1.9e-11 |
+| filtered_seurat_tenx_10xmousebrain | 1: instrumented; sapphirerapids | 11,425 of 11,831; 4.9e-15 (2.9e-11) | 2 of 11,831; 0.019 (0.049) | 185,495 of 35,493,000; 1.8e-14 (1.6e-10) | 198 of 251,376; 1.4e-14 (5e-14) | 589,570 of 591,550; 2e-11 (7.5e-08) | 149,383 of 150,000; 1.4e-13 (4.1e-08) | 49 of 50; 3.9e-14 (6e-15) | 1.7e-11 |
+| soupx_emptydrops_4500871lane | 1: instrumented; sapphirerapids | 26,332 of 26,598; 1.1e-14 (1.7e-10) | = | 334,966 of 79,794,000; 2.8e-14 (3.4e-11) | 194 of 273,972; 3.1e-15 (3.3e-13) | 1,325,273 of 1,329,900; 1.4e-10 (5.1e-07) | 149,270 of 150,000; 1.6e-12 (1.2e-07) | 49 of 50; 3.2e-14 (8.2e-15) | 4e-11 |
+| soupx_emptydrops_sscovelli | 1: instrumented; sapphirerapids | 79,128 of 79,409; 3.3e-13 (1.2e-09) | 2 of 79,409; 0.0056 (0.0077) | 979,794 of 238,227,000; 4.3e-14 (6.9e-11) | 174 of 264,168; 2.2e-15 (3.3e-12) | 3,959,817 of 3,970,450; 1.1e-10 (1e-06) | 149,216 of 150,000; 2.7e-13 (1.5e-08) | 46 of 50; 2.2e-14 (7.3e-15) | 1.1e-10 |
+| filtered_seurat_emptydrops_sscovelli | 1: instrumented; sapphirerapids | 78,628 of 79,409; 1.1e-13 (3.1e-09) | 2 of 79,409; 0.0046 (0.0053) | 560,796 of 238,227,000; 3.6e-14 (1e-09) | 162 of 264,300; 5.6e-16 (1.1e-12) | 3,960,732 of 3,970,450; 4.9e-11 (7.6e-06) | 149,420 of 150,000; 2.5e-13 (1.3e-08) | 46 of 50; 2.5e-14 (7.8e-15) | 4.8e-11 |
+| cellbender_fromraw_ghirsutum2 | 1: instrumented; sapphirerapids | 58,935 of 59,323; 6.7e-14 (3e-09) | 2 of 59,323; 0.0036 (0.0047) | 1,272,578 of 177,969,000; 2.8e-14 (6.7e-11) | 346 of 673,272; 1.9e-15 (3.3e-13) | 2,957,305 of 2,966,150; 1.2e-10 (1.5e-07) | 149,569 of 150,000; 7.1e-13 (6.4e-08) | 49 of 50; 1.9e-14 (8.7e-15) | 2.6e-11 |
+
+Where the differences come from:
+
+- **The PCA** differs in every run, in the last bits: RunPCA's BLAS products (irlba's, and the one that forms the embeddings) run under another kernel. On tier T, scale.data is identical, so RunPCA alone causes the PCA's differences there. Components often change sign between the kernels (641 of tier T's 1,350 embedding components, 113 of tier P's 350), which changes no distance. Dimensions 31 to 50 of the smallest tier-T objects, where the singular values crowd together, differ by up to 4.3e-6, but nothing downstream reads them. The loadings' largest relative difference, 0.092, is on a loading of 8.5e-8 (component 50 of posthocfilt_threshold_doubletfinder_soupx_emptydrops_test, whose median loading is 0.022). The next largest is 0.002, and no loading differs by more than 1.2e-7.
+- **Silhouette widths and purities** read only the labels, which are identical, and the PCA's first 30 dimensions. Each row's PCA difference is therefore what moves them. Silhouette widths move in the last bits. A purity changes when a cell's distance to another lies within an ulp of the radius ([kernel comparison](#different-kernels-same-cpu-type) below).
+- **scale.data and the residual statistics** (the SCTModel's `residual_mean` and `residual_variance`) differ on tier P only, upstream of the PCA rather than because of it. The residuals' fitted means are `exp(tcrossprod(model parameters, regressors))`, an OpenBLAS `dgemm` with an inner dimension of 2, as M2 found ([doubletfinder_m2.md](doubletfinder_m2.md)). The corrected counts are rounded to integers and come out identical, and so do their log1p, `nCount_SCT` and `nFeature_SCT`. RunPCA reads this scale.data, so on tier P the PCA's differences include its input's.
+
+These are the same differences as between the portable and production runs (below), since every production run reproduces its saved object.
+
+### Same kernel, different CPU types
+
+OpenBLAS's Haswell kernel on Cascade Lake (Xeon Platinum 8268) and Sapphire Rapids (8480CL), all 27 tier-T objects and soupx_tenx_SRR18256555, direct and instrumented: every file, all 1,205 stage arrays, every RNG checkpoint and the Annoy index identical (previous section). The portable references can be regenerated on another CPU type and checked by checksum, as A5b intends; as in M2, an AMD machine remains untested.
+
+### Different kernels, same CPU type
+
+Haswell (portable) against SapphireRapids (production) on Sapphire Rapids, instrumented runs of all 34 objects, block by block (`data/clustering/compare/<object>/portable_vs_production.json`):
 
 Tier T, 27 objects: identical across kernels in every object that dumps it: K10_genes, K5_nn_index, K7_final_ids, K7_optimizer_ids, K8_silhouette_other, K9_maximum, K9_weights, S2a_cells_step1, S2a_cells, S2a_gene_stats, S2a_genes_step1_pool, S2a_genes_step1, S2a_genes, S2a_log_gmean_step1, S2b_glm, S2b_model_pars_raw, S2b_model_pars, S2c_model_pars_fit, S2c_outliers, S2c_poisson_genes, S2c_smoothing_genes, S2d_pca_features, S2d_residual_stats, S2d_scale_data.chain, S2d_top_features, S2d_variable_features, S2d_y.chain.
 
@@ -207,7 +302,7 @@ Per object (instrumented runs, portable against production, on Sapphire Rapids; 
 | filtered_seurat_emptydrops_sscovelli | P | 79409 | 1 | 1 | 78628 | 2 | 1 | 0 | 4.91198193230957e-11 | 9 | 33 | 0 | 2 | 2 | 4.78337369713699e-11 | 1 | 0 | 1 |
 | cellbender_fromraw_ghirsutum2 | P | 59323 | 1 | 1 | 58935 | 2 | 1 | 0 | 1.15623066676562e-10 | 14 | 27 | 0 | 0 | 2 | 2.64925859028153e-11 | 1 | 0 | 1 |
 
-- **Identical across kernels everywhere:** SCTransform's setup, fits and regularisation (S2a–S2c), the variable features, every RNG checkpoint (so irlba's draw count), the neighbour ids, both graphs, the optimizer's result, the labels and levels, and the corrected counts. On tier T, SCTransform's residual statistics and scale.data (S2d) are identical too; on tier P they differ in the last bits (at most 2.8e-14), as in M2.
+- **Identical across kernels everywhere:** SCTransform's setup, fits and regularisation (S2a–S2c), the variable features, every RNG checkpoint (so irlba's draw count), the neighbour ids, both graphs, the optimizer's result, the labels and levels, and the corrected counts. On tier T, SCTransform's residual statistics and scale.data (S2d) are identical too. On tier P they differ in the last bits, as in M2: the residual statistics by at most 1.4e-14, and scale.data by at most 4.3e-14 in at most 0.72% of its values. That covers all seven objects; the three light-level ones were measured against their saved objects ([above](#portable-runs-against-the-saved-objects)).
 - **The PCA** differs in every object. The 30 dimensions the neighbour search, silhouette and purity read differ by at most 1.5e-10 after aligning signs (2.3e-12 of the largest value on tier T); the later dimensions of the smallest tier-T objects, where the singular values crowd together, by up to 4.3e-6. Components often change sign between kernels (341 of tier T's 810 used components), which changes no distance.
 - **Annoy's float items:** after aligning signs, 7 of tier T's 5,904 cells and 114 of tier P's 271,509 have an item value that differs: 116 of these 121 values by one float ulp, 3 by two to four, and two values near zero (2e-8, 1.8e-6) by more; at most 9.5e-7. No cell's neighbour ids change, and 10 cells' neighbour distances move by about a float ulp (at most 1.9e-6).
 - **Silhouette widths** differ in the last bits for nearly every cell (at most 3.3e-13).
@@ -326,6 +421,7 @@ Corrected in [`docs/PLAN.md`](../PLAN.md) on this branch:
 - **The marker table's cluster order** (C3g, C4): the workflow combines the per-cluster files in the order Snakemake's `glob_wildcards()` lists them, the filesystem's directory order, not in level order; the loader's test takes the order from the saved table.
 - **`meta.data` reaches `vst()` as `cell_attr`** (C1, new): harmless for the workflow's objects, which lack vst's attribute names, but it is part of the code path.
 - **`scale.data`'s row order** (C3g, new): Seurat keeps the rows in the SCT assay's gene order, not in `VariableFeatures()` order; the Seurat loader has to keep both orders.
+- **M8's first criterion** (C6's M8 row): it now names the production profile, and says that the portable runs' differences from the saved objects are reported in the floor. This states A5b's, K8's and C3i's rule rather than changing it (Outcome).
 
 Plan facts the data confirmed as written: all 840 production objects and all 27 test objects were clustered on Sapphire Rapids; 36 production logs report singletons, up to 40; the tier-P objects' sizes and singletons (C4's table); the emptyDrops objects' v3 assay; the SNN graph's layout and diagonal; Annoy's node size (16 + 4f bytes); RunUMAP's lack of downstream effect; GroupSingletons' `set.seed(1)`; neighborPurity's KMKNN index and median radius; Seurat 5.5.1 and RcppAnnoy built with GCC 14.3 and `-march=nocona`; Seurat built against RcppEigen 0.3.4.0.2 and RcppAnnoy 0.0.23.
 
@@ -339,7 +435,7 @@ Plan facts the data confirmed as written: all 840 production objects and all 27 
 
 `tests/fixtures/` now holds 23.07 MB (21.17 MB before M8, after Step 1). That is above A1's "about 20 MB": Step 1 had already passed it, and M8 adds 1.90 MB, less than one of M2's tier-T DoubletFinder objects (3.1–3.4 MB each). The stage references of the five DoubletFinder inputs, and everything for the other 20 tier-T objects, stay in `data/` (each about 0.5 MB compressed); committing them would add about 2.5 MB. Moving the base objects' stage references to `data/` too would save 1.4 MB.
 
-**Data** (`data/clustering/`, gitignored, 19.6 GB: 18.6 GB for the seven tier-P objects, most of it scale.data and the residual-sized dumps at level standard, about 1 GB for the rest): every export, run, marker check, optimizer run and comparison, listed in `validation/manifest.toml` (5,629 file entries with 7,847 byte-identical copies recorded in `identical_on`, and 359 `[[run]]` tables; the manifest grows from 3.2 to 6.0 MB). The manifest's clustering section uses a compact form, described in its header: one `[[run]]` table per run with what its files share, and one short `[[file]]` table per distinct file, with `identical_on` naming the other runs whose copy has the same sha256.
+**Data** (`data/clustering/`, gitignored, 19.6 GB: 18.6 GB for the seven tier-P objects, most of it scale.data and the residual-sized dumps at level standard, about 1 GB for the rest): every export, run, marker check, optimizer run, comparison and floor measurement, listed in `validation/manifest.toml` (5,664 file entries with 7,847 byte-identical copies recorded in `identical_on`, and 363 `[[run]]` tables; the manifest grows from 3.2 to 6.0 MB). The manifest's clustering section uses a compact form, described in its header: one `[[run]]` table per run with what its files share, and one short `[[file]]` table per distinct file, with `identical_on` naming the other runs whose copy has the same sha256.
 
 **Tolerances.** `validation/tolerances.toml` gains the clustering entries M8's own checks need: the saved objects (exact in the production profile), the marker references (byte-identical), the instrumented optimizer (exact), and the floor as measurements. The stage criteria K0–K13 are settled at their milestones.
 
@@ -355,6 +451,9 @@ sbatch validation/slurm/reference_clustering.sbatch portable instrumented soupx_
 sbatch validation/slurm/markers_clustering.sbatch soupx_tenx_test
 bash validation/slurm/optimizer_clustering.sbatch soupx_tenx_test
 bash validation/slurm/compare_clustering.sbatch soupx_tenx_test
+sbatch validation/slurm/floor_clustering.sbatch data/clustering/floor.tsv data/clustering/floor_tables.md
 ```
 
-Memory per object is in `validation/slurm/README.md`. The tables in this report come from `Rscript validation/R/report_clustering_m8.R docs/validation/clustering_m8.tsv`, the panel table from `validation/R/clustering_panel.R`, the manifest's clustering section from `validation/R/manifest_clustering.R` and the committed fixtures from `validation/slurm/fixtures_clustering.sh`; all read plain files only. SLURM logs of every M8 job are in `data/clustering/logs/`.
+For the objects whose runs kept scale.data only as a digest (level light), `floor_clustering.sbatch` needs `floor_scale_data.sbatch <object>` first.
+
+Memory per object is in `validation/slurm/README.md`. The tables in this report come from `Rscript validation/R/report_clustering_m8.R docs/validation/clustering_m8.tsv`, those of the portable runs against the saved objects from `sbatch validation/slurm/floor_clustering.sbatch docs/validation/clustering_m8_floor.tsv data/clustering/floor_tables.md` (`validation/R/floor_clustering.R`), the panel table from `validation/R/clustering_panel.R`, the manifest's clustering section from `validation/R/manifest_clustering.R` and the committed fixtures from `validation/slurm/fixtures_clustering.sh`; all read plain files only. SLURM logs of every M8 job are in `data/clustering/logs/`.

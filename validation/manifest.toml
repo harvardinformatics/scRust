@@ -657,6 +657,8 @@ note = "SHA-256 of .Random.seed after RunPCA() (set.seed(42), then irlba's draws
 #               validation/R/lib/clustering_hooks.R)
 #   markers/    the marker steps on the saved .rds and reference_markergenes.csv
 #   optimizer/  the instrumented modularity optimizer on saved/graphs/snn.mtx.gz
+#   floor/      floor_scale_data.R: the portable profile's scale.data against the saved object's,
+#               where the runs kept it only as a digest (and soupx_tenx_SRR18256555, a cross-check)
 # data/clustering/compare/<object>/: compare_clustering.R's checks. data/clustering/k0/: the K0
 # vectors. tests/fixtures/clustering/: the committed subset cargo test uses (its README).
 #
@@ -1900,6 +1902,13 @@ run = "clustering/filtered_seurat_tenx_test/compare"
 path = "data/clustering/compare/filtered_seurat_tenx_test/direct-production-sapphirerapids-noumap_vs_saved.json"
 sha256 = "b219b67055e840d37e24de9f40513f5afd9bf061a5a1a90970b4080647d5374b"
 bytes = 2492
+role = "check"
+run = "clustering/filtered_seurat_tenx_test/compare"
+
+[[file]]
+path = "data/clustering/compare/filtered_seurat_tenx_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "37cd7eb95b8c329f5e677ca3eb9b0f1e6c6d2bb6d7932231a3748b6f3d74ab29"
+bytes = 2698
 role = "check"
 run = "clustering/filtered_seurat_tenx_test/compare"
 
@@ -3295,6 +3304,13 @@ role = "check"
 run = "clustering/filtered_seurat_emptydrops_test/compare"
 
 [[file]]
+path = "data/clustering/compare/filtered_seurat_emptydrops_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "f54620710231d91d2c45dff539268ba2903900d9cd16dd64020406a12464a696"
+bytes = 2716
+role = "check"
+run = "clustering/filtered_seurat_emptydrops_test/compare"
+
+[[file]]
 path = "data/clustering/compare/filtered_seurat_emptydrops_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "63cddc76a1df27c29264873f5e384641d64d1a0fef0336a7eeb298a6b7188019"
 bytes = 2722
@@ -4578,6 +4594,13 @@ role = "check"
 run = "clustering/soupx_tenx_test/compare"
 
 [[file]]
+path = "data/clustering/compare/soupx_tenx_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "425b5d828a6b6f01c6b0d7909ec31bb68f6591d6df7899f234c100ad3479b4a3"
+bytes = 2668
+role = "check"
+run = "clustering/soupx_tenx_test/compare"
+
+[[file]]
 path = "data/clustering/compare/soupx_tenx_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "88efa71b85d9d9a336f32c040f9c3d69bb5916f68e7cf3674a51243162924e1a"
 bytes = 2674
@@ -5854,6 +5877,13 @@ role = "check"
 run = "clustering/soupx_emptydrops_test/compare"
 
 [[file]]
+path = "data/clustering/compare/soupx_emptydrops_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "9b2e7eaacebf3c80835635da6f9150b1dd9366c92c808f14d6dd70128e14fd1e"
+bytes = 2686
+role = "check"
+run = "clustering/soupx_emptydrops_test/compare"
+
+[[file]]
 path = "data/clustering/compare/soupx_emptydrops_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "0d86c8e2467d6df2d0bde3f2d2053f769d3f6fe93057ddd786592264cbf9b578"
 bytes = 2692
@@ -7119,6 +7149,13 @@ run = "clustering/decontx_raw_tenx_test/compare"
 path = "data/clustering/compare/decontx_raw_tenx_test/direct-production-sapphirerapids-noumap_vs_saved.json"
 sha256 = "830e3fe1a6834846a7b401c2ed7603b4765f13c4c6073f51da025c197826250f"
 bytes = 2480
+role = "check"
+run = "clustering/decontx_raw_tenx_test/compare"
+
+[[file]]
+path = "data/clustering/compare/decontx_raw_tenx_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "9b7a88e37f316c416c496cb1608d17718bedf821e4e8ccb16b696f19adf86b22"
+bytes = 2686
 role = "check"
 run = "clustering/decontx_raw_tenx_test/compare"
 
@@ -8399,6 +8436,13 @@ role = "check"
 run = "clustering/decontx_raw_emptydrops_test/compare"
 
 [[file]]
+path = "data/clustering/compare/decontx_raw_emptydrops_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "276ba3f7d9e2a12b794a5998b6ee71e2b56149cd6452f4fb82d649181461818b"
+bytes = 2704
+role = "check"
+run = "clustering/decontx_raw_emptydrops_test/compare"
+
+[[file]]
 path = "data/clustering/compare/decontx_raw_emptydrops_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "9c85931063d5af5003a3ea1982ee50cd8c7a421fe2158eab38cddd3eb0fbf372"
 bytes = 2710
@@ -9675,6 +9719,13 @@ role = "check"
 run = "clustering/cellbender_fromraw_test/compare"
 
 [[file]]
+path = "data/clustering/compare/cellbender_fromraw_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "6302b53c07af9ccc95f4d1312c190bb5cba880026d773d12ce1ebd05f6d93759"
+bytes = 2692
+role = "check"
+run = "clustering/cellbender_fromraw_test/compare"
+
+[[file]]
 path = "data/clustering/compare/cellbender_fromraw_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "7f635b2c7db8db22022e3a3020441736bb0dde6cabd4895e79c2fbfe4280afab"
 bytes = 2698
@@ -10940,6 +10991,13 @@ run = "clustering/doubletfinder_soupx_tenx_test/compare"
 path = "data/clustering/compare/doubletfinder_soupx_tenx_test/direct-production-sapphirerapids-noumap_vs_saved.json"
 sha256 = "b9fbf06c63269bf1c180c316624775d21e4741f97273e921cd6b09f17edfab50"
 bytes = 2504
+role = "check"
+run = "clustering/doubletfinder_soupx_tenx_test/compare"
+
+[[file]]
+path = "data/clustering/compare/doubletfinder_soupx_tenx_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "9f2748980a088cd9f62a8eaaaa84f0bc9dcae69114a11d4d8cef9331931219a8"
+bytes = 2710
 role = "check"
 run = "clustering/doubletfinder_soupx_tenx_test/compare"
 
@@ -12213,6 +12271,13 @@ role = "check"
 run = "clustering/doubletfinder_soupx_emptydrops_test/compare"
 
 [[file]]
+path = "data/clustering/compare/doubletfinder_soupx_emptydrops_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "20cc570ac224154676ec17b2696fbc85c31f8a4716f28f5a734614be8bfc6fc8"
+bytes = 2728
+role = "check"
+run = "clustering/doubletfinder_soupx_emptydrops_test/compare"
+
+[[file]]
 path = "data/clustering/compare/doubletfinder_soupx_emptydrops_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "db6f969f4337f479bce0bbc23d8a782a1a413673773e49c48fefa9c6fe89bade"
 bytes = 2734
@@ -13478,6 +13543,13 @@ run = "clustering/doubletfinder_decontx_raw_tenx_test/compare"
 path = "data/clustering/compare/doubletfinder_decontx_raw_tenx_test/direct-production-sapphirerapids-noumap_vs_saved.json"
 sha256 = "0c34bf48dffb3ed6cb52479bfe3c8cc33dd8ca753624d992ab0ae2769cbf0339"
 bytes = 2522
+role = "check"
+run = "clustering/doubletfinder_decontx_raw_tenx_test/compare"
+
+[[file]]
+path = "data/clustering/compare/doubletfinder_decontx_raw_tenx_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "6783e8e9be343b1e059b539bfefe7dd7df670059062b5cb8791668e15eaebf65"
+bytes = 2728
 role = "check"
 run = "clustering/doubletfinder_decontx_raw_tenx_test/compare"
 
@@ -14754,6 +14826,13 @@ run = "clustering/doubletfinder_decontx_raw_emptydrops_test/compare"
 path = "data/clustering/compare/doubletfinder_decontx_raw_emptydrops_test/direct-production-sapphirerapids-noumap_vs_saved.json"
 sha256 = "afe52391edb1cd93e97c679334b5fe36bb68b4eb7f9443ebc14e57a141a06c6b"
 bytes = 2540
+role = "check"
+run = "clustering/doubletfinder_decontx_raw_emptydrops_test/compare"
+
+[[file]]
+path = "data/clustering/compare/doubletfinder_decontx_raw_emptydrops_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "955c8856546f4cd2093d34f5c8cc6e8a4c1b1280516f041df422146688961c1a"
+bytes = 2746
 role = "check"
 run = "clustering/doubletfinder_decontx_raw_emptydrops_test/compare"
 
@@ -16082,6 +16161,13 @@ role = "check"
 run = "clustering/doubletfinder_cellbender_fromraw_test/compare"
 
 [[file]]
+path = "data/clustering/compare/doubletfinder_cellbender_fromraw_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "8e2fc870e683e2a000ec458a7a7079639187936e33c55f08d1272027e8f72547"
+bytes = 2734
+role = "check"
+run = "clustering/doubletfinder_cellbender_fromraw_test/compare"
+
+[[file]]
 path = "data/clustering/compare/doubletfinder_cellbender_fromraw_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "5d715a2baf83caa1a9bdcbd3ebf2872b3615b21853cbb8d6ff241378df39fda1"
 bytes = 2740
@@ -17368,6 +17454,13 @@ run = "clustering/scdblfinder_soupx_tenx_test/compare"
 path = "data/clustering/compare/scdblfinder_soupx_tenx_test/direct-production-sapphirerapids-noumap_vs_saved.json"
 sha256 = "f0d1f7d1d45832f8d9749e57821599cb07551fba08099a2a27e5fc16eeae0bee"
 bytes = 2498
+role = "check"
+run = "clustering/scdblfinder_soupx_tenx_test/compare"
+
+[[file]]
+path = "data/clustering/compare/scdblfinder_soupx_tenx_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "2f3ced4273afc0a7eff42dc23f700f5ad3c3990f8c9a5b3ca4324d0287152b9e"
+bytes = 2704
 role = "check"
 run = "clustering/scdblfinder_soupx_tenx_test/compare"
 
@@ -18669,6 +18762,13 @@ role = "check"
 run = "clustering/scdblfinder_soupx_emptydrops_test/compare"
 
 [[file]]
+path = "data/clustering/compare/scdblfinder_soupx_emptydrops_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "8eb1c75725238e95d4fd708cd5dfe8d77a91336d1ce047876c09262d06682ac5"
+bytes = 2722
+role = "check"
+run = "clustering/scdblfinder_soupx_emptydrops_test/compare"
+
+[[file]]
 path = "data/clustering/compare/scdblfinder_soupx_emptydrops_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "a3243b7bf75912e300035704fe63e91ef3843b03f4e5dd4c0f38a561e8e4e353"
 bytes = 2728
@@ -19955,6 +20055,13 @@ run = "clustering/scdblfinder_decontx_raw_tenx_test/compare"
 path = "data/clustering/compare/scdblfinder_decontx_raw_tenx_test/direct-production-sapphirerapids-noumap_vs_saved.json"
 sha256 = "59429f59a9138e7aecb3bb2d1731da0f79f35a79fcff2420ef03db2f78e6bfe1"
 bytes = 2516
+role = "check"
+run = "clustering/scdblfinder_decontx_raw_tenx_test/compare"
+
+[[file]]
+path = "data/clustering/compare/scdblfinder_decontx_raw_tenx_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "3e6f74c4371f42826445f1110dfb97ae295bf3c5b911a8a55f5bdebac911de84"
+bytes = 2722
 role = "check"
 run = "clustering/scdblfinder_decontx_raw_tenx_test/compare"
 
@@ -21264,6 +21371,13 @@ role = "check"
 run = "clustering/scdblfinder_decontx_raw_emptydrops_test/compare"
 
 [[file]]
+path = "data/clustering/compare/scdblfinder_decontx_raw_emptydrops_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "70d9b401d4732b89ea576fd61e4e1843f3cf0e81be11055791c340b500b44028"
+bytes = 2740
+role = "check"
+run = "clustering/scdblfinder_decontx_raw_emptydrops_test/compare"
+
+[[file]]
 path = "data/clustering/compare/scdblfinder_decontx_raw_emptydrops_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "7c14f568312e167e8d24ba0dda55a2d85fbcfbc5722e787dd2cab82199f554de"
 bytes = 2746
@@ -22561,6 +22675,13 @@ role = "check"
 run = "clustering/scdblfinder_cellbender_fromraw_test/compare"
 
 [[file]]
+path = "data/clustering/compare/scdblfinder_cellbender_fromraw_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "d14a3d75ccce745d099d7fe804e4da1d49c1af4df8f00e9bb33e177f612b141c"
+bytes = 2728
+role = "check"
+run = "clustering/scdblfinder_cellbender_fromraw_test/compare"
+
+[[file]]
 path = "data/clustering/compare/scdblfinder_cellbender_fromraw_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "9dd9ad470b398112e736156a00ec238a3e573c79d9341a9549716aef850b8fa4"
 bytes = 2734
@@ -23840,6 +23961,13 @@ run = "clustering/posthocfilt_threshold_doubletfinder_soupx_tenx_test/compare"
 path = "data/clustering/compare/posthocfilt_threshold_doubletfinder_soupx_tenx_test/direct-production-sapphirerapids-noumap_vs_saved.json"
 sha256 = "b7aa1b2ad9793e110f585f053c6116005bc0a1012528411c38f379f80586fe23"
 bytes = 2570
+role = "check"
+run = "clustering/posthocfilt_threshold_doubletfinder_soupx_tenx_test/compare"
+
+[[file]]
+path = "data/clustering/compare/posthocfilt_threshold_doubletfinder_soupx_tenx_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "9f0f774ccedd4fbcdef03ab2413f8f9c3637273912f9d47c2bfef25fc878bd54"
+bytes = 2776
 role = "check"
 run = "clustering/posthocfilt_threshold_doubletfinder_soupx_tenx_test/compare"
 
@@ -25182,6 +25310,13 @@ role = "check"
 run = "clustering/posthocfilt_threshold_doubletfinder_soupx_emptydrops_test/compare"
 
 [[file]]
+path = "data/clustering/compare/posthocfilt_threshold_doubletfinder_soupx_emptydrops_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "11feb45ff326b16676f2fa28e9fbd95e00ac09e518b1e7d553d6b2b519275967"
+bytes = 2794
+role = "check"
+run = "clustering/posthocfilt_threshold_doubletfinder_soupx_emptydrops_test/compare"
+
+[[file]]
 path = "data/clustering/compare/posthocfilt_threshold_doubletfinder_soupx_emptydrops_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "15310fe69107993d306d66a34c1e5fb9db950518291751bea727c69d45e37dc0"
 bytes = 2800
@@ -26461,6 +26596,13 @@ run = "clustering/posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test/comp
 path = "data/clustering/compare/posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test/direct-production-sapphirerapids-noumap_vs_saved.json"
 sha256 = "f54b5f34ee0e3d07182c3212e86f61d59d3059c5761de7dbf326138a003349ba"
 bytes = 2586
+role = "check"
+run = "clustering/posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test/compare"
+
+[[file]]
+path = "data/clustering/compare/posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "403202883ac8f8f3f9d699fddb6f3fa154d46ae4d0782aa1c4bee9d1c98a4e93"
+bytes = 2792
 role = "check"
 run = "clustering/posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test/compare"
 
@@ -27755,6 +27897,13 @@ role = "check"
 run = "clustering/posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test/compare"
 
 [[file]]
+path = "data/clustering/compare/posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "eee4248ce8084e928950e0c32e2cb09ea7071487fa31a535040ca3561ae43382"
+bytes = 2810
+role = "check"
+run = "clustering/posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test/compare"
+
+[[file]]
 path = "data/clustering/compare/posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "9f932d2d83577b533780ff77fb25c48135329a39303ac2a6a42e134cab3dd62d"
 bytes = 2816
@@ -29038,6 +29187,13 @@ role = "check"
 run = "clustering/posthocfilt_threshold_doubletfinder_cellbender_fromraw_test/compare"
 
 [[file]]
+path = "data/clustering/compare/posthocfilt_threshold_doubletfinder_cellbender_fromraw_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "618d7709719b1bba6f79a9c89c0ae1b9d62d3714b6f8878cbb116acde2fe44f8"
+bytes = 2800
+role = "check"
+run = "clustering/posthocfilt_threshold_doubletfinder_cellbender_fromraw_test/compare"
+
+[[file]]
 path = "data/clustering/compare/posthocfilt_threshold_doubletfinder_cellbender_fromraw_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "0d0024f64fa572f645ebd90c52847c2abe7c6e3b5a1ed995c53ef0ff6aa01fcc"
 bytes = 2806
@@ -30317,6 +30473,13 @@ run = "clustering/posthocfilt_threshold_scdblfinder_soupx_tenx_test/compare"
 path = "data/clustering/compare/posthocfilt_threshold_scdblfinder_soupx_tenx_test/direct-production-sapphirerapids-noumap_vs_saved.json"
 sha256 = "a92e6181c6e78ae31f8d042d16e7481d8c6f1e3de82ec8ab770cfd141fb63e07"
 bytes = 2564
+role = "check"
+run = "clustering/posthocfilt_threshold_scdblfinder_soupx_tenx_test/compare"
+
+[[file]]
+path = "data/clustering/compare/posthocfilt_threshold_scdblfinder_soupx_tenx_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "f2f5fa0108c8ff311c41e352d57ca4608a7e9115e70df2d2776b2dd445a1772f"
+bytes = 2770
 role = "check"
 run = "clustering/posthocfilt_threshold_scdblfinder_soupx_tenx_test/compare"
 
@@ -31666,6 +31829,13 @@ role = "check"
 run = "clustering/posthocfilt_threshold_scdblfinder_soupx_emptydrops_test/compare"
 
 [[file]]
+path = "data/clustering/compare/posthocfilt_threshold_scdblfinder_soupx_emptydrops_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "25db1db19a2a5924ce70978fc6f9b9846aa999e5fde52dc4f1c1fb9eb90c6a3b"
+bytes = 2788
+role = "check"
+run = "clustering/posthocfilt_threshold_scdblfinder_soupx_emptydrops_test/compare"
+
+[[file]]
 path = "data/clustering/compare/posthocfilt_threshold_scdblfinder_soupx_emptydrops_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "44efbc63be0ef6f99e3e02bbe342897555f2c1fd18ba98a76c690f7e7554e8be"
 bytes = 2794
@@ -33004,6 +33174,13 @@ role = "check"
 run = "clustering/posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test/compare"
 
 [[file]]
+path = "data/clustering/compare/posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "e8cb205e0dd61c18ed143d04422d0228c5e575169f8595a9ed18ad088bc0d378"
+bytes = 2786
+role = "check"
+run = "clustering/posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test/compare"
+
+[[file]]
 path = "data/clustering/compare/posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test/instr_vs_direct_portable-sapphirerapids.json"
 sha256 = "6370c19015577e0a79a1fefc6375698d6b658f7ab0dea46856d81695d5754997"
 bytes = 2792
@@ -34298,6 +34475,13 @@ run = "clustering/posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test/
 path = "data/clustering/compare/posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test/direct-production-sapphirerapids-noumap_vs_saved.json"
 sha256 = "a586cef755c5cba6e24c0cab64ba9065c47ec6f1994365ed89a33924d57e6fa9"
 bytes = 2600
+role = "check"
+run = "clustering/posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test/compare"
+
+[[file]]
+path = "data/clustering/compare/posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "9c24eb09e07e4dd6705824b2a81f7f856e506f734973387035eefd67b2e3403f"
+bytes = 2806
 role = "check"
 run = "clustering/posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test/compare"
 
@@ -35636,6 +35820,13 @@ run = "clustering/posthocfilt_threshold_scdblfinder_cellbender_fromraw_test/comp
 path = "data/clustering/compare/posthocfilt_threshold_scdblfinder_cellbender_fromraw_test/direct-production-sapphirerapids-noumap_vs_saved.json"
 sha256 = "c8da7bd32e143c130d666180480293f607248dc39a2258c44d1fb684f3b268aa"
 bytes = 2588
+role = "check"
+run = "clustering/posthocfilt_threshold_scdblfinder_cellbender_fromraw_test/compare"
+
+[[file]]
+path = "data/clustering/compare/posthocfilt_threshold_scdblfinder_cellbender_fromraw_test/instr_vs_direct_portable-cascadelake.json"
+sha256 = "08a2470e1b0541596abb3656b24b4b73e3686d0a27d887ec54843743c5deb4a3"
+bytes = 2794
 role = "check"
 run = "clustering/posthocfilt_threshold_scdblfinder_cellbender_fromraw_test/compare"
 
@@ -37095,6 +37286,20 @@ sha256 = "88fb3832ab51f9c00c7c3c10b52ec54c6d22a9b6279838b2cfada2d5d8142513"
 bytes = 11732
 role = "check"
 run = "clustering/soupx_tenx_SRR18256555/compare"
+
+[[file]]
+path = "data/clustering/soupx_tenx_SRR18256555/floor/scale_data_portable.json"
+sha256 = "d12763640da56436994b29204174d61697de03046bca8a493d389fc86576a536"
+bytes = 4755
+role = "check"
+run = "clustering/soupx_tenx_SRR18256555/floor"
+
+[[file]]
+path = "data/clustering/soupx_tenx_SRR18256555/floor/time_v.txt"
+sha256 = "afda64d9fe46625d00d24e4a13d2dc39633cda03cb45ab734cda93d7e9320e60"
+bytes = 1194
+role = "run-record"
+run = "clustering/soupx_tenx_SRR18256555/floor"
 
 [[file]]
 path = "data/clustering/soupx_tenx_10xmousebrain/export_run.json"
@@ -42455,6 +42660,20 @@ role = "check"
 run = "clustering/soupx_emptydrops_sscovelli/compare"
 
 [[file]]
+path = "data/clustering/soupx_emptydrops_sscovelli/floor/scale_data_portable.json"
+sha256 = "ecdb411620ca96756a8b77065ce46f50071743e7295645cb7b06997599ae4a1c"
+bytes = 4776
+role = "check"
+run = "clustering/soupx_emptydrops_sscovelli/floor"
+
+[[file]]
+path = "data/clustering/soupx_emptydrops_sscovelli/floor/time_v.txt"
+sha256 = "52da763e072d18dc612a290a5c08aac484e2848726cea0198401a50b042f1669"
+bytes = 1216
+role = "run-record"
+run = "clustering/soupx_emptydrops_sscovelli/floor"
+
+[[file]]
 path = "data/clustering/filtered_seurat_emptydrops_sscovelli/export_run.json"
 sha256 = "79a358d7c6f61ac91131bd5f84ed1e2b75424e0eb370d4b37e360a3b5d42bd76"
 bytes = 2436
@@ -43895,6 +44114,20 @@ role = "check"
 run = "clustering/filtered_seurat_emptydrops_sscovelli/compare"
 
 [[file]]
+path = "data/clustering/filtered_seurat_emptydrops_sscovelli/floor/scale_data_portable.json"
+sha256 = "d5148ba6da884f4e7a247fb1b2f496722fc4d8e047563234ce94e90ec10cbe87"
+bytes = 4785
+role = "check"
+run = "clustering/filtered_seurat_emptydrops_sscovelli/floor"
+
+[[file]]
+path = "data/clustering/filtered_seurat_emptydrops_sscovelli/floor/time_v.txt"
+sha256 = "ef142ba558b3eeeda0aaca09444b0da6300e8dd63ae0f91d0dd375484c488506"
+bytes = 1253
+role = "run-record"
+run = "clustering/filtered_seurat_emptydrops_sscovelli/floor"
+
+[[file]]
 path = "data/clustering/cellbender_fromraw_ghirsutum2/export_run.json"
 sha256 = "2c11b0f11a03c7aad3a0029bf14951ca4aeaf34e124b34778baef8870f980066"
 bytes = 2436
@@ -45147,6 +45380,20 @@ sha256 = "91d3f4fc2d1df847dc658d03a5198e510ec7bbc62c9cfa443d39e23e0993773f"
 bytes = 11799
 role = "check"
 run = "clustering/cellbender_fromraw_ghirsutum2/compare"
+
+[[file]]
+path = "data/clustering/cellbender_fromraw_ghirsutum2/floor/scale_data_portable.json"
+sha256 = "a78e999916325e5a53b0b26be85d6e64649bd4fb9e00aa3fa603fe68569f65a7"
+bytes = 4782
+role = "check"
+run = "clustering/cellbender_fromraw_ghirsutum2/floor"
+
+[[file]]
+path = "data/clustering/cellbender_fromraw_ghirsutum2/floor/time_v.txt"
+sha256 = "655aea186169a6e06161088d5c7f541c86b833dbebf16e585eccddeabf4fec1b"
+bytes = 1246
+role = "run-record"
+run = "clustering/cellbender_fromraw_ghirsutum2/floor"
 
 [[file]]
 path = "data/clustering/k0/groupsingletons_sample.tsv"
@@ -52588,6 +52835,27 @@ recipe = "validation/slurm/compare_clustering.sbatch soupx_tenx_SRR18256555 (val
 env = "envs/r-reference (plain files)"
 
 [[run]]
+id = "clustering/soupx_tenx_SRR18256555/floor"
+tool = "clustering"
+kind = "floor"
+dataset = "soupx_tenx_SRR18256555"
+tier = "P"
+profile = "portable"
+recipe = "validation/slurm/floor_scale_data.sbatch soupx_tenx_SRR18256555 (validation/R/floor_scale_data.R)"
+source = "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing/results/soupx/seurat_soupx_tenx_SRR18256555.rds"
+source_sha256 = "56fa079bc3413bbb21a71ee0e8f106b3bd6fdb7893d62d340a2dd4c672a5394a"
+slurm_job_id = "60351586"
+env = "envs/r-reference"
+node = "holy8a26602.rc.fas.harvard.edu"
+cpu_model = "Intel(R) Xeon(R) Platinum 8480CL"
+openblas_core = "Haswell"
+openblas_threads = 1
+glibc = "2.28"
+R = "R version 4.5.3 (2026-03-11)"
+max_rss_kib = 2624384
+elapsed = "0:39.37"
+
+[[run]]
 id = "clustering/soupx_tenx_10xmousebrain/export"
 tool = "clustering"
 kind = "export"
@@ -53206,6 +53474,27 @@ recipe = "validation/slurm/compare_clustering.sbatch soupx_emptydrops_sscovelli 
 env = "envs/r-reference (plain files)"
 
 [[run]]
+id = "clustering/soupx_emptydrops_sscovelli/floor"
+tool = "clustering"
+kind = "floor"
+dataset = "soupx_emptydrops_sscovelli"
+tier = "P"
+profile = "portable"
+recipe = "validation/slurm/floor_scale_data.sbatch soupx_emptydrops_sscovelli (validation/R/floor_scale_data.R)"
+source = "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing/results/soupx/seurat_soupx_emptydrops_sscovelli.rds"
+source_sha256 = "9bd9eede8bea0a001c61eb947b0a3ac74a3748843e72771742a3b0cac7b02afc"
+slurm_job_id = "60351592"
+env = "envs/r-reference"
+node = "holy8a26602.rc.fas.harvard.edu"
+cpu_model = "Intel(R) Xeon(R) Platinum 8480CL"
+openblas_core = "Haswell"
+openblas_threads = 1
+glibc = "2.28"
+R = "R version 4.5.3 (2026-03-11)"
+max_rss_kib = 61413872
+elapsed = "6:00.27"
+
+[[run]]
 id = "clustering/filtered_seurat_emptydrops_sscovelli/export"
 tool = "clustering"
 kind = "export"
@@ -53382,6 +53671,27 @@ recipe = "validation/slurm/compare_clustering.sbatch filtered_seurat_emptydrops_
 env = "envs/r-reference (plain files)"
 
 [[run]]
+id = "clustering/filtered_seurat_emptydrops_sscovelli/floor"
+tool = "clustering"
+kind = "floor"
+dataset = "filtered_seurat_emptydrops_sscovelli"
+tier = "P"
+profile = "portable"
+recipe = "validation/slurm/floor_scale_data.sbatch filtered_seurat_emptydrops_sscovelli (validation/R/floor_scale_data.R)"
+source = "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing/results/emptydrops/filtered_seurat_emptydrops_sscovelli.rds"
+source_sha256 = "e4722b5853e67c15047b813580534462fc5035a3d081cb5d4bbdfd67ced7fd25"
+slurm_job_id = "60351612"
+env = "envs/r-reference"
+node = "holy8a26602.rc.fas.harvard.edu"
+cpu_model = "Intel(R) Xeon(R) Platinum 8480CL"
+openblas_core = "Haswell"
+openblas_threads = 1
+glibc = "2.28"
+R = "R version 4.5.3 (2026-03-11)"
+max_rss_kib = 58334064
+elapsed = "5:54.14"
+
+[[run]]
 id = "clustering/cellbender_fromraw_ghirsutum2/export"
 tool = "clustering"
 kind = "export"
@@ -53535,6 +53845,27 @@ dataset = "cellbender_fromraw_ghirsutum2"
 tier = "P"
 recipe = "validation/slurm/compare_clustering.sbatch cellbender_fromraw_ghirsutum2 (validation/R/compare_clustering.R)"
 env = "envs/r-reference (plain files)"
+
+[[run]]
+id = "clustering/cellbender_fromraw_ghirsutum2/floor"
+tool = "clustering"
+kind = "floor"
+dataset = "cellbender_fromraw_ghirsutum2"
+tier = "P"
+profile = "portable"
+recipe = "validation/slurm/floor_scale_data.sbatch cellbender_fromraw_ghirsutum2 (validation/R/floor_scale_data.R)"
+source = "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing/results/cellbender_fromraw/seurat_cellbender_fromraw_ghirsutum2.rds"
+source_sha256 = "0bdc82e5dc2c5893af0f9085fcdb25236a84a329cb2a3f53ff697611562d6386"
+slurm_job_id = "60351617"
+env = "envs/r-reference"
+node = "holy8a26502.rc.fas.harvard.edu"
+cpu_model = "Intel(R) Xeon(R) Platinum 8480CL"
+openblas_core = "Haswell"
+openblas_threads = 1
+glibc = "2.28"
+R = "R version 4.5.3 (2026-03-11)"
+max_rss_kib = 109305484
+elapsed = "10:57.38"
 
 [[run]]
 id = "clustering/k0"

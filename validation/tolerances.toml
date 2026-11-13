@@ -293,7 +293,9 @@ measured_m6b = [
 # every workflow job), reproduces its saved object exactly. Settled (M8): exact in every file,
 # for every production-profile run of the 27 tier-T and 7 tier-P objects (direct, instrumented,
 # without RunUMAP, and through the v5 assay path for the emptyDrops objects): 104 runs.
-# Portable-profile runs (Haswell kernel) differ in the PCA's last bits and are measured below.
+# Portable-profile runs (Haswell kernel) are not held to this: their differences from the saved
+# objects belong to the floor (below; output by output in docs/validation/clustering_m8_floor.tsv),
+# as A5b, K8 and C3i say, and as C6's M8 row states.
 [clustering.saved_objects]
 criterion = "exact"
 profile = "production"
@@ -335,10 +337,12 @@ all_stages = "identical"
 # corrected counts and their log1p (K10), the neighbour ids (K5), both graphs (K6), the
 # optimizer's result, the labels and levels (K7). The rest, as maxima over the objects (T: 27
 # objects, 5,904 cells; P: 7 objects, 271,509 cells); embeddings after aligning each component's
-# sign; max_scaled is max|a - b| / max|a| within one array; S2d identical on tier T:
+# sign; max_scaled is max|a - b| / max|a| within one array; S2d identical on tier T. scale.data
+# on tier P: the four objects whose runs dumped it, and the three light-level objects measured by
+# validation/R/floor_scale_data.R against their saved objects, which the production runs reproduce:
 [clustering.floor.kernel]
 S2d_residual_stats = { max_abs = 1.5e-14, max_scaled = 3.2e-17 }
-S2d_scale_data = { max_abs = 2.9e-14, max_fraction_differing = 0.006 }
+S2d_scale_data = { max_abs = 4.3e-14, max_fraction_differing = 0.0072 }
 S3_sdev = { max_abs = 1.9e-13, max_scaled = 3.6e-14 }
 S3_embeddings_dims_1_30 = { max_abs = 1.6e-10, max_scaled = 2.4e-12 }
 S3_embeddings_dims_31_50 = { max_abs = 4.3e-6, note = "trailing components of the smallest tier-T objects" }
