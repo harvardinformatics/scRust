@@ -59,3 +59,4 @@ The Rust core runs on the instrumented runs' own embeddings and is compared with
 
   It also records whether the layer equals the input export's counts restricted to the kept cells, slot for slot. Run it through [`../slurm/export_doubletfinder_singlets.sbatch`](../slurm/export_doubletfinder_singlets.sbatch).
 - `scrust validate doubletfinder --saved` compares `singlets/` with that export: the barcodes in order, the feature lines, and every stored entry and value of the matrix. [`../slurm/m6_doubletfinder.sbatch`](../slurm/m6_doubletfinder.sbatch) runs this check with the others.
+- [`read10x_singlets.R`](read10x_singlets.R) `<label> <profile> <object>...` reads the Rust runs' `singlets/` back with R's readers, as a downstream R step would: `lib/io.R`'s exact reader and `Seurat::Read10X()`. It compares each with the export, slot for slot, and records whether `Read10X` keeps every stored entry. It reads only plain files.
