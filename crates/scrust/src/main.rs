@@ -3,12 +3,14 @@
 //! Each tool is a library crate under `crates/` plus a subcommand here, so the repository ships
 //! as one binary: `doubletfinder` (milestone M6: the whole tool; M3: on R's own embeddings), `knn` (the shared
 //! neighbour stage on its own), `sctransform` (SCTransform v2, milestone M4), `pca` (RunPCA,
-//! milestone M5), `validate` (Rust against R, plan A4) and `fingerprint` (the environment
-//! fingerprint of plan A5b, which the R reference runs record too).
+//! milestone M5), `neighbors` (FindNeighbors: Annoy and the SNN graph, milestone M9),
+//! `validate` (Rust against R, plan A4) and `fingerprint` (the environment fingerprint of plan
+//! A5b, which the R reference runs record too).
 
 mod cli;
 mod cmd_doubletfinder;
 mod cmd_knn;
+mod cmd_neighbors;
 mod cmd_pca;
 mod cmd_sctransform;
 mod cmd_validate;
@@ -28,8 +30,10 @@ Commands:
                  Pearson residuals, variable features and scale.data (milestone M4)
   pca            RunPCA as Seurat 5.5.1 runs it (irlba 2.4.1) on an SCTransform output
                  (milestone M5)
+  neighbors      FindNeighbors as Seurat 5.5.1 runs it (RcppAnnoy 0.0.23's Annoy, the SNN
+                 graph) on cell embeddings (milestone M9)
   validate       Compare a Rust run with an R reference run
-                 (validate doubletfinder|sctransform|pca)
+                 (validate doubletfinder|sctransform|pca|neighbors)
   fingerprint    Print the environment fingerprint as JSON: node, CPU, OpenBLAS kernel
                  and threads, glibc (docs/PLAN.md A5b)
 
@@ -60,11 +64,12 @@ fn main() -> ExitCode {
             print!("{}", fingerprint::json());
             ExitCode::SUCCESS
         }
-        Some(cmd @ ("doubletfinder" | "knn" | "pca" | "sctransform" | "validate")) => {
+        Some(cmd @ ("doubletfinder" | "knn" | "neighbors" | "pca" | "sctransform" | "validate")) => {
             let rest: Vec<String> = std::env::args().skip(2).collect();
             let usage = match cmd {
                 "doubletfinder" => cmd_doubletfinder::USAGE,
                 "knn" => cmd_knn::USAGE,
+                "neighbors" => cmd_neighbors::USAGE,
                 "pca" => cmd_pca::USAGE,
                 "sctransform" => cmd_sctransform::USAGE,
                 _ => cmd_validate::USAGE,
@@ -76,6 +81,7 @@ fn main() -> ExitCode {
             let result = match cmd {
                 "doubletfinder" => cmd_doubletfinder::main(&rest).map(|_| true),
                 "knn" => cmd_knn::main(&rest).map(|_| true),
+                "neighbors" => cmd_neighbors::main(&rest).map(|_| true),
                 "pca" => cmd_pca::main(&rest).map(|_| true),
                 "sctransform" => cmd_sctransform::main(&rest).map(|_| true),
                 _ => cmd_validate::main(&rest),

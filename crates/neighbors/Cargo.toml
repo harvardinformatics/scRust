@@ -1,0 +1,13 @@
+[package]
+name = "neighbors"
+description = "Seurat 5.5.1's FindNeighbors without Seurat: Annoy 1.17.3 as RcppAnnoy 0.0.23 builds and searches it, and the shared-nearest-neighbour graph"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+rcompat.workspace = true
+scio.workspace = true

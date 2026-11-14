@@ -14,6 +14,8 @@ Usage: scrust validate doubletfinder --candidate <Rust output dir> [--reference 
        scrust validate pca --input <10x dir> --stages <R stage dir>
                            [--mode both|teacher|chained] [--contexts <ctx,ctx,...>]
                            [--json <file>] [--markdown <file>] [--threads N]
+       scrust validate neighbors --reference <R run dir> --candidate <Rust output dir>
+                                 [--json <file>] [--markdown <file>]
 
 doubletfinder: compares a Rust run with an R reference run (--reference): cells.tsv,
 sweep_stats.tsv and bcmvn.tsv byte for byte and the result section of summary.json field by
@@ -37,13 +39,23 @@ teacher-forced on R's PCA input (or, where R did not dump it, Rust's S2d on R's 
 parameters; --mode teacher), and after Rust's own SCTransform (S3-chain; --mode chained); both
 by default. Run under the reference run's OpenBLAS kernel.
 
+neighbors: compares a `scrust neighbors --annoy yes` run with an R run of FindNeighbors on the
+same embeddings (an instrumented clustering run, or a neighbour reference run in its layout:
+stages/ and graphs/): the parameters R recorded; Annoy's items (K3_items.npy against the
+candidate's annoy.ann) and the index file byte for byte (K3, K4); every cell's neighbour ids and
+float distances (K5); SCT_nn and SCT_snn, every stored entry in order and every value bitwise
+(K6). No BLAS is involved, so the comparison is exact on any machine.
+
 Exit status 0 when nothing differs, 1 otherwise.
 ";
 
 pub fn main(argv: &[String]) -> Result<bool, String> {
     let Some(tool) = argv.first() else {
-        return Err("which tool? (doubletfinder, sctransform, pca)".into());
+        return Err("which tool? (doubletfinder, sctransform, pca, neighbors)".into());
     };
+    if tool == "neighbors" {
+        return neighbors_report(&argv[1..]);
+    }
     let report = match tool.as_str() {
         "doubletfinder" => doubletfinder_report(&argv[1..])?,
         "sctransform" => sctransform_report(&argv[1..])?,
@@ -67,6 +79,25 @@ pub fn main(argv: &[String]) -> Result<bool, String> {
     let na = report.checks.iter().filter(|c| c.status == Status::NotApplicable).count();
     if na > 0 {
         eprintln!("  {na} checks not applicable (R's structural checks of its own containers; stage dumps of a direct run; the RNG digest under teacher forcing)");
+    }
+    eprintln!("{}", if report.pass() { "pass: everything compared is identical" } else { "FAIL" });
+    Ok(report.pass())
+}
+
+fn neighbors_report(argv: &[String]) -> Result<bool, String> {
+    let args = Args::parse(argv)?;
+    args.only(&["reference", "candidate", "json", "markdown"])?;
+    let reference = args.path("reference")?;
+    let candidate = args.path("candidate")?;
+    let report = neighbors::validate::compare(&reference, &candidate)?;
+    if let Some(p) = args.get("json").map(PathBuf::from) {
+        std::fs::write(&p, scio::json::to_file_text(&report.to_json())).map_err(|e| format!("{}: {e}", p.display()))?;
+    }
+    if let Some(p) = args.get("markdown").map(PathBuf::from) {
+        std::fs::write(&p, report.to_markdown()).map_err(|e| format!("{}: {e}", p.display()))?;
+    }
+    for c in &report.checks {
+        eprintln!("{:>6} {:<36} {:<9} {} of {} differ; {}", c.stage, c.name, c.status.as_str(), c.n_differ, c.n, c.detail);
     }
     eprintln!("{}", if report.pass() { "pass: everything compared is identical" } else { "FAIL" });
     Ok(report.pass())

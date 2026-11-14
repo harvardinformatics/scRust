@@ -230,3 +230,49 @@ fn pca_matches_r_byte_for_byte() {
         assert!(out.join("summary.json").is_file());
     }
 }
+
+/// `scrust neighbors` on a base object's PCA embeddings (milestone M9's committed fixture, the
+/// portable instrumented R run of M8) at the workflow's settings, then `scrust validate
+/// neighbors` against that R run: the parameters, Annoy's items and index file (K3, K4), every
+/// cell's neighbours (K5) and both graphs (K6) identical. No BLAS: any kernel, any machine.
+#[test]
+fn neighbors_match_r_and_validate() {
+    let reference = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/clustering/filtered_seurat_emptydrops_test/reference");
+    for threads in ["1", "4"] {
+        let out = tmp(&format!("neighbors_t{threads}"));
+        let run = scrust(&[
+            "neighbors", "--pca", &reference.join("pca").display().to_string(), "--out", &out.display().to_string(),
+            "--dims", "1:30", "--annoy", "yes", "--threads", threads,
+        ]);
+        assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
+        let report = out.join("validate.json");
+        let v = scrust(&[
+            "validate", "neighbors", "--reference", &reference.display().to_string(), "--candidate", &out.display().to_string(),
+            "--json", &report.display().to_string(),
+        ]);
+        assert!(v.status.success(), "{}", String::from_utf8_lossy(&v.stderr));
+        let r = scio::Json::parse(&std::fs::read_to_string(&report).unwrap()).unwrap();
+        assert_eq!(r.get("pass"), Some(&scio::Json::Bool(true)));
+        let text = std::fs::read_to_string(&report).unwrap();
+        for stage in ["\"K3\"", "\"K4\"", "\"K5\"", "\"K6\""] {
+            assert!(text.contains(stage), "{stage} not checked");
+        }
+        let ids = std::fs::read_to_string(out.join("knn_index.tsv")).unwrap();
+        assert!(ids.starts_with("barcode\tnn_1\t"));
+        assert_eq!(ids.lines().count(), 268);
+    }
+    // the same files at one and at four threads
+    for f in ["knn_index.tsv", "knn_distance.tsv", "nn.mtx.gz", "snn.mtx.gz", "annoy.ann"] {
+        let a = std::fs::read(PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("cli/neighbors_t1").join(f)).unwrap();
+        let b = std::fs::read(PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("cli/neighbors_t4").join(f)).unwrap();
+        assert!(a == b, "{f} depends on the thread count");
+    }
+    // refusals: another code path, and dims beyond the PCA
+    let out = tmp("neighbors_refused");
+    let pca = reference.join("pca").display().to_string();
+    let r = scrust(&["neighbors", "--pca", &pca, "--out", &out.display().to_string(), "--metric", "hamming"]);
+    assert!(!r.status.success());
+    let r = scrust(&["neighbors", "--pca", &pca, "--out", &out.display().to_string(), "--dims", "1:51"]);
+    assert!(!r.status.success());
+    assert!(String::from_utf8_lossy(&r.stderr).contains("More dimensions specified in dims"));
+}

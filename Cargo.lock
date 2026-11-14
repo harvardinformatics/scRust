@@ -31,6 +31,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "neighbors"
+version = "0.1.0"
+dependencies = [
+ "rcompat",
+ "scio",
+]
+
+[[package]]
 name = "pca"
 version = "0.1.0"
 dependencies = [
@@ -51,6 +59,7 @@ version = "0.1.0"
 dependencies = [
  "doubletfinder",
  "knn",
+ "neighbors",
  "pca",
  "rcompat",
  "scio",

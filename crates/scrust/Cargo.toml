@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 doubletfinder.workspace = true
 knn.workspace = true
+neighbors.workspace = true
 pca.workspace = true
 rcompat.workspace = true
 scio.workspace = true

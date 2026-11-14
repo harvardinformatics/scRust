@@ -243,7 +243,7 @@ fn format_piece(m: &CscMatrix, cols: &[usize], starts: &[usize], a: usize, b: us
     out
 }
 
-fn push_uint(out: &mut Vec<u8>, mut v: u64) {
+pub(crate) fn push_uint(out: &mut Vec<u8>, mut v: u64) {
     let mut buf = [0u8; 20];
     let mut k = buf.len();
     loop {
@@ -259,7 +259,7 @@ fn push_uint(out: &mut Vec<u8>, mut v: u64) {
 
 /// `%.17g` of a finite value: integers below 1e15 in magnitude directly, anything else (and a
 /// negative zero) through [`fmt17`].
-fn push_value(out: &mut Vec<u8>, v: f64) {
+pub(crate) fn push_value(out: &mut Vec<u8>, v: f64) {
     if v == v.trunc() && v.abs() < 1e15 && !(v == 0.0 && v.is_sign_negative()) {
         if v < 0.0 {
             out.push(b'-');
