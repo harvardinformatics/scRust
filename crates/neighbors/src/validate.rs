@@ -8,7 +8,9 @@
 //! - **K4, the index**: `annoy.ann` against R's saved index (`stages/annoy.ann`), byte for byte;
 //!   on a difference, the first differing node and field, and how many nodes differ;
 //! - **K5, the neighbours**: every cell's k ids (`stages/K5_nn_index.npy`, 1-based) and float
-//!   distances (`stages/K5_nn_dist.npy`) against `knn_index.tsv` and `knn_distance.tsv`;
+//!   distances (`stages/K5_nn_dist.npy`) against `knn_index.tsv` and `knn_distance.tsv`, bitwise;
+//!   a NaN distance (only overflowing inputs make one) matches a NaN, because the text spells
+//!   every NaN alike;
 //! - **K6, the graphs**: `graphs/nn.mtx.gz` and `graphs/snn.mtx.gz` (`SCT_nn` and `SCT_snn` as
 //!   R stored them) against the candidate's: dimensions, every stored entry in order, values
 //!   bitwise.
@@ -251,7 +253,7 @@ pub fn compare(reference: &Path, candidate: &Path) -> Result<Report, String> {
     let (_, ci) = read_knn_table(&candidate.join("knn_index.tsv"))?;
     let (_, cd) = read_knn_table(&candidate.join("knn_distance.tsv"))?;
     let kk = ri.ncol();
-    let (mut id_cells, mut id_vals, mut d_cells, mut d_vals) = (0usize, 0usize, 0usize, 0usize);
+    let (mut id_cells, mut id_vals, mut d_cells, mut d_vals, mut d_nan) = (0usize, 0usize, 0usize, 0usize, 0usize);
     let mut first_id = None;
     let mut first_d = None;
     for i in 0..n {
@@ -268,7 +270,11 @@ pub fn compare(reference: &Path, candidate: &Path) -> Result<Report, String> {
             }
             let want = rd.get(i, r);
             let got = cd.get(i).and_then(|row| row.get(r)).and_then(|v| scio::parse17(v));
-            if got.map(f64::to_bits) != Some(want.to_bits()) {
+            // the text spells every NaN "NaN", without its sign or payload (cargo test compares
+            // NaN distances bitwise, through the arrays themselves)
+            let both_nan = want.is_nan() && got.is_some_and(f64::is_nan);
+            d_nan += both_nan as usize;
+            if !both_nan && got.map(f64::to_bits) != Some(want.to_bits()) {
                 d_vals += 1;
                 cd_bad = true;
                 if first_d.is_none() {
@@ -291,6 +297,9 @@ pub fn compare(reference: &Path, candidate: &Path) -> Result<Report, String> {
     }
     checks.push(check("K5", "nn_index", n * kk, id_vals, d1));
     let mut d2 = format!("{n} cells x {kk}; {d_cells} cells differ");
+    if d_nan > 0 {
+        d2.push_str(&format!("; {d_nan} distances NaN in both (compared as NaN: the text keeps no NaN sign)"));
+    }
     if shape(&cd) {
         d2.push_str(&format!("; candidate table is {} rows", cd.len()));
         d_vals = d_vals.max(1);

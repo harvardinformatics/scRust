@@ -1,6 +1,9 @@
 //! `Kiss64Random`, the generator RcppAnnoy 0.0.23 gives every Annoy index (`kissrandom.h`,
 //! Annoy 1.17.3; docs/PLAN.md C2).
 //!
+//! *Ported from Annoy 1.17.3's `kissrandom.h` (Copyright (c) 2013 Spotify AB, Apache License
+//! 2.0, `third_party/licenses/Apache-2.0.txt`): translated into Rust; NOTICE lists the changes.*
+//!
 //! George Marsaglia's 64-bit KISS: a linear congruential generator, a xorshift and a
 //! multiply-with-carry, added. Every operation is on `uint64_t` and wraps modulo 2^64.
 //! Seurat never calls `setSeed`, so every index starts from [`Kiss64Random::DEFAULT_SEED`].

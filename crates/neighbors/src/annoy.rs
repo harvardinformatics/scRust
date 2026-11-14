@@ -3,6 +3,10 @@
 //! `D` = `Euclidean`, `Angular` (Seurat's `annoy.metric = "cosine"`) or `Manhattan`. Ported
 //! statement by statement from `annoylib.h`; the comments name the C++ functions.
 //!
+//! *Ported from Annoy 1.17.3's `annoylib.h` (Copyright (c) 2013 Spotify AB, Apache License 2.0,
+//! `third_party/licenses/Apache-2.0.txt`). This file is a modified version: translated into Rust,
+//! for the three metrics Seurat uses; NOTICE lists the changes.*
+//!
 //! **Arithmetic.** Everything is IEEE single precision, as compiled for R (`-O2
 //! -march=nocona`): no FMA, no AVX, every reduction a sequential loop (GCC vectorizes only the
 //! element-wise products and differences, which does not change any value). Two places mix in

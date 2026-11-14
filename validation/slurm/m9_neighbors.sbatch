@@ -14,7 +14,8 @@
 #                      byte-identical to R's, which then holds the same bytes)
 #   time_v.txt         /usr/bin/time -v of the Rust run
 #   validate.json, validate.md   scrust validate neighbors against the R run
-# EUCLIDEAN_ONLY=1 skips the cosine and manhattan references (e.g. while they are being made).
+# SCRUST_BIN names the binary (default target/release/scrust; a copy keeps a long run safe from
+# rebuilds). EUCLIDEAN_ONLY=1 skips the cosine and manhattan references (e.g. while they are being made).
 # An existing output directory is never overwritten: its run is skipped. Work in progress goes
 # to <dir>.partial.<job id>, renamed when complete. Exit status 1 if any comparison differs.
 #
@@ -43,8 +44,9 @@ echo "host=$(hostname) cpu='$(lscpu | sed -n 's/^Model name: *//p')' $(ldd --ver
 echo "OPENBLAS_CORETYPE=${OPENBLAS_CORETYPE:-auto} OPENBLAS_NUM_THREADS=$OPENBLAS_NUM_THREADS" \
      "$(rustc --version) commit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 
-bin=target/release/scrust
+bin=${SCRUST_BIN:-target/release/scrust}
 [ -x "$bin" ] || { echo "no $bin: run cargo build --release -p scrust first" >&2; exit 1; }
+echo "binary $bin sha256 $(sha256sum "$bin" | cut -d' ' -f1)"
 threads=${SLURM_CPUS_PER_TASK:-1}
 status=0
 

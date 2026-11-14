@@ -178,6 +178,10 @@ nr_cases <- function() {
   x <- c(1.5 + 2^-23, -0.25, 2, 0.75)
   add("ulp_outlier", rbind(matrix(x, 199, 4, byrow = TRUE), x + c(2^-23, 0, 0, 0)),
       "199 copies of one point and one cell a float ulp away (in a coordinate with an odd mantissa, so the midpoint rounds onto the outlier): splits that cannot separate them, retried, kept imbalanced or randomised")
+  add("exp_spacing", cbind(2^((0:249 - 125) * 0.95), 0.5),
+      "250 cells at exponentially spaced positions, 2^-118.75 to 2^117.8 (f = 2): splits that peel off a few cells, retried, kept imbalanced or randomised; squared distances that underflow and overflow in float")
+  add("exp_spacing_dup", cbind(2^((0:239 %% 120) - 60), 0.5),
+      "120 exponentially spaced positions, 2^-60 to 2^59, each twice (f = 2)")
   add("collinear", outer((1:150) / 7, c(0.6, -0.8, 0, 0.5, 0.25, -1)),
       "150 cells on a line through the origin (rank one, f = 6)")
   add("zero_rows", rbind(matrix(0, 20, 4), matrix(round(rnorm(80 * 4), 2), 80, 4)),
