@@ -437,25 +437,23 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
                 None => checks.push(missing("K7", &format!("{col}: every start"), format!("{}: no starts.tsv for {col}", dir.display()))),
             }
         }
-        // R's .Random.seed after GroupSingletons
+        // R's .Random.seed after GroupSingletons. Whether R drew cannot be read from its entry
+        // and exit states: a call that draws after an earlier call drew can end where it started
+        // (set.seed(1) and as many uniforms either way). So: where Rust drew, R's state after the
+        // call must be Rust's; where Rust did not, R's state must not have changed.
         match (&gs_entry, &gs_exit) {
             (Some(en), Some(ex)) if en.len() > k && ex.len() > k => {
-                let drew = en[k] != ex[k];
                 let c_rng: Option<Vec<i64>> = match cr.get("rng_after_groupsingletons") {
                     Some(Json::Vector(v) | Json::List(v)) => Some(v.iter().filter_map(Json::as_f64).map(|x| x as i64).collect()),
                     _ => None,
                 };
                 let name = format!("{col}: .Random.seed after GroupSingletons");
-                if drew {
-                    match c_rng {
-                        Some(v) => {
-                            let differ = if v.len() != ex[k].len() { ex[k].len() } else { v.iter().zip(&ex[k]).filter(|(a, b)| **a != **b as i64).count() };
-                            checks.push(check("K7", &name, ex[k].len(), differ, format!("R drew (position {} after set.seed(1))", ex[k][1])));
-                        }
-                        None => checks.push(check("K7", &name, ex[k].len(), ex[k].len(), "R drew, Rust did not".into())),
+                match c_rng {
+                    Some(v) => {
+                        let differ = if v.len() != ex[k].len() { ex[k].len() } else { v.iter().zip(&ex[k]).filter(|(a, b)| **a != **b as i64).count() };
+                        checks.push(check("K7", &name, ex[k].len(), differ, format!("Rust drew; R's state after the call (position {} after set.seed(1))", ex[k][1])));
                     }
-                } else {
-                    checks.push(check("K7", &name, 1, c_rng.is_some() as usize, "no draw in R (no singletons, or group.singletons = FALSE)".into()));
+                    None => checks.push(check("K7", &name, 1, (en[k] != ex[k]) as usize, "Rust drew nothing (no singletons, or group.singletons = FALSE); R's state unchanged by the call".into())),
                 }
             }
             _ => checks.push(not_applicable("K7", &format!("{col}: .Random.seed after GroupSingletons"), "no RNG checkpoints in the reference".into())),
