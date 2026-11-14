@@ -352,3 +352,67 @@ K8_silhouette_width = { max_abs = 3.3e-13, fraction_differing = 0.99 }
 K9_dist50 = { max_abs = 6.5e-11, max_scaled = 2.8e-13 }
 K9_neighbor_count = { cells_differing = 22, objects = 11 }
 K9_purity = { cells_differing = 19, objects = 10, max_abs = 0.019 }
+
+# K0, Kiss64Random (M9): RcppAnnoy 0.0.23's kissrandom.h, compiled with the R env's compiler and
+# flags (tests/fixtures/clustering/k0/, M8), against crates/neighbors (tests/k0_kiss64.rs):
+# kiss(), index(n) for 21 values of n from 1 to 2^32 + 1, flip(), and one stream of 1,449 mixed
+# calls, from the default seed and three others. JavaRandom and GroupSingletons' draw: M10.
+# Settled (M9): exact.
+[clustering.K0_kiss64]
+criterion = "exact"
+compare = ["kiss", "index", "flip", "mixed"]
+
+# K3-K6 (M9), teacher-forced: scrust neighbors on each R run's own embeddings (columns 1:30, or a
+# constructed input), against that run (scrust validate neighbors; docs/validation/clustering_m9.md).
+# No BLAS is involved, so these are exact on any machine, in either profile, at any thread count.
+# Settled (M9): exact in every comparison, with no exception:
+#   euclidean: all 98 instrumented runs of the 27 tier-T and 7 tier-P objects (M8's, both
+#     profiles, Sapphire Rapids and Cascade Lake, the v5 runs);
+#   cosine (AnnoyAngular) and manhattan: validation/R/neighbors_references.R on 57 instrumented
+#     runs' embeddings (the 27 tier-T objects in both profiles, soupx_tenx_SRR18256555 in both,
+#     soupx_emptydrops_sscovelli portable): 114 comparisons;
+#   25 constructed edge cases (C7) x 3 metrics: cargo test compares 732 files by sha256
+#     (crates/neighbors/tests/edge_cases.rs), the command line 72 cases; the 3 one-cell cases are
+#     refused, as R's FindNeighbors fails on them.
+[clustering.K3]
+criterion = "exact"
+compare = ["items: getItemsVector, or R's index file, against the first n nodes of annoy.ann"]
+
+[clustering.K4]
+criterion = "byte-identical"
+compare = ["annoy.ann"]
+
+[clustering.K5]
+criterion = "exact"
+compare = ["nn_index", "nn_dist"]
+note = "scrust validate neighbors reads the distances as text, where every NaN reads alike: a NaN (only from overflow, edge case exp_spacing with cosine) matches a NaN there, and cargo test compares those bits"
+
+[clustering.K6]
+criterion = "exact"
+compare = ["SCT_nn", "SCT_snn"]
+detail = "dimensions, every stored entry in stored order, values bitwise"
+
+# Threads (M9, scrust neighbors): 1 and 32 threads on both 79,409-cell objects give byte-identical
+# knn_index.tsv, knn_distance.tsv, nn.mtx.gz, snn.mtx.gz and annoy.ann (job 60383132,
+# validation/slurm/m9_benchmark.sbatch); cargo test compares 1, 3, 4 and 7 threads on tier T.
+[clustering.threads_neighbors]
+criterion = "byte-identical"
+
+# Performance (M9): FindNeighbors alone on the two 79,409-cell objects, one node (Xeon Platinum
+# 8480CL, test partition, job 60383132), on their production instrumented runs' embeddings.
+# R: the workflow's call, FindNeighbors(embeddings[, 1:30]) (neighbors_references.R --mode bench);
+# findneighbors_s is the call, process_wall_s and peak_rss_gib the whole Rscript (loading Seurat
+# and the embeddings included). Rust: scrust neighbors (binary scrust-m9-db5e474),
+# neighbors_s = build + search + graphs, process_wall_s and peak_rss_gib the whole command
+# (reading the embeddings and writing the outputs included). For comparison, R's FindNeighbors
+# step in M8's direct production runs of the chain took 31.4-33.4 s. Measurements; the chain's
+# criterion (C5) is settled at M11.
+[clustering.performance_neighbors]
+measured_m9 = [
+  { object = "soupx_emptydrops_sscovelli", side = "R", threads = 1, findneighbors_s = 27.2, process_wall_s = 37.4, peak_rss_gib = 1.58 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 1, build_s = 3.66, search_s = 15.49, graphs_s = 0.99, neighbors_s = 20.1, process_wall_s = 24.8, peak_rss_gib = 0.26 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 32, build_s = 3.70, search_s = 0.41, graphs_s = 0.09, neighbors_s = 4.2, process_wall_s = 6.8, peak_rss_gib = 0.44 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "R", threads = 1, findneighbors_s = 27.8, process_wall_s = 33.7, peak_rss_gib = 1.60 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 1, build_s = 3.72, search_s = 15.67, graphs_s = 0.98, neighbors_s = 20.4, process_wall_s = 24.8, peak_rss_gib = 0.26 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 32, build_s = 3.73, search_s = 0.57, graphs_s = 0.09, neighbors_s = 4.4, process_wall_s = 7.2, peak_rss_gib = 0.41 },
+]

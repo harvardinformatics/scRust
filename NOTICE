@@ -23,12 +23,37 @@ Seurat 5.5.1, SeuratObject 5.4.0       MIT
 decontX 1.8.0, celda 1.26.0            MIT
 xgboost 3.2.0                          Apache-2.0
 fields 17.3                            GPL (>= 2)
-RcppAnnoy 0.0.23 (Annoy)               GPL (>= 2); Annoy itself is Apache-2.0
+RcppAnnoy 0.0.23 (Annoy 1.17.3)        GPL (>= 2); Annoy itself is Apache-2.0
+                                       (see "Ported code" below)
 matrixStats 1.5.0                      Artistic-2.0
 KernSmooth 2.23-27                     Unlimited
 Matrix 1.7-6                           GPL (>= 2)
 R 4.5.3                                GPL-2 | GPL-3 (random number generation
                                        and numerical routines)
+
+Ported code
+-----------
+crates/neighbors (milestone M9) is a Rust port of:
+
+- Annoy 1.17.3, as bundled in RcppAnnoy 0.0.23 (inst/include/annoylib.h and
+  kissrandom.h): Copyright (c) 2013 Spotify AB, licensed under the Apache
+  License, Version 2.0 (third_party/licenses/Apache-2.0.txt). Changes: the
+  index build (two_means, create_split, side, _make_tree, _split_imbalance),
+  the search (_get_all_nns), the node layout and file format, and the
+  Kiss64Random generator, for the Euclidean, Angular and Manhattan metrics,
+  translated statement by statement into Rust (crates/neighbors/src/annoy.rs
+  and kiss.rs); the multi-threaded build, on-disk build, mmap loading, the
+  DotProduct and Hamming metrics and the other generators are not ported.
+  Annoy's principal author is Erik Bernhardsson.
+- RcppAnnoy 0.0.23 (Dirk Eddelbuettel, GPL (>= 2)): its conversions of R's
+  doubles to the index's floats (addItem, getNNsByVectorList).
+- Seurat 5.5.1 (Copyright 2021 Seurat authors, MIT): FindNeighbors' Annoy
+  path (AnnoyBuildIndex, AnnoySearch, the k adjustment) and ComputeSNN
+  (src/snn.cpp), in crates/neighbors/src/lib.rs and graph.rs.
+- The GNU C++ library (libstdc++, GCC; GPL-3 with the GCC Runtime Library
+  Exception): std::priority_queue's push_heap and pop_heap and
+  std::partial_sort (bits/stl_heap.h, bits/stl_algo.h), whose exact moves
+  Annoy's search depends on, in crates/neighbors/src/stl.rs.
 
 Planned, with licensing to be handled when the work starts
 ----------------------------------------------------------
