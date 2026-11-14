@@ -16,6 +16,9 @@ Usage: scrust validate doubletfinder --candidate <Rust output dir> [--reference 
                            [--json <file>] [--markdown <file>] [--threads N]
        scrust validate neighbors --reference <R run dir> --candidate <Rust output dir>
                                  [--json <file>] [--markdown <file>]
+       scrust validate cluster --reference <R run dir> --candidate <Rust output dir>
+                               [--optimizer <dir>] [--panel <tsv> --object <name>]
+                               [--json <file>] [--markdown <file>]
 
 doubletfinder: compares a Rust run with an R reference run (--reference): cells.tsv,
 sweep_stats.tsv and bcmvn.tsv byte for byte and the result section of summary.json field by
@@ -46,15 +49,33 @@ candidate's annoy.ann) and the index file byte for byte (K3, K4); every cell's n
 float distances (K5); SCT_nn and SCT_snn, every stored entry in order and every value bitwise
 (K6). No BLAS is involved, so the comparison is exact on any machine.
 
+cluster: compares a `scrust cluster --snn` run with an R run of FindClusters on the same SNN
+graph (an instrumented clustering run of M8, a direct run, or a FindClusters reference run in
+the same layout), resolution by resolution (K7): the settings; the optimizer's ids before
+GroupSingletons (stages/K7_optimizer_ids.npy) and the final ids (K7_final_ids.npy); each
+column's labels (metadata.tsv) and levels (<column>_levels.txt, byte for byte); every line
+FindClusters printed but the elapsed time (nodes, edges, the maximum modularity as %.4f,
+communities) and GroupSingletons' messages; the singletons in order; R's .Random.seed after
+GroupSingletons (stages/rng.npy); seurat_clusters with its levels, idents_levels.txt,
+cluster_ids.txt and nclusters.txt. With --optimizer (the instrumented optimizer's output: a
+directory holding starts.tsv, or one per column or res.<r>), every start's iterations and
+modularity as a double, the best start, ids.txt, and each start's partition when the candidate
+ran with --keep-stages. With --panel (validation/clustering_panel.tsv) and --object, the
+numbers the workflow job logged. No BLAS is involved, so the comparison is exact on any
+machine.
+
 Exit status 0 when nothing differs, 1 otherwise.
 ";
 
 pub fn main(argv: &[String]) -> Result<bool, String> {
     let Some(tool) = argv.first() else {
-        return Err("which tool? (doubletfinder, sctransform, pca, neighbors)".into());
+        return Err("which tool? (doubletfinder, sctransform, pca, neighbors, cluster)".into());
     };
     if tool == "neighbors" {
         return neighbors_report(&argv[1..]);
+    }
+    if tool == "cluster" {
+        return cluster_report(&argv[1..]);
     }
     let report = match tool.as_str() {
         "doubletfinder" => doubletfinder_report(&argv[1..])?,
@@ -98,6 +119,31 @@ fn neighbors_report(argv: &[String]) -> Result<bool, String> {
     }
     for c in &report.checks {
         eprintln!("{:>6} {:<36} {:<9} {} of {} differ; {}", c.stage, c.name, c.status.as_str(), c.n_differ, c.n, c.detail);
+    }
+    eprintln!("{}", if report.pass() { "pass: everything compared is identical" } else { "FAIL" });
+    Ok(report.pass())
+}
+
+fn cluster_report(argv: &[String]) -> Result<bool, String> {
+    let args = Args::parse(argv)?;
+    args.only(&["reference", "candidate", "optimizer", "panel", "object", "json", "markdown"])?;
+    let reference = args.path("reference")?;
+    let candidate = args.path("candidate")?;
+    let panel = match (args.get("panel"), args.get("object")) {
+        (Some(p), Some(o)) => Some((PathBuf::from(p), o.to_string())),
+        (None, None) => None,
+        _ => return Err("--panel and --object go together".into()),
+    };
+    let opts = cluster::validate::CompareOptions { optimizer: args.get("optimizer").map(PathBuf::from), panel };
+    let report = cluster::validate::compare(&reference, &candidate, &opts)?;
+    if let Some(p) = args.get("json").map(PathBuf::from) {
+        std::fs::write(&p, scio::json::to_file_text(&report.to_json())).map_err(|e| format!("{}: {e}", p.display()))?;
+    }
+    if let Some(p) = args.get("markdown").map(PathBuf::from) {
+        std::fs::write(&p, report.to_markdown()).map_err(|e| format!("{}: {e}", p.display()))?;
+    }
+    for c in &report.checks {
+        eprintln!("{:>6} {:<58} {:<9} {} of {} differ; {}", c.stage, c.name, c.status.as_str(), c.n_differ, c.n, c.detail);
     }
     eprintln!("{}", if report.pass() { "pass: everything compared is identical" } else { "FAIL" });
     Ok(report.pass())
