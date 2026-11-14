@@ -55,6 +55,32 @@ crates/neighbors (milestone M9) is a Rust port of:
   std::partial_sort (bits/stl_heap.h, bits/stl_algo.h), whose exact moves
   Annoy's search depends on, in crates/neighbors/src/stl.rs.
 
+crates/cluster (milestone M10) is a Rust port of:
+
+- Seurat 5.5.1 (Copyright 2021 Seurat authors, MIT): src/ModularityOptimizer.cpp
+  and src/RModularityOptimizer.cpp, Seurat's C++ translation of Ludo Waltman
+  and Nees Jan van Eck's ModularityOptimizer 1.3.0 (the Java program of
+  http://www.ludowaltman.nl/slm/, which implements their smart local moving
+  algorithm and the Louvain algorithm of Blondel et al.). Changes: the
+  JavaRandom generator (java.util.Random's nextInt, with its power-of-two
+  branch and its 32-bit wrap-around) and generateRandomPermutation, the
+  Clustering and Network classes (matrixToNetwork, createReducedNetwork,
+  createSubnetworks), VOSClusteringTechnique's calcQualityFunction, local
+  moving, Louvain, Louvain with multilevel refinement and smart local moving,
+  and RunModularityClusteringCpp's random starts, best start, printed output
+  and orderClustersByNNodes, translated statement by statement into Rust
+  (crates/cluster/src/java_random.rs, clustering.rs, network.rs, vos.rs,
+  optimizer.rs); the standalone main(), the edge-file reader,
+  identifyComponents, removeCluster and removeSmallClusters, which
+  FindClusters does not use, are not ported. The network and clustering are
+  passed by reference instead of shared_ptr; the arithmetic and every order
+  of operations are the C++'s.
+- Seurat 5.5.1's R code (MIT): GroupSingletons, FindClusters.default's loop
+  over the resolutions and FindClusters.Seurat's columns, level order and
+  seurat_clusters (R/clustering.R), in crates/cluster/src/singletons.rs and
+  find_clusters.rs. GroupSingletons' tie-breaking draw uses R's set.seed and
+  sample, and its connectivity R's mean, from crates/rcompat (R, GPL (>= 2)).
+
 Planned, with licensing to be handled when the work starts
 ----------------------------------------------------------
 SoupX 1.6.2                            GPL-2 only. This is incompatible with

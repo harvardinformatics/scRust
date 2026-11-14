@@ -416,3 +416,71 @@ measured_m9 = [
   { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 1, build_s = 3.72, search_s = 15.67, graphs_s = 0.98, neighbors_s = 20.4, process_wall_s = 24.8, peak_rss_gib = 0.26 },
   { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 32, build_s = 3.73, search_s = 0.57, graphs_s = 0.09, neighbors_s = 4.4, process_wall_s = 7.2, peak_rss_gib = 0.41 },
 ]
+
+# K0, JavaRandom and GroupSingletons' draw (M10): Seurat 5.5.1's own JavaRandom
+# (ModularityOptimizer.cpp compiled unmodified with the R env's compiler and flags,
+# tests/fixtures/clustering/k0/, M8): nextInt(n) for 43 values of n from 1 to 2^31 - 1 (powers of
+# two and the rejection loop's wrap-around region included) from six seeds, negative ones included,
+# 100 draws each; and 15 streams of successive generateRandomPermutation draws. R 4.5.3's
+# set.seed(1); sample(x, 1) for 213 values of n from 1 to 100,000, with .Random.seed[2] after it.
+# Against crates/cluster (tests/k0_vectors.rs). Settled (M10): exact.
+[clustering.K0_javarandom]
+criterion = "exact"
+compare = ["nextInt", "generateRandomPermutation"]
+
+[clustering.K0_sample]
+criterion = "exact"
+compare = ["set.seed(1); sample(x, 1)", ".Random.seed[2] afterwards"]
+
+# K7 (M10), teacher-forced: scrust cluster --snn on each R run's own SNN graph, against that run
+# (scrust validate cluster; docs/validation/clustering_m10.md) and the instrumented optimizer on the
+# same graph. No BLAS is involved, so these are exact on any machine, in either profile, at any
+# thread count. Per resolution: the optimizer's ids before GroupSingletons, the final ids, the
+# labels and levels, every line FindClusters printed but the elapsed time (nodes, edges, the maximum
+# modularity as %.4f, communities), GroupSingletons' singletons in order and its message, every
+# random start's iterations and modularity (bitwise) and partition, the best start, R's
+# .Random.seed after GroupSingletons where it drew (and an unchanged state where it did not); then
+# seurat_clusters, its levels, cluster_ids.txt and nclusters.txt; for tier P the workflow job's
+# logged numbers. Settled (M10): exact in every comparison, with no exception:
+#   the workflow's settings: all 98 instrumented runs of the 27 tier-T and 7 tier-P objects (M8's,
+#     both profiles, Sapphire Rapids and Cascade Lake, the v5 runs), the 4 tier-P objects with
+#     singletons included (1, 18, 22 and 40);
+#   other settings (validation/R/cluster_references.R on the saved graphs): 465 settings of the 34
+#     objects (algorithms 2 and 3, modularity function 2, five resolutions in one call,
+#     group.singletons = FALSE, starts 1 and 20, iterations 1 and 50, seeds 0 and 1), where R stops
+#     in 4 (every cell a singleton) and Rust stops with R's message;
+#   53 settings of 20 constructed edge cases (C7): cargo test recomputes 717 of R's files and compares
+#     their sha256 (crates/cluster/tests/edge_cases.rs); in 3 of them R stops, and so does Rust.
+[clustering.K7]
+criterion = "exact"
+compare = ["optimizer ids", "final ids", "labels", "levels", "printed numbers", "singletons", "every start's iterations and modularity", "every start's partition", "best start", ".Random.seed after GroupSingletons", "seurat_clusters", "cluster_ids.txt", "nclusters.txt", "workflow log (tier P)"]
+detail = "modularities bitwise; labels and levels as text; files byte for byte"
+
+# Threads (M10, scrust cluster): resolutions run in parallel, the starts of one resolution in
+# turn. Five resolutions at 1 and 32 threads on both 79,409-cell objects (job 60510816,
+# validation/slurm/m10_benchmark.sbatch), and at 1 and 8 threads on all 34 objects' `resolutions`
+# reference (m10_cluster.sbatch): every file byte-identical, and summary.json's result section;
+# cargo test compares 1, 2, 3, 4 and 7 threads on tier T.
+[clustering.threads_cluster]
+criterion = "byte-identical"
+
+# Performance (M10): FindClusters alone on the two 79,409-cell objects' saved graphs, one node (Xeon
+# Platinum 8480CL, test partition, job 60510816). R: the workflow's call, FindClusters(obj,
+# random.seed = 12345) (cluster_references.R --mode bench); findclusters_s is the call,
+# process_wall_s and peak_rss_gib the whole Rscript (loading Seurat and the graph included). Rust:
+# scrust cluster --snn (binary scrust-m10-e0a40a9, whose clustering is the final binary's),
+# clustering_s = building the network and every resolution, process_wall_s and peak_rss_gib the
+# whole command (reading the graph and writing the outputs included). For comparison, R's
+# FindClusters step in M8's direct production runs of the chain took 31.2-36.0 s on other nodes.
+# Measurements; the chain's criterion (C5) is settled at M11.
+[clustering.performance_cluster]
+measured_m10 = [
+  { object = "soupx_emptydrops_sscovelli", side = "R", resolutions = 1, threads = 1, findclusters_s = 19.8, process_wall_s = 36.5, peak_rss_gib = 1.10 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", resolutions = 1, threads = 1, clustering_s = 14.2, process_wall_s = 15.2, peak_rss_gib = 0.15 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", resolutions = 5, threads = 1, clustering_s = 66.5, process_wall_s = 67.5, peak_rss_gib = 0.15 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", resolutions = 5, threads = 32, clustering_s = 15.0, process_wall_s = 16.1, peak_rss_gib = 0.42 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "R", resolutions = 1, threads = 1, findclusters_s = 20.8, process_wall_s = 35.8, peak_rss_gib = 1.13 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", resolutions = 1, threads = 1, clustering_s = 14.8, process_wall_s = 15.8, peak_rss_gib = 0.15 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", resolutions = 5, threads = 1, clustering_s = 70.3, process_wall_s = 71.3, peak_rss_gib = 0.15 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", resolutions = 5, threads = 32, clustering_s = 15.4, process_wall_s = 16.4, peak_rss_gib = 0.41 },
+]

@@ -585,7 +585,7 @@ obj <- add_silhouette_to_metadata(obj)  # the workflow's own, through bluster
    - **`GroupSingletons`:** each cluster of one cell joins the cluster with the highest mean SNN weight to that cell (C3d).
    - **Assembly:**
      - the labels go into the column `SCT_snn_res.0.8`, named by `paste0("res.", r)`. Seurat 5.5.1 sorts its levels numerically;
-     - `seurat_clusters` and the identities take the last resolution's labels, with levels sorted numerically.
+     - `seurat_clusters` and the identities take the last resolution's labels, with levels sorted numerically. When a level is `"singleton"` (`group.singletons = FALSE`), R's `as.numeric()` warns and Seurat sorts the levels as text instead, so `"10"` comes before `"2"` (M10).
    - **The job's log** records the number of nodes and edges, the maximum modularity of the 10 starts (`%.4f`) and the number of communities, printed by the optimizer. GroupSingletons adds the number of singletons. 36 of the 840 production logs report singletons, up to 40 (cellbender_fromraw_ghirsutum2).
 6. **The workflow's additions,** which are not Seurat:
    - **`add_silhouette_to_metadata`** (`silhouette_utils.R`) takes PCA dims 1:30 and `seurat_clusters`:
@@ -622,7 +622,7 @@ There are four generators. R's is reseeded before each stage that draws from it,
 | Annoy build | `Kiss64Random`, one per index | the default seed, 1234567890987654321, because Seurat never calls `setSeed`. RcppAnnoy builds single-threaded, so one stream runs through all 50 trees | per split attempt: two `index()` draws for the starting pair, then 200 for the two-means iterations, then one `flip()` for each point whose margin is exactly 0; up to three attempts per node; in the fallback, one `flip()` per point per round |
 | Annoy search, SNN, `correct()`, silhouette, purity's sums | none | | |
 | Modularity optimizer | `JavaRandom`, java.util.Random's 48-bit LCG | created once per resolution, with `random.seed` (12345) | each local-moving pass draws a permutation of its network's nodes: n calls to `nextInt(n)`. This happens at every level of every iteration of every start, in one continuing stream |
-| GroupSingletons | R's | `set.seed(1)` before each candidate cluster's connectivity | one `sample(<tied clusters>, 1)` per singleton |
+| GroupSingletons | R's | `set.seed(1)` before each candidate cluster's connectivity | one `sample(<tied clusters>, 1)` per singleton; none with `group.singletons = FALSE` |
 | Purity's search index (KMKNN) | `std::mt19937_64`, in knncolle's k-means++ | the library's fixed seed, 6523 | k-means++'s draws for the index's ⌈√n⌉ centres. They decide only where the search looks, not what it finds (C3e) |
 
 Consequences:
@@ -645,7 +645,9 @@ scrust neighbors   --pca <dir> --out <dir> [--dims 1:10] [--k 20] [--trees 50]
                    [--annoy yes|no] [--threads N]                                          (exists, M9)
 scrust cluster     --snn <dir> [--pca <dir>] --out <dir> [--resolution 0.8[,1.2,...]] [--algorithm 1|2|3]
                    [--starts 10] [--iterations 10] [--seed 0] [--modularity 1|2] [--no-group-singletons]
+                   [--graph-name SCT_snn] [--keep-stages] [--threads N]
                    [--stats silhouette,purity|none] [--purity-k 50] [--purity-weighted true|false]
+                                                                       (--snn exists, M10; --pca and the scores: M11, M12)
 ```
 
 The whole chain also runs in one process, for the workflow:
@@ -668,6 +670,7 @@ scrust cluster --counts <10x dir> --out <dir> [--preset workflow] [--params <fil
 - `seurat_clusters.tsv` (barcode and label, in the counts' column order) and `seurat_clusters_levels.txt`: the layout `scrust doubletfinder --clusters` reads, so the tools chain without R;
 - `clusters.tsv`: one column per resolution, named as Seurat names it (`SCT_snn_res.0.8`), with each column's levels;
 - `cluster_ids.txt` and `nclusters.txt`, as `write_cluster_metadata` writes them;
+- `optimizer_ids.tsv`: each resolution's optimizer result before GroupSingletons, numbered by size (K7 checks it); with `--keep-stages`, also `stages/<column>_partitions.npy`, every random start's own partition (M10);
 - `metadata.tsv`: one row per cell, in the counts' column order, with the columns the workflow's objects hold:
   - `nCount_RNA`, `nFeature_RNA`, each `res.` column, `seurat_clusters`, `silhouette_width` and `neighborhood_purity`;
   - `nCount_SCT` and `nFeature_SCT` with `--export`, since they come from the corrected counts;
@@ -694,7 +697,7 @@ The clustering changes no counts, so it writes no new count data (A3). The expor
 - **`sctransform`:** used as it is, with the workflow's parameters. New: `correct()` (C3f).
 - **`pca`:** used as it is.
 - **`knn`:** new: the search `neighborPurity` makes, with knncolle's arithmetic (C3e).
-- **`rcompat`:** `set.seed` and `sample` for GroupSingletons; long-double `mean` and `sum`, whose accumulator R's `colMeans`, `colSums` and `rowSums` also use (small additions); R's `median`; R's number formatting for the `res.` names; and `order`.
+- **`rcompat`:** `set.seed` and `sample` for GroupSingletons; long-double `mean` and `sum`, whose accumulator R's `colMeans`, `colSums` and `rowSums` also use (small additions); R's `median`; R's number formatting for the `res.` names; and `order`. `set.seed`, `sample`, the long-double `mean` and the number formatting exist since M1, and GroupSingletons and the `res.` names use them as they are (M10).
 - **`scio`:** 10x reading, TSV, `.npy` and JSON. New: the TOML reader; Matrix Market writers for real and integer matrices, with comment lines; the manifest; copying a directory with its checksums.
 - **`scrust`:** the commands above, `scrust validate cluster`, and the new options of `scrust doubletfinder` (C3h).
 - **`loaders/`** (new, outside the Cargo workspace): the R and Python packages (C3g).
@@ -767,12 +770,15 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
   - singletons are handled in order of their first appearance among the cells (`intersect(unique(ids), ...)`), and the candidate clusters likewise (`setdiff`);
   - a candidate's connectivity is the long-double `mean()` of the singleton's SNN row over the candidate's current cells, so singletons merged earlier count;
   - the highest connectivity wins. Ties go to `sample(names, 1)` after `set.seed(1)`;
-  - a cell with no SNN edges ties at 0 with every cluster, so that draw places it;
-  - with `group.singletons = FALSE`, the singletons are labelled `"singleton"` instead.
+  - a cell with no SNN edges ties at 0 with every cluster, so that draw places it. Every singleton of the tier-P objects (81 in four objects) is such a cell (M10);
+  - with `group.singletons = FALSE`, the singletons are labelled `"singleton"` instead; GroupSingletons then returns before drawing and before its message (M10);
+  - if every cluster is a singleton, R stops: `sample()` of no candidate fails ("invalid first argument"), and the port stops with R's message. With modularity function 2 at resolution 0.8, 4 of the 27 test objects end so (M10);
+  - Seurat's parallel path (`nbrOfWorkers() > 1`, a `future` plan with several workers) calls GroupSingletons without `group.singletons`, so it groups singletons even when asked not to. The workflow and the references run the sequential path, which the port reproduces.
 - **Labels and levels:**
   - the labels are the optimizer's ids, as character once a singleton has been merged;
   - in each `res.` column, numeric labels are sorted numerically and come first, then any others alphabetically (Seurat 5.5.1);
-  - `seurat_clusters` takes the last resolution's labels, with levels sorted numerically.
+  - `seurat_clusters` takes the last resolution's labels, with levels sorted numerically; when a level is `"singleton"`, as text (`"0"`, `"1"`, `"10"`, `"11"`, …, `"2"`, …, `"singleton"`), because Seurat keeps the text when `as.numeric()` warns (M10);
+  - two resolutions with the same name (R's `res.<r>`, at 15 significant digits) write the same column, the later overwriting the earlier; the port refuses them instead (M10).
 - **Column names:** the graph name, then `res.`, then the resolution as R formats numbers (15 significant digits).
 - **Numbering:** clusters are numbered by size before the singletons are merged. The final labels are therefore not always in decreasing size, and the port keeps that.
 - **`approxSilhouette`:**
@@ -966,7 +972,7 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
 - k ∈ {10, 20, 30, 50} × resolution ∈ {0.2, 0.4, 0.8, 1.2, 2.0} × dims ∈ {1:10, 1:30}: 40 label sets per sample;
 - one parameter at a time, around the workflow's settings:
   - neighbours: trees {10, 100}; metric cosine and manhattan; prune {0, 0.2};
-  - clustering: algorithms 2 and 3; starts {1, 20}; iterations {1, 50}; FindClusters seeds {0, 1}; modularity function 2; `group.singletons = FALSE`;
+  - clustering: algorithms 2 and 3; starts {1, 20}; iterations {1, 50}; FindClusters seeds {0, 1}; modularity function 2; `group.singletons = FALSE`. Modularity function 2 leaves the resolution unscaled: at 0.8 nearly every cell is a singleton, and on 4 of the 27 test objects every one, where R stops (M10);
   - SCTransform and PCA: npcs {30, 100}; 2,000 and 5,000 variable features; 2,000 fitting cells; Seurat's default seeds.
 
 ### C5. Acceptance criteria (in `tolerances.toml`)

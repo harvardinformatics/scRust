@@ -32,3 +32,13 @@ For the two base objects, `reference/` also holds the stage references M9 and M1
 - `stages/K9_*.npy.gz`: neighborPurity's per-cell 50th distance, neighbour counts and lists (CSR: `neighbors_ptr`, 1-based `neighbors_idx`), weights, totals, purity and maximum.
 
 Index conventions are in [`validation/R/lib/clustering_hooks.R`](../../../validation/R/lib/clustering_hooks.R). `.npy` files are NumPy format 1.0, little-endian, Fortran order for matrices; read the `.gz` ones through `scio::gz`.
+
+## edge/: constructed edge cases for the cluster crate (milestone M10)
+
+Made by `validation/R/cluster_references.R --mode edge` (Seurat 5.5.1's FindClusters and the instrumented optimizer, in the pinned env) and copied by [`validation/slurm/fixtures_cluster.sh`](../../../validation/slurm/fixtures_cluster.sh); R's files themselves stay in `data/clustering/edge/` (listed in the manifest). `crates/cluster/tests/edge_cases.rs` reads:
+
+- `cases.tsv`: each case and setting (53): cells, edges, FindClusters' arguments (resolutions as `%.17g`), R's error where R stopped, what the case exercises;
+- `<case>/snn.mtx.gz`, `<case>/barcodes.tsv`: the graph (stored order, values `%.17g`) and its cells;
+- `expected.tsv`: the bytes and sha256 of every file R wrote for each setting: `metadata.tsv`, the levels files, `cluster_ids.txt`, `nclusters.txt`, `stages/K7_optimizer_ids.npy`, `stages/K7_final_ids.npy`, `stages/rng.npy` and `rng.tsv` (`.Random.seed` at each GroupSingletons call's entry and exit, after `set.seed(20261114)`), and the instrumented optimizer's `optimizer/<res.r>/starts.tsv`, `partitions.npy` and `ids.txt`. The test recomputes each of them from Rust's result in R's format;
+- `printed.tsv`: what FindClusters printed (but the elapsed time), its messages, R's error, and each call's singletons in GroupSingletons' order.
+
