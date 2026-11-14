@@ -13,6 +13,7 @@ members = [
     "crates/knn",
     "crates/kde",
     "crates/doubletfinder",
+    "crates/neighbors",
     "crates/scrust",
 ]
 
@@ -34,3 +35,4 @@ pca = { path = "crates/pca" }
 knn = { path = "crates/knn" }
 kde = { path = "crates/kde" }
 doubletfinder = { path = "crates/doubletfinder" }
+neighbors = { path = "crates/neighbors" }

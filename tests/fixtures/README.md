@@ -3,7 +3,7 @@
 Small fixtures committed to the repository, which `cargo test` checks on every change (docs/PLAN.md A1, A4 and A5b): tier-T data exported from the workflow's test data, and R-generated vectors for `rcompat` (stage S0).
 
 - **Size:** about 20 MB in total at most. Larger fixtures go to `data/` (gitignored) and are listed in `validation/manifest.toml`.
-- **Layout:** one directory per crate or tool, for example `rcompat/` (R vectors, M1), `doubletfinder/<object>/` (inputs and stage references for the five test objects, M2) and `clustering/` (Step 2's K0 vectors and tier-T references, M8; [its README](clustering/README.md)).
+- **Layout:** one directory per crate or tool, for example `rcompat/` (R vectors, M1), `doubletfinder/<object>/` (inputs and stage references for the five test objects, M2) `clustering/` (Step 2's K0 vectors and tier-T references, M8; [its README](clustering/README.md)) and `neighbors/` (the neighbour stage's constructed edge cases, M9; [its README](neighbors/README.md)).
 - **Provenance:** every file is listed in `validation/manifest.toml` with its sha256, size, the script that made it, and the env and profile it was made in. Regenerate fixtures from those recipes; never edit them by hand.
 - **Profile:** fixtures that depend on BLAS are made in the portable profile (`OPENBLAS_CORETYPE=Haswell`, one thread), so tests can check them exactly on any x86-64 CPU with AVX2 (A5b).
 - **From a crate's tests:** `concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures")`.
@@ -28,3 +28,7 @@ Doubles in the TSV and JSON files have 17 significant digits, so Rust's `str::pa
 ## clustering/
 
 Step 2's committed reference data (milestone M8; [`docs/validation/clustering_m8.md`](../../docs/validation/clustering_m8.md)): the K0 vectors of the clustering chain's generators (`k0/`: Seurat's `JavaRandom`, RcppAnnoy's `Kiss64Random`, R's draw in GroupSingletons), and, for seven tier-T objects (the two base objects and the five DoubletFinder inputs, whose counts are the `doubletfinder/` fixtures above), the expected labels and scores of the portable profile and of the saved object and the instrumented optimizer's per-start results; for the two base objects also their counts and the stage references from R's own embeddings (the Annoy index, the neighbours, both graphs, silhouette's and purity's intermediates). Some files are gzipped (`gzip -n -9`) to stay near the size budget. Details in [clustering/README.md](clustering/README.md); the other 20 tier-T objects and the tier-P objects are in `data/clustering/`, listed in `validation/manifest.toml`.
+
+## neighbors/
+
+The neighbour stage's constructed edge cases (milestone M9; [`docs/validation/clustering_m9.md`](../../docs/validation/clustering_m9.md)): 25 inputs that reach Annoy's and FindNeighbors' rare branches, and the size and SHA-256 of every file R wrote for them with each of the three metrics; R's files themselves are in `data/neighbors/edge/`. Details in [neighbors/README.md](neighbors/README.md). The real objects' neighbour references are M8's `clustering/` fixtures.

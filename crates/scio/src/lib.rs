@@ -9,6 +9,7 @@
 //!   stored entry kept, explicit zeros included (M4);
 //! - [`tsv`]: per-cell and per-parameter tables (cluster labels in; `cells.tsv` and the sweep
 //!   tables out);
+//! - [`mtx`]: plain Matrix Market files (graphs), written gzipped and read in stored order;
 //! - [`text`]: doubles as `%.17g` text, as the R reference scripts write them, and back;
 //! - [`json`]: `summary.json` in the R scripts' layout, and a small parser;
 //! - [`npy`]: `.npy` arrays, the format of the R scripts' dense intermediates and RNG
@@ -18,6 +19,7 @@
 pub mod deflate;
 pub mod gz;
 pub mod json;
+pub mod mtx;
 pub mod npy;
 pub mod sha256;
 pub mod sparse;

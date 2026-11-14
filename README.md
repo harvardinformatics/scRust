@@ -84,10 +84,11 @@ To rebuild the env exactly as solved, use `conda create -p .envs/rust-dev --file
 | Crate | Contents |
 |---|---|
 | `rcompat` | R-compatible random numbers and R arithmetic semantics (sampling, `rnorm`, long-double `sum`/`mean`/`var`, `round`, `seq`, `order`, number formatting, R's decimal parser, `fft`, `dnorm`, `approx`), and R's numerical routines that the ports reach (`nlminb`, `optimize`, `uniroot`, `density`, `bw.SJ`, `ksmooth`, quantiles, gamma functions, `dnbinom`, matrixStats), plus a std-only OpenBLAS binding (BLAS, R's `%*%`, LAPACK `dgesdd` as R's `svd()` calls it) |
-| `scio` | plain-file I/O: `.npy`, `%.17g` text, TSV, `summary.json`, gzip and 10x Matrix Market directories, sparse matrices |
+| `scio` | plain-file I/O: `.npy`, `%.17g` text, TSV, `summary.json`, gzip, 10x Matrix Market directories and plain Matrix Market files, sparse matrices |
 | `sctransform` | SCTransform v2 (sctransform 0.4.3 with glmGamPoi 1.22.0's fitting), as Seurat 5.5.1 runs it |
 | `pca` | Seurat's `RunPCA` with irlba 2.4.1 (PrepDR's filter with Seurat's `RowVar`, the Lanczos bidiagonalisation with its restarts and rare branches), its two large products split across threads only where OpenBLAS's kernels keep R's bits |
 | `knn` | exact nearest neighbours, memory-bounded |
 | `kde` | `KernSmooth::bkde`, `approxfun` and moments |
+| `neighbors` | Seurat's `FindNeighbors`: Annoy 1.17.3 as RcppAnnoy 0.0.23 builds and searches it (`Kiss64Random`, the Euclidean, Angular and Manhattan forests, the index file, libstdc++'s heap order), the `SCT_nn` graph and `ComputeSNN`; byte-identical to R's index and graphs |
 | `doubletfinder` | DoubletFinder 2.0.6: the whole tool from the counts (the doublets drawn from R's random-number stream, SCTransform, PCA), the sweep, `summarizeSweep`, `find.pK`, nExp and the calls; stage dumps in the instrumented R runs' layout and the comparison with R runs and saved workflow outputs |
-| `scrust` | the command-line binary, `scrust <tool> ...`: `doubletfinder` (the whole tool; `--from-stages` runs it on an instrumented R run's embeddings), `sctransform`, `pca`, `knn`, `validate doubletfinder`, `validate sctransform` and `validate pca` (Rust against R), and `fingerprint` (CPU, OpenBLAS kernel and threads, glibc) |
+| `scrust` | the command-line binary, `scrust <tool> ...`: `doubletfinder` (the whole tool; `--from-stages` runs it on an instrumented R run's embeddings), `sctransform`, `pca`, `neighbors`, `knn`, `validate doubletfinder`, `validate sctransform`, `validate pca` and `validate neighbors` (Rust against R), and `fingerprint` (CPU, OpenBLAS kernel and threads, glibc) |

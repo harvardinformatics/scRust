@@ -569,7 +569,7 @@ obj <- add_silhouette_to_metadata(obj)  # the workflow's own, through bluster
    - **It affects nothing downstream.** FindNeighbors reads only the PCA embeddings. Annoy and the modularity optimizer have their own generators. GroupSingletons, the only later use of R's stream, calls `set.seed(1)` first (C2).
    - M8 confirms this with a run without RunUMAP.
 4. **FindNeighbors** is called with `dims = 1:30` and its defaults: `k.param = 20`, `prune.SNN = 1/15`, `nn.method = "annoy"`, `n.trees = 50`, `annoy.metric = "euclidean"`, `l2.norm = FALSE`.
-   - **The input** is the first 30 columns of the PCA embeddings (`u %*% diag(d)`): cells × 30, doubles. With fewer than k cells, k becomes the number of cells − 1.
+   - **The input** is the first 30 columns of the PCA embeddings (`u %*% diag(d)`): cells × 30, doubles. With fewer than k cells, k becomes the number of cells − 1. For a single cell that is 0: the search returns no neighbours and building `SCT_nn` then fails (`'i' and 'j' must not contain NA`; M9).
    - **`AnnoyBuildIndex`:** `new(AnnoyEuclidean, 30)`; then `addItem(i − 1, row i)` for every cell in order, each double rounded to float; then `build(50)`.
    - **`AnnoySearch`:** for each cell, `getNNsByVectorList(row, 20, search_k = −1, TRUE)`. With `search_k = −1`, Annoy collects candidates until it holds at least 20 × 50 = 1,000. The query is rounded to float again. The `future_lapply` around the loop has `future.seed = FALSE`, so it draws no random numbers.
    - **The `SCT_nn` graph** is `sparseMatrix(i, j = neighbours, x = 1)`.
@@ -642,6 +642,7 @@ scrust sctransform --counts <10x dir> --out <dir> [--seed 1448145] [--corrected-
 scrust pca         --sct <dir> --out <dir> [--npcs 50] [--seed 42]                         (exists, M5)
 scrust neighbors   --pca <dir> --out <dir> [--dims 1:10] [--k 20] [--trees 50]
                    [--metric euclidean|cosine|manhattan] [--prune 1/15] [--search-k -1]
+                   [--annoy yes|no] [--threads N]                                          (exists, M9)
 scrust cluster     --snn <dir> [--pca <dir>] --out <dir> [--resolution 0.8[,1.2,...]] [--algorithm 1|2|3]
                    [--starts 10] [--iterations 10] [--seed 0] [--modularity 1|2] [--no-group-singletons]
                    [--stats silhouette,purity|none] [--purity-k 50] [--purity-weighted true|false]
@@ -677,7 +678,7 @@ scrust cluster --counts <10x dir> --out <dir> [--preset workflow] [--params <fil
   - `run`: parameters, the versions reproduced, timings, peak RSS and the environment fingerprint;
   - `files`: the manifest of C3f;
 - stage outputs, in subdirectories:
-  - `pca/` and `neighbors/`, always: they are small, and the loaders need them for the reductions and the graphs. `neighbors/` holds `knn_index.tsv` and `knn_distance.tsv` (each cell's k neighbours, 1-based as in R, and their float distances), and `nn.mtx.gz` and `snn.mtx.gz` (Matrix Market, entries in stored order, values as `%.17g` writes them);
+  - `pca/` and `neighbors/`, always: they are small, and the loaders need them for the reductions and the graphs. `neighbors/` holds `knn_index.tsv` and `knn_distance.tsv` (each cell's barcode, then its k neighbours, 1-based as in R, and their float distances, with a header line), and `nn.mtx.gz` and `snn.mtx.gz` (Matrix Market, entries in stored order, values as `%.17g` writes them);
   - `sct/`, in `scrust sctransform`'s layout, with `--keep-stages` or `--export`. Its residuals are large: 1.9 GB on the 79,409-cell objects;
   - on request, `annoy.ann`: the index in Annoy's own file format;
 - with `--export`, the rest of the export (C3f): the input counts, the corrected counts and their log1p, and a README.
@@ -719,7 +720,7 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
   - FFI would need a C++ compiler in `envs/rust-dev.yml`, a build step and vendored C++ sources. The workspace is now the standard library plus OpenBLAS's C interface;
   - FFI stays the fallback, should the port fail to be byte-identical.
 - **Items:** each embedding row is rounded to `f32`, to nearest even, as C++'s conversion and Rcpp's `as<std::vector<float>>` do. Items are added in cell order.
-- **Nodes** have `16 + 4f` bytes: `n_descendants`, the offset `a`, two children and the f-vector. A leaf holds up to K = f + 2 item ids, 32 for 30 dims.
+- **Nodes** have `16 + 4f` bytes for Euclidean and Manhattan: `n_descendants`, the offset `a`, two children and the f-vector. Angular nodes have `12 + 4f` bytes: no offset, and the squared norm Angular stores shares its four bytes with the first child (a union), so an item holds its norm there (M9). A leaf holds up to K = f + 2 item ids with every metric, 32 for 30 dims. Bytes Annoy never writes are zero (`_reallocate_nodes` clears what it adds), so the offset of an item or a leaf is 0.
 - **Node ids:**
   - the items take 0…n−1;
   - then, tree by tree, each node takes the next id when it is created. A leaf is created when it is reached, and a split node after both its children. The smaller child is built first. A subset of one item is that item, not a new node;
@@ -728,13 +729,15 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
   - it picks two distinct random items, then 200 random items. Each is assigned to the nearer centroid, distances weighted by the centroid's count (`ic * dist`), and that centroid becomes `(p*ic + x/1)/(ic + 1)` in float. On a tie, neither moves;
   - the normal is p − q, normalised. The offset accumulates `a += -v*(p + q)/2` in float;
   - each point goes left or right by the sign of `a + v·x`, with a `flip()` at exactly 0;
-  - there are up to three attempts while the larger side holds 95% or more. `_split_imbalance` mixes float and double, as written;
-  - if a split stays above 99%, the sides are drawn at random until it is not. The node keeps its last `a`, with a zero normal.
+  - there are up to three attempts while `_split_imbalance`, the larger side's share computed in double and rounded to float, is at least 0.95 as a double. The rounding lets an exact 95% split pass (19 of 20 gives 0.94999999; M9);
+  - if the last attempt is above 0.99, the sides are drawn at random until it is not; an exact 99% split counts as above (99 of 100 gives 0.99000001). The node keeps its last `a`, with a zero normal.
 - **The search:**
   - a max-priority queue holds pairs of (float priority, node id), with the roots at +∞. Children enter at `min(d, ±margin)`;
   - leaves add all their items, until at least 1,000 candidates have been collected. The candidates are sorted by id and deduplicated, and their distances computed in float;
   - `partial_sort` by (distance, id) keeps the 20 smallest. Distances come back as `sqrt(max(d, 0))`, computed in float.
 - **Metrics:** Euclidean for the workflow. Angular (`annoy.metric = "cosine"`) and Manhattan serve the parameter grid.
+  - Manhattan builds as Euclidean does (the same normal and offset), with its own distance in the two-means steps and the search.
+  - Angular normalises both starting centroids and divides each point by its norm in the two-means updates, skipping zero vectors (their draw is still made). Its margin has no offset. Its distance, `2.0 − 2.0 * pq / sqrt(pp * qq)`, takes the float `sqrt` and computes the quotient and the difference in double, rounded to float on return (`sqrtss`, then `divsd`, `subsd` and `cvtsd2ss` in `RcppAnnoy.so`; M9).
   - Seurat means to convert Angular distances to cosine distances, but `res$dist <- 0.5 * (res$dist * res$dist)` adds a new list element, and the distances it returns are the Angular ones. The port returns those too.
   - The distances feed no graph, so this changes no label.
 - **File format:** `annoy.ann` is the node array, as Annoy's `save()` writes it.
@@ -875,7 +878,7 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
 - **Float conversion:** R rounds the embeddings to float twice, at `addItem` and at the query. The port rounds once and reuses the result, which is the same value. Float distances convert back to double exactly.
 - **Float arithmetic in Annoy:** the operation order of `two_means`, `create_split`, `normalize`, the margins and the distances, including the conversions from integer to float, and `sqrt` in float.
 - **Tie orders:**
-  - the queue pops equal priorities by the larger node id; +0 and −0 compare equal;
+  - the queue pops equal priorities by the larger node id; +0 and −0 compare equal. The port copies libstdc++'s heap moves (`push_heap`, `pop_heap`, `partial_sort`), so even the NaN distances of overflowing inputs come out in R's order (M9's edge cases);
   - `partial_sort` keeps equal distances by the lower item id. Duplicated cells (identical embeddings) produce such ties, and a cell can then be missing from its own neighbour list, as in R;
   - the optimizer breaks equal gains by the lowest cluster index, and equal modularities by the first start;
   - `stable_sort` numbers equal-sized clusters in their previous order;

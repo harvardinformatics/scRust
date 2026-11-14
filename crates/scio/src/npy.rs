@@ -284,15 +284,32 @@ fn header_bytes(dtype: Dtype, shape: &[usize]) -> Vec<u8> {
     out
 }
 
-/// Writes doubles in column-major order with the given shape, byte for byte as R's `npy_write`.
-pub fn write_f64(path: &Path, data: &[f64], shape: &[usize]) -> io::Result<()> {
+/// The bytes [`write_f64`] writes: doubles in column-major order with the given shape, as R's
+/// `npy_write` writes them.
+pub fn encode_f64(data: &[f64], shape: &[usize]) -> Vec<u8> {
     assert_eq!(data.len(), shape.iter().product::<usize>());
     let mut out = header_bytes(Dtype::F8, shape);
     out.reserve(data.len() * 8);
     for v in data {
         out.extend_from_slice(&v.to_le_bytes());
     }
-    fs::File::create(path)?.write_all(&out)
+    out
+}
+
+/// The bytes [`write_i32`] writes.
+pub fn encode_i32(data: &[i32], shape: &[usize]) -> Vec<u8> {
+    assert_eq!(data.len(), shape.iter().product::<usize>());
+    let mut out = header_bytes(Dtype::I4, shape);
+    out.reserve(data.len() * 4);
+    for v in data {
+        out.extend_from_slice(&v.to_le_bytes());
+    }
+    out
+}
+
+/// Writes doubles in column-major order with the given shape, byte for byte as R's `npy_write`.
+pub fn write_f64(path: &Path, data: &[f64], shape: &[usize]) -> io::Result<()> {
+    fs::File::create(path)?.write_all(&encode_f64(data, shape))
 }
 
 /// Writes a matrix held row-major in memory (`rows[r * ncol + c]`, as `scale.data` rows are) as
@@ -324,13 +341,7 @@ pub fn write_f64_rows(path: &Path, rows: &[f64], nrow: usize, ncol: usize) -> io
 
 /// Writes 32-bit integers in column-major order with the given shape, as R's `npy_write`.
 pub fn write_i32(path: &Path, data: &[i32], shape: &[usize]) -> io::Result<()> {
-    assert_eq!(data.len(), shape.iter().product::<usize>());
-    let mut out = header_bytes(Dtype::I4, shape);
-    out.reserve(data.len() * 4);
-    for v in data {
-        out.extend_from_slice(&v.to_le_bytes());
-    }
-    fs::File::create(path)?.write_all(&out)
+    fs::File::create(path)?.write_all(&encode_i32(data, shape))
 }
 
 #[cfg(test)]

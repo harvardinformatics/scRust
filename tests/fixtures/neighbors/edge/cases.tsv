@@ -1,0 +1,26 @@
+case	n	f	k_param	n_trees	prune	embeddings_sha256	what
+duplicates	240	30	20	50	0.066666666666666666	337a6f387e494b70aa7cea1247455ef59ae878f4ab77f5e5cf5a765a93d602ac	240 cells: 40 points 5 times each, interleaved, and 40 more copies of point 7, so 45 identical cells (more than k): ties at distance 0, cells missing from their own lists, splits of identical points
+lattice	225	2	20	50	0.066666666666666666	ece21ccfdcbfd95aa080b9c8d05602ede062bf7622220601a922c3af9b48477b	the integer lattice -7..7 squared (f = 2, leaves of 4): exact midpoints and margins of exactly 0
+two_sites	150	3	20	50	0.066666666666666666	b6b5a0390ddb6f142c4c0ff12f6ccdc6cc97e0c1d356346a9e33bf933cb352c5	70 copies of (1, 0, 0), 70 of (-1, 0, 0) and 10 cells on the plane between them: centroids that stay on the sites, margins of exactly 0
+ulp_outlier	200	4	20	50	0.066666666666666666	c936896d06971500fe3c11515508db02d4adf0c353caceeeb4e0ab4faccd738a	199 copies of one point and one cell a float ulp away (in a coordinate with an odd mantissa, so the midpoint rounds onto the outlier): splits that cannot separate them, retried, kept imbalanced or randomised
+exp_spacing	250	2	20	50	0.066666666666666666	a8a71b2f666a485068e34eb8d1b1c008ab4a733e5d2f30fbb7d6ea71fb23bba3	250 cells at exponentially spaced positions, 2^-118.75 to 2^117.8 (f = 2): splits that peel off a few cells, retried, kept imbalanced or randomised; squared distances that underflow and overflow in float
+exp_spacing_dup	240	2	20	50	0.066666666666666666	ca538ce6857cae73b2992b4fccae4c28a0a38ee685919d337c5d3b417f7dce1e	120 exponentially spaced positions, 2^-60 to 2^59, each twice (f = 2)
+collinear	150	6	20	50	0.066666666666666666	e31a9a63cf0281ac42f8cc90ccd0cf9642b8b528ac6fcbe7f60d049c1d027e92	150 cells on a line through the origin (rank one, f = 6)
+zero_rows	100	4	20	50	0.066666666666666666	3e1698660fcb16a94b2b070cb9da3aa05349be08995fcd93079f5e1448a43db2	20 zero vectors among 80 others: Angular's two_means skips them and its distance to them is 2
+n1_f30	1	30	20	50	0.066666666666666666	91ae03e478a7730b418018ad8662292fad44ab75b82659a3adbeb9905e870b82	1 cells, f = 30 (leaves of K = 32): every root is a leaf
+n2_f30	2	30	20	50	0.066666666666666666	b468b0446568dc6b13de5a6f84154f5f6f76a344294c2e1b360bcc1f3be2bc32	2 cells, f = 30 (leaves of K = 32): every root is a leaf
+n3_f30	3	30	20	50	0.066666666666666666	9b0750647bbc5208d0a06cbb3c220562423635063522c14736e9286a0b514c0a	3 cells, f = 30 (leaves of K = 32): every root is a leaf
+n5_f30	5	30	20	50	0.066666666666666666	53d6d3c51a8c36f44b167381f3bdca7003b9501fc795ee75a204747a8512bae1	5 cells, f = 30 (leaves of K = 32): every root is a leaf
+n32_f30	32	30	20	50	0.066666666666666666	f63883ba289bfb991871ed1ba02100fdc1c352f0170d540ce94e4f0cf3f3e90b	32 cells, f = 30 (leaves of K = 32): every root is a leaf
+n33_f30	33	30	20	50	0.066666666666666666	b45ab88d6b246af04aef261a72d3353ae74b69f047aea7ed4ebc623903e27c56	33 cells, f = 30 (leaves of K = 32): the first split
+n4_f2	4	2	20	50	0.066666666666666666	c5dcd67064cd7cf23733540898d8973a91bef43b15e8b28da4ccb3de67f01ca5	4 cells, f = 2 (K = 4): roots are leaves
+n5_f2	5	2	20	50	0.066666666666666666	acc8143be33f0a22d50efed379d0bfaf38e1e3276c9b04a67fb518195a814779	5 cells, f = 2 (K = 4): the smallest split
+fewer_than_k	12	30	20	50	0.066666666666666666	df895b52800b007b47e8ca34bbed20dca635b39c8e729ec0eaa599ce0c0eb3c0	12 cells with k.param = 20: FindNeighbors lowers k to 11
+pow2_64	64	10	20	50	0.066666666666666666	37221020def3c5d004c38cc940aea7d2b8031a1a0bc7d63919b1a47c133f7908	64 cells (a power of two), f = 10
+pow2_256	256	10	20	50	0.066666666666666666	ab65f7b7ce49271d3f69a9c99345dba0fa02e7c81f9ccd41fd8c7fb9f0bad630	256 cells (a power of two), f = 10
+pow2_1024	1024	10	20	50	0.066666666666666666	5ff7762a82f11ea3f227facadeca661136f9b8733a1687c19e178ba2756d87d7	1024 cells (a power of two), f = 10
+trees10	300	30	20	10	0.066666666666666666	7d46b01e17a707718e4b9bbf1e2e3bb01f74943ff4a7fc7491d7e9d325b96dfa	300 cells, n.trees = 10
+k5	300	30	5	50	0.066666666666666666	7d46b01e17a707718e4b9bbf1e2e3bb01f74943ff4a7fc7491d7e9d325b96dfa	300 cells, k.param = 5
+k50	300	30	50	50	0.066666666666666666	7d46b01e17a707718e4b9bbf1e2e3bb01f74943ff4a7fc7491d7e9d325b96dfa	300 cells, k.param = 50
+prune0	300	30	20	50	0	7d46b01e17a707718e4b9bbf1e2e3bb01f74943ff4a7fc7491d7e9d325b96dfa	300 cells, prune.SNN = 0 (nothing pruned)
+prune02	300	30	20	50	0.20000000000000001	7d46b01e17a707718e4b9bbf1e2e3bb01f74943ff4a7fc7491d7e9d325b96dfa	300 cells, prune.SNN = 0.2
