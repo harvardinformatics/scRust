@@ -12,6 +12,12 @@ pub struct Args {
 
 impl Args {
     pub fn parse(args: &[String]) -> Result<Args, String> {
+        Args::parse_with_flags(args, &[])
+    }
+
+    /// As [`Args::parse`], with `flags` taking no value (`--no-group-singletons`); a flag given
+    /// is stored as "true" ([`Args::flag`]).
+    pub fn parse_with_flags(args: &[String], flags: &[&str]) -> Result<Args, String> {
         let mut values = BTreeMap::new();
         let mut i = 0;
         while i < args.len() {
@@ -19,13 +25,22 @@ impl Args {
             let Some(name) = a.strip_prefix("--") else {
                 return Err(format!("unexpected argument '{a}'"));
             };
-            let v = args.get(i + 1).ok_or_else(|| format!("--{name} needs a value"))?;
-            if values.insert(name.to_string(), v.clone()).is_some() {
+            let (v, step) = if flags.contains(&name) {
+                ("true".to_string(), 1)
+            } else {
+                (args.get(i + 1).ok_or_else(|| format!("--{name} needs a value"))?.clone(), 2)
+            };
+            if values.insert(name.to_string(), v).is_some() {
                 return Err(format!("--{name} given twice"));
             }
-            i += 2;
+            i += step;
         }
         Ok(Args { values })
+    }
+
+    /// Whether the flag `name` was given.
+    pub fn flag(&self, name: &str) -> bool {
+        self.values.contains_key(name)
     }
 
     pub fn get(&self, name: &str) -> Option<&str> {

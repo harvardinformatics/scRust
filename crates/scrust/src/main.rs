@@ -3,11 +3,13 @@
 //! Each tool is a library crate under `crates/` plus a subcommand here, so the repository ships
 //! as one binary: `doubletfinder` (milestone M6: the whole tool; M3: on R's own embeddings), `knn` (the shared
 //! neighbour stage on its own), `sctransform` (SCTransform v2, milestone M4), `pca` (RunPCA,
-//! milestone M5), `neighbors` (FindNeighbors: Annoy and the SNN graph, milestone M9),
-//! `validate` (Rust against R, plan A4) and `fingerprint` (the environment fingerprint of plan
+//! milestone M5), `neighbors` (FindNeighbors: Annoy and the SNN graph, milestone M9), `cluster`
+//! (FindClusters: the modularity optimizer and GroupSingletons, milestone M10), `validate` (Rust
+//! against R, plan A4) and `fingerprint` (the environment fingerprint of plan
 //! A5b, which the R reference runs record too).
 
 mod cli;
+mod cmd_cluster;
 mod cmd_doubletfinder;
 mod cmd_knn;
 mod cmd_neighbors;
@@ -32,8 +34,10 @@ Commands:
                  (milestone M5)
   neighbors      FindNeighbors as Seurat 5.5.1 runs it (RcppAnnoy 0.0.23's Annoy, the SNN
                  graph) on cell embeddings (milestone M9)
+  cluster        FindClusters as Seurat 5.5.1 runs it (the modularity optimizer,
+                 GroupSingletons, the columns and levels) on an SNN graph (milestone M10)
   validate       Compare a Rust run with an R reference run
-                 (validate doubletfinder|sctransform|pca|neighbors)
+                 (validate doubletfinder|sctransform|pca|neighbors|cluster)
   fingerprint    Print the environment fingerprint as JSON: node, CPU, OpenBLAS kernel
                  and threads, glibc (docs/PLAN.md A5b)
 
@@ -64,9 +68,10 @@ fn main() -> ExitCode {
             print!("{}", fingerprint::json());
             ExitCode::SUCCESS
         }
-        Some(cmd @ ("doubletfinder" | "knn" | "neighbors" | "pca" | "sctransform" | "validate")) => {
+        Some(cmd @ ("cluster" | "doubletfinder" | "knn" | "neighbors" | "pca" | "sctransform" | "validate")) => {
             let rest: Vec<String> = std::env::args().skip(2).collect();
             let usage = match cmd {
+                "cluster" => cmd_cluster::USAGE,
                 "doubletfinder" => cmd_doubletfinder::USAGE,
                 "knn" => cmd_knn::USAGE,
                 "neighbors" => cmd_neighbors::USAGE,
@@ -79,6 +84,7 @@ fn main() -> ExitCode {
                 return ExitCode::SUCCESS;
             }
             let result = match cmd {
+                "cluster" => cmd_cluster::main(&rest).map(|_| true),
                 "doubletfinder" => cmd_doubletfinder::main(&rest).map(|_| true),
                 "knn" => cmd_knn::main(&rest).map(|_| true),
                 "neighbors" => cmd_neighbors::main(&rest).map(|_| true),
