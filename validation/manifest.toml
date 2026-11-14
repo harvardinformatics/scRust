@@ -659,9 +659,11 @@ note = "SHA-256 of .Random.seed after RunPCA() (set.seed(42), then irlba's draws
 #               (the bytes and sha256 of every file R wrote) and printed.tsv, for
 #               crates/cluster/tests/edge_cases.rs
 #
-# Compact form: one [[run]] table per reference directory, with its file count and bytes, and one
-# [[file]] for the SHA256SUMS written into it (`sha256sum -c SHA256SUMS` in the directory checks
-# every file). No BLAS is involved and no .rds is read: the references depend on the graph only.
+# Compact form: one [[run]] table per reference directory under cluster_refs/, with its file count
+# and bytes, and one [[file]] for the SHA256SUMS written into it (`sha256sum -c SHA256SUMS` in the
+# directory checks every file). The edge cases share one [[run]], and each setting's SHA256SUMS
+# [[file]] gives its directory's file count and bytes as dir_files and dir_bytes. No BLAS is
+# involved and no .rds is read: the references depend on the graph only.
 # Rust's validation runs (data/clustering/<object>/rust/m10/) are not listed; their results are in
 # the report.
 
@@ -15029,8 +15031,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 11186
 
 [[file]]
 path = "data/clustering/edge/isolated_two_clusters/nogroup/SHA256SUMS"
@@ -15039,8 +15041,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 11291
 
 [[file]]
 path = "data/clustering/edge/isolated_two_clusters/seed1/SHA256SUMS"
@@ -15049,8 +15051,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 11179
 
 [[file]]
 path = "data/clustering/edge/isolated_ten_clusters/workflow/SHA256SUMS"
@@ -15059,8 +15061,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 13513
 
 [[file]]
 path = "data/clustering/edge/isolated_ten_clusters/nogroup/SHA256SUMS"
@@ -15069,8 +15071,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 13601
 
 [[file]]
 path = "data/clustering/edge/isolated_twelve_clusters/workflow/SHA256SUMS"
@@ -15079,8 +15081,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 13469
 
 [[file]]
 path = "data/clustering/edge/singleton_order/modularity2/SHA256SUMS"
@@ -15089,8 +15091,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 9653
 
 [[file]]
 path = "data/clustering/edge/singleton_order/modularity2_nogroup/SHA256SUMS"
@@ -15099,8 +15101,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 9703
 
 [[file]]
 path = "data/clustering/edge/singleton_order_reversed/modularity2/SHA256SUMS"
@@ -15109,8 +15111,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 9682
 
 [[file]]
 path = "data/clustering/edge/one_cell/workflow/SHA256SUMS"
@@ -15120,8 +15122,8 @@ role = "reference"
 stage = "K7"
 run = "clustering/edge"
 r_error = "Matrix contained no network data.  Check format."
-files = 1
-bytes = 79
+dir_files = 1
+dir_bytes = 1026
 
 [[file]]
 path = "data/clustering/edge/two_cells/workflow/SHA256SUMS"
@@ -15130,8 +15132,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 9194
 
 [[file]]
 path = "data/clustering/edge/two_cells_apart/workflow/SHA256SUMS"
@@ -15141,8 +15143,8 @@ role = "reference"
 stage = "K7"
 run = "clustering/edge"
 r_error = "Matrix contained no network data.  Check format."
-files = 1
-bytes = 79
+dir_files = 1
+dir_bytes = 1045
 
 [[file]]
 path = "data/clustering/edge/components/workflow/SHA256SUMS"
@@ -15151,8 +15153,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 10470
 
 [[file]]
 path = "data/clustering/edge/components/algorithm2/SHA256SUMS"
@@ -15161,8 +15163,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 10528
 
 [[file]]
 path = "data/clustering/edge/components/algorithm3/SHA256SUMS"
@@ -15171,8 +15173,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 14835
 
 [[file]]
 path = "data/clustering/edge/ring8/workflow/SHA256SUMS"
@@ -15181,8 +15183,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 9602
 
 [[file]]
 path = "data/clustering/edge/ring8/algorithm3/SHA256SUMS"
@@ -15191,8 +15193,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 13967
 
 [[file]]
 path = "data/clustering/edge/ring8/resolution2/SHA256SUMS"
@@ -15201,8 +15203,8 @@ bytes = 1489
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1489
+dir_files = 17
+dir_bytes = 9426
 
 [[file]]
 path = "data/clustering/edge/lattice6/workflow/SHA256SUMS"
@@ -15211,8 +15213,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 11503
 
 [[file]]
 path = "data/clustering/edge/lattice6/starts1/SHA256SUMS"
@@ -15221,8 +15223,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 8725
 
 [[file]]
 path = "data/clustering/edge/all_singletons/modularity2/SHA256SUMS"
@@ -15232,8 +15234,8 @@ role = "reference"
 stage = "K7"
 run = "clustering/edge"
 r_error = "invalid first argument"
-files = 6
-bytes = 559
+dir_files = 6
+dir_bytes = 3341
 
 [[file]]
 path = "data/clustering/edge/all_singletons/modularity2_nogroup/SHA256SUMS"
@@ -15242,8 +15244,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 9610
 
 [[file]]
 path = "data/clustering/edge/snn63/workflow/SHA256SUMS"
@@ -15252,8 +15254,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 13146
 
 [[file]]
 path = "data/clustering/edge/snn63/resolutions/SHA256SUMS"
@@ -15262,8 +15264,8 @@ bytes = 2623
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 29
-bytes = 2623
+dir_files = 29
+dir_bytes = 35491
 
 [[file]]
 path = "data/clustering/edge/snn63/algorithm2/SHA256SUMS"
@@ -15272,8 +15274,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 13204
 
 [[file]]
 path = "data/clustering/edge/snn63/algorithm3/SHA256SUMS"
@@ -15282,8 +15284,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 17511
 
 [[file]]
 path = "data/clustering/edge/snn64/workflow/SHA256SUMS"
@@ -15292,8 +15294,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 13221
 
 [[file]]
 path = "data/clustering/edge/snn64/resolutions/SHA256SUMS"
@@ -15302,8 +15304,8 @@ bytes = 2623
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 29
-bytes = 2623
+dir_files = 29
+dir_bytes = 35842
 
 [[file]]
 path = "data/clustering/edge/snn64/algorithm2/SHA256SUMS"
@@ -15312,8 +15314,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 13277
 
 [[file]]
 path = "data/clustering/edge/snn64/algorithm3/SHA256SUMS"
@@ -15322,8 +15324,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 17584
 
 [[file]]
 path = "data/clustering/edge/snn65/workflow/SHA256SUMS"
@@ -15332,8 +15334,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 13284
 
 [[file]]
 path = "data/clustering/edge/snn65/resolutions/SHA256SUMS"
@@ -15342,8 +15344,8 @@ bytes = 2623
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 29
-bytes = 2623
+dir_files = 29
+dir_bytes = 35685
 
 [[file]]
 path = "data/clustering/edge/snn65/algorithm2/SHA256SUMS"
@@ -15352,8 +15354,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 13340
 
 [[file]]
 path = "data/clustering/edge/snn65/algorithm3/SHA256SUMS"
@@ -15362,8 +15364,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 17647
 
 [[file]]
 path = "data/clustering/edge/snn128/workflow/SHA256SUMS"
@@ -15372,8 +15374,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 17249
 
 [[file]]
 path = "data/clustering/edge/snn128/resolutions/SHA256SUMS"
@@ -15382,8 +15384,8 @@ bytes = 2623
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 29
-bytes = 2623
+dir_files = 29
+dir_bytes = 46192
 
 [[file]]
 path = "data/clustering/edge/snn128/algorithm2/SHA256SUMS"
@@ -15392,8 +15394,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 17305
 
 [[file]]
 path = "data/clustering/edge/snn128/algorithm3/SHA256SUMS"
@@ -15402,8 +15404,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 21619
 
 [[file]]
 path = "data/clustering/edge/snn256/workflow/SHA256SUMS"
@@ -15412,8 +15414,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 25322
 
 [[file]]
 path = "data/clustering/edge/snn256/resolutions/SHA256SUMS"
@@ -15422,8 +15424,8 @@ bytes = 2623
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 29
-bytes = 2623
+dir_files = 29
+dir_bytes = 67566
 
 [[file]]
 path = "data/clustering/edge/snn256/algorithm2/SHA256SUMS"
@@ -15432,8 +15434,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 25379
 
 [[file]]
 path = "data/clustering/edge/snn256/algorithm3/SHA256SUMS"
@@ -15442,8 +15444,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 29687
 
 [[file]]
 path = "data/clustering/edge/snn1024/workflow/SHA256SUMS"
@@ -15452,8 +15454,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 73720
 
 [[file]]
 path = "data/clustering/edge/snn1024/resolutions/SHA256SUMS"
@@ -15462,8 +15464,8 @@ bytes = 2623
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 29
-bytes = 2623
+dir_files = 29
+dir_bytes = 196461
 
 [[file]]
 path = "data/clustering/edge/snn1024/algorithm2/SHA256SUMS"
@@ -15472,8 +15474,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 73776
 
 [[file]]
 path = "data/clustering/edge/snn1024/algorithm3/SHA256SUMS"
@@ -15482,8 +15484,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 78081
 
 [[file]]
 path = "data/clustering/edge/snn300_high_resolution/resolution5/SHA256SUMS"
@@ -15492,8 +15494,8 @@ bytes = 1489
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1489
+dir_files = 17
+dir_bytes = 28105
 
 [[file]]
 path = "data/clustering/edge/snn300_high_resolution/nogroup2/SHA256SUMS"
@@ -15502,8 +15504,8 @@ bytes = 1489
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1489
+dir_files = 17
+dir_bytes = 28079
 
 [[file]]
 path = "data/clustering/edge/snn300_high_resolution/order/SHA256SUMS"
@@ -15512,8 +15514,8 @@ bytes = 2635
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 29
-bytes = 2635
+dir_files = 29
+dir_bytes = 74934
 
 [[file]]
 path = "data/clustering/edge/snn300_high_resolution/modularity2/SHA256SUMS"
@@ -15522,8 +15524,8 @@ bytes = 2653
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 29
-bytes = 2653
+dir_files = 29
+dir_bytes = 77966
 
 [[file]]
 path = "data/clustering/edge/seeds/seed_minus1/SHA256SUMS"
@@ -15532,8 +15534,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 21785
 
 [[file]]
 path = "data/clustering/edge/seeds/seed_max/SHA256SUMS"
@@ -15542,8 +15544,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 21790
 
 [[file]]
 path = "data/clustering/edge/seeds/seed_minus12345/SHA256SUMS"
@@ -15552,8 +15554,8 @@ bytes = 1501
 role = "reference"
 stage = "K7"
 run = "clustering/edge"
-files = 17
-bytes = 1501
+dir_files = 17
+dir_bytes = 21793
 
 [[file]]
 path = "tests/fixtures/clustering/edge/all_singletons/barcodes.tsv"

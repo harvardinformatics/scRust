@@ -15,10 +15,13 @@
 # manifest_doubletfinder.R from there on, so this section sits before all three. Anything else in
 # the manifest is kept as is.
 #
-# The format is compact: the 519 reference directories hold about 10,000 files, so each directory
-# gets one [[run]] table and its files one SHA256SUMS (the format of `sha256sum`, so
-# `sha256sum -c SHA256SUMS` in the directory checks every file), listed as a [[file]] with its own
-# sha256. The edge cases' inputs and the committed fixture are listed file by file.
+# The format is compact: the 518 reference directories hold about 10,000 files, so each directory's
+# files are listed in one SHA256SUMS (the format of `sha256sum`, so `sha256sum -c SHA256SUMS` in the
+# directory checks every file), itself listed as a [[file]] with its own sha256. Each directory under
+# cluster_refs/ also gets a [[run]] table with its file count and bytes; the edge cases share one
+# [[run]], and each setting's SHA256SUMS [[file]] gives its directory's file count and bytes as
+# dir_files and dir_bytes (its own bytes are the SHA256SUMS file's). The edge cases' inputs and the
+# committed fixture are listed file by file.
 
 args0 <- commandArgs(trailingOnly = FALSE)
 here <- dirname(normalizePath(sub("^--file=", "", grep("^--file=", args0, value = TRUE))))
@@ -140,9 +143,10 @@ if (dir.exists(edge)) {
   for (k in seq_len(nrow(cases))) {
     d <- file.path(edge, cases$case[k], cases$setting[k])
     sz <- sums_of(d)
-    add_file(c(list(path = file.path(d, "SHA256SUMS"), sha256 = sha256_file(file.path(d, "SHA256SUMS")),
-                    bytes = file.size(file.path(d, "SHA256SUMS")), role = "reference", stage = "K7", run = "clustering/edge",
-                    r_error = if (nzchar(cases$error[k])) cases$error[k] else NULL), sz))
+    add_file(list(path = file.path(d, "SHA256SUMS"), sha256 = sha256_file(file.path(d, "SHA256SUMS")),
+                  bytes = file.size(file.path(d, "SHA256SUMS")), role = "reference", stage = "K7", run = "clustering/edge",
+                  r_error = if (nzchar(cases$error[k])) cases$error[k] else NULL,
+                  dir_files = sz$files, dir_bytes = sz$bytes))
   }
 }
 
@@ -179,9 +183,11 @@ header <- c(
   "#               (the bytes and sha256 of every file R wrote) and printed.tsv, for",
   "#               crates/cluster/tests/edge_cases.rs",
   "#",
-  "# Compact form: one [[run]] table per reference directory, with its file count and bytes, and one",
-  "# [[file]] for the SHA256SUMS written into it (`sha256sum -c SHA256SUMS` in the directory checks",
-  "# every file). No BLAS is involved and no .rds is read: the references depend on the graph only.",
+  "# Compact form: one [[run]] table per reference directory under cluster_refs/, with its file count",
+  "# and bytes, and one [[file]] for the SHA256SUMS written into it (`sha256sum -c SHA256SUMS` in the",
+  "# directory checks every file). The edge cases share one [[run]], and each setting's SHA256SUMS",
+  "# [[file]] gives its directory's file count and bytes as dir_files and dir_bytes. No BLAS is",
+  "# involved and no .rds is read: the references depend on the graph only.",
   "# Rust's validation runs (data/clustering/<object>/rust/m10/) are not listed; their results are in",
   "# the report.",
   "")
