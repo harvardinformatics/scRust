@@ -138,6 +138,8 @@ pub fn result_json(r: &FindClusters) -> Json {
                 ("max_modularity", Json::Num(o.max_modularity)),
                 ("max_modularity_printed", Json::Str(o.max_modularity_printed())),
                 ("communities", int(o.n_communities)),
+                ("next_int_draws", Json::Int(o.draws as i64)),
+                ("next_int_power_of_two_draws", Json::Int(o.pow2_draws as i64)),
                 ("singletons", Json::Vector(g.singletons.iter().map(|v| Json::Str(v.to_string())).collect())),
                 ("singleton_cells", Json::Vector(g.singleton_cells.iter().map(|&c| int(c + 1)).collect())),
                 ("singleton_ties", Json::Vector(g.n_tied.iter().map(|&t| int(t)).collect())),

@@ -31,9 +31,10 @@ pub fn quality(network: &Network, clustering: &Clustering, resolution: f64) -> f
     let mut quality_function = 0.0f64;
     for i in 0..network.n_nodes {
         let j = clustering.cluster[i];
-        for k in network.first_neighbor_index[i]..network.first_neighbor_index[i + 1] {
-            if clustering.cluster[network.neighbor[k] as usize] == j {
-                quality_function += network.edge_weight[k];
+        let (a, b) = (network.first_neighbor_index[i], network.first_neighbor_index[i + 1]);
+        for (&nb, &w) in network.neighbor[a..b].iter().zip(&network.edge_weight[a..b]) {
+            if clustering.cluster[nb as usize] == j {
+                quality_function += w;
             }
         }
     }
@@ -82,13 +83,14 @@ pub fn run_local_moving(network: &Network, clustering: &mut Clustering, resoluti
     loop {
         let j = node_permutation[i] as usize;
         let mut n_neighboring_clusters = 0usize;
-        for k in network.first_neighbor_index[j]..network.first_neighbor_index[j + 1] {
-            let l = clustering.cluster[network.neighbor[k] as usize] as usize;
+        let (a, b) = (network.first_neighbor_index[j], network.first_neighbor_index[j + 1]);
+        for (&nb, &w) in network.neighbor[a..b].iter().zip(&network.edge_weight[a..b]) {
+            let l = clustering.cluster[nb as usize] as usize;
             if edge_weight_per_cluster[l] == 0.0 {
                 neighboring_cluster[n_neighboring_clusters] = l as u32;
                 n_neighboring_clusters += 1;
             }
-            edge_weight_per_cluster[l] += network.edge_weight[k];
+            edge_weight_per_cluster[l] += w;
         }
 
         let cj = clustering.cluster[j] as usize;

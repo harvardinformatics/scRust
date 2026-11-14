@@ -21,16 +21,19 @@ const ADDEND: u64 = 0xB;
 /// The 48-bit state mask.
 const MASK: u64 = (1u64 << 48) - 1;
 
-/// `ModularityOptimizer::JavaRandom`: a `java.util.Random` stream.
+/// `ModularityOptimizer::JavaRandom`: a `java.util.Random` stream. It also counts its `nextInt`
+/// calls, and those that took the power-of-two branch (not part of the C++; they change nothing).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JavaRandom {
     seed: u64,
+    draws: u64,
+    pow2_draws: u64,
 }
 
 impl JavaRandom {
     /// `JavaRandom(uint64_t seed)`.
     pub fn new(seed: u64) -> JavaRandom {
-        let mut r = JavaRandom { seed: 0 };
+        let mut r = JavaRandom { seed: 0, draws: 0, pow2_draws: 0 };
         r.set_seed(seed);
         r
     }
@@ -61,8 +64,10 @@ impl JavaRandom {
     #[inline]
     pub fn next_int(&mut self, n: i32) -> i32 {
         assert!(n > 0, "n must be positive");
+        self.draws += 1;
         if (n & n.wrapping_neg()) == n {
             // a power of two
+            self.pow2_draws += 1;
             return ((n as u64).wrapping_mul(self.next(31) as u64) >> 31) as i32;
         }
         loop {
@@ -73,6 +78,11 @@ impl JavaRandom {
                 return val;
             }
         }
+    }
+
+    /// `nextInt` calls so far, and those whose bound was a power of two.
+    pub fn draws(&self) -> (u64, u64) {
+        (self.draws, self.pow2_draws)
     }
 
     /// `Arrays2::generateRandomPermutation(nElements, random)`: the identity, then for each
@@ -104,6 +114,14 @@ mod tests {
     fn negative_seeds_sign_extend() {
         assert_eq!(JavaRandom::from_r_seed(-1), JavaRandom::new(u64::MAX));
         assert_eq!(JavaRandom::from_r_seed(12345), JavaRandom::new(12345));
+    }
+
+    #[test]
+    fn counts_draws() {
+        let mut r = JavaRandom::new(7);
+        r.permutation(8);
+        r.permutation(5);
+        assert_eq!(r.draws(), (13, 8));
     }
 
     #[test]

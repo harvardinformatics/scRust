@@ -113,6 +113,10 @@ pub struct OptimizerResult {
     pub n_clusters: usize,
     /// Wall-clock seconds of the starts (the C++'s "Elapsed time").
     pub seconds: f64,
+    /// `nextInt` calls over all starts, and those whose bound was a power of two (a network,
+    /// reduced network or subnetwork of 2^k nodes).
+    pub draws: u64,
+    pub pow2_draws: u64,
 }
 
 impl OptimizerResult {
@@ -213,6 +217,7 @@ pub fn run(network: &Network, params: &OptimizerParams, keep_partitions: bool) -
     };
     let n_communities = clustering.n_clusters;
     clustering.order_clusters_by_n_nodes();
+    let (draws, pow2_draws) = random.draws();
     Ok(OptimizerResult {
         params: *params,
         n_nodes: network.n_nodes,
@@ -225,6 +230,8 @@ pub fn run(network: &Network, params: &OptimizerParams, keep_partitions: bool) -
         n_clusters: clustering.n_clusters,
         ids: clustering.cluster,
         seconds,
+        draws,
+        pow2_draws,
     })
 }
 

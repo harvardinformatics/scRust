@@ -1,0 +1,54 @@
+case	setting	n_cells	edges	modularity_fxn	resolution	algorithm	n_start	n_iter	random_seed	group_singletons	error	optimizer_equals_R	what
+isolated_two_clusters	workflow	30	132	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	two weighted cliques of 12 interleaved, 6 isolated cells at the end: ties of 2
+isolated_two_clusters	nogroup	30	132	1	0.80000000000000004	1	10	10	12345	FALSE		TRUE	two weighted cliques of 12 interleaved, 6 isolated cells at the end: ties of 2
+isolated_two_clusters	seed1	30	132	1	0.80000000000000004	1	10	10	1	TRUE		TRUE	two weighted cliques of 12 interleaved, 6 isolated cells at the end: ties of 2
+isolated_ten_clusters	workflow	65	150	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	ten cliques of 6 and 5 isolated cells: ties of 10, which sample() resolves to the 9th
+isolated_ten_clusters	nogroup	65	150	1	0.80000000000000004	1	10	10	12345	FALSE		TRUE	ten cliques of 6 and 5 isolated cells: ties of 10, which sample() resolves to the 9th
+isolated_twelve_clusters	workflow	64	120	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	twelve cliques of 5, 4 isolated cells; 64 nodes, a power of two
+singleton_order	modularity2	6	5	2	0.80000000000000004	1	10	10	12345	TRUE		TRUE	pairs A = {1, 2}, B = {3, 4}; singletons 5 (to A 0.5, to 6 0.75) and 6 (to B 0.4)
+singleton_order	modularity2_nogroup	6	5	2	0.80000000000000004	1	10	10	12345	FALSE		TRUE	pairs A = {1, 2}, B = {3, 4}; singletons 5 (to A 0.5, to 6 0.75) and 6 (to B 0.4)
+singleton_order_reversed	modularity2	6	5	2	0.80000000000000004	1	10	10	12345	TRUE		TRUE	as singleton_order with cells 5 and 6 swapped: the singleton tied to B through the other comes first
+one_cell	workflow	1	0	1	0.80000000000000004	1	10	10	12345	TRUE	Matrix contained no network data.  Check format.		a single cell: no network (R stops)
+two_cells	workflow	2	1	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	two connected cells
+two_cells_apart	workflow	2	0	1	0.80000000000000004	1	10	10	12345	TRUE	Matrix contained no network data.  Check format.		two cells without an edge: no network (R stops)
+components	workflow	20	42	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	cliques of 7, 5 and 5 (equal sizes keep their order), an isolated cell, a pair
+components	algorithm2	20	42	1	0.80000000000000004	2	10	10	12345	TRUE		TRUE	cliques of 7, 5 and 5 (equal sizes keep their order), an isolated cell, a pair
+components	algorithm3	20	42	1	0.80000000000000004	3	10	10	12345	TRUE		TRUE	cliques of 7, 5 and 5 (equal sizes keep their order), an isolated cell, a pair
+ring8	workflow	8	8	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	a ring of 8 equal edges: every gain ties
+ring8	algorithm3	8	8	1	0.80000000000000004	3	10	10	12345	TRUE		TRUE	a ring of 8 equal edges: every gain ties
+ring8	resolution2	8	8	1	2	1	10	10	12345	TRUE		TRUE	a ring of 8 equal edges: every gain ties
+lattice6	workflow	36	60	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	a 6 x 6 lattice of equal edges
+lattice6	starts1	36	60	1	0.80000000000000004	1	1	10	12345	TRUE		TRUE	a 6 x 6 lattice of equal edges
+all_singletons	modularity2	10	9	2	0.80000000000000004	1	10	10	12345	TRUE	invalid first argument	TRUE	a path of weak edges: with modularity function 2 at 0.8 no node joins another
+all_singletons	modularity2_nogroup	10	9	2	0.80000000000000004	1	10	10	12345	FALSE		TRUE	a path of weak edges: with modularity function 2 at 0.8 no node joins another
+snn63	workflow	63	1295	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	an SNN graph of 63 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn63	resolutions	63	1295	1	0.29999999999999999,1,3	1	10	10	12345	TRUE		TRUE	an SNN graph of 63 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn63	algorithm2	63	1295	1	0.80000000000000004	2	10	10	12345	TRUE		TRUE	an SNN graph of 63 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn63	algorithm3	63	1295	1	0.80000000000000004	3	10	10	12345	TRUE		TRUE	an SNN graph of 63 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn64	workflow	64	1337	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	an SNN graph of 64 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn64	resolutions	64	1337	1	0.29999999999999999,1,3	1	10	10	12345	TRUE		TRUE	an SNN graph of 64 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn64	algorithm2	64	1337	1	0.80000000000000004	2	10	10	12345	TRUE		TRUE	an SNN graph of 64 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn64	algorithm3	64	1337	1	0.80000000000000004	3	10	10	12345	TRUE		TRUE	an SNN graph of 64 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn65	workflow	65	1387	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	an SNN graph of 65 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn65	resolutions	65	1387	1	0.29999999999999999,1,3	1	10	10	12345	TRUE		TRUE	an SNN graph of 65 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn65	algorithm2	65	1387	1	0.80000000000000004	2	10	10	12345	TRUE		TRUE	an SNN graph of 65 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn65	algorithm3	65	1387	1	0.80000000000000004	3	10	10	12345	TRUE		TRUE	an SNN graph of 65 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn128	workflow	128	1984	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	an SNN graph of 128 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn128	resolutions	128	1984	1	0.29999999999999999,1,3	1	10	10	12345	TRUE		TRUE	an SNN graph of 128 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn128	algorithm2	128	1984	1	0.80000000000000004	2	10	10	12345	TRUE		TRUE	an SNN graph of 128 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn128	algorithm3	128	1984	1	0.80000000000000004	3	10	10	12345	TRUE		TRUE	an SNN graph of 128 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn256	workflow	256	7968	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	an SNN graph of 256 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn256	resolutions	256	7968	1	0.29999999999999999,1,3	1	10	10	12345	TRUE		TRUE	an SNN graph of 256 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn256	algorithm2	256	7968	1	0.80000000000000004	2	10	10	12345	TRUE		TRUE	an SNN graph of 256 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn256	algorithm3	256	7968	1	0.80000000000000004	3	10	10	12345	TRUE		TRUE	an SNN graph of 256 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn1024	workflow	1024	47740	1	0.80000000000000004	1	10	10	12345	TRUE		TRUE	an SNN graph of 1024 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn1024	resolutions	1024	47740	1	0.29999999999999999,1,3	1	10	10	12345	TRUE		TRUE	an SNN graph of 1024 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn1024	algorithm2	1024	47740	1	0.80000000000000004	2	10	10	12345	TRUE		TRUE	an SNN graph of 1024 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn1024	algorithm3	1024	47740	1	0.80000000000000004	3	10	10	12345	TRUE		TRUE	an SNN graph of 1024 cells from a 4-component Gaussian mixture (FindNeighbors, k = 20)
+snn300_high_resolution	resolution5	300	7336	1	5	1	10	10	12345	TRUE		TRUE	300 cells, 6 components: many singletons with edges
+snn300_high_resolution	nogroup2	300	7336	1	2	1	10	10	12345	FALSE		TRUE	300 cells, 6 components: many singletons with edges
+snn300_high_resolution	order	300	7336	1	1.2,0.40000000000000002,2	1	10	10	12345	TRUE		TRUE	300 cells, 6 components: many singletons with edges
+snn300_high_resolution	modularity2	300	7336	2	0.050000000000000003,0.20000000000000001,0.5	1	10	10	12345	TRUE		TRUE	300 cells, 6 components: many singletons with edges
+seeds	seed_minus1	200	4898	1	0.80000000000000004	1	10	10	-1	TRUE		TRUE	negative and extreme seeds (the int converts to uint64_t by sign extension)
+seeds	seed_max	200	4898	1	0.80000000000000004	1	10	10	2147483647	TRUE		TRUE	negative and extreme seeds (the int converts to uint64_t by sign extension)
+seeds	seed_minus12345	200	4898	1	0.80000000000000004	1	10	10	-12345	TRUE		TRUE	negative and extreme seeds (the int converts to uint64_t by sign extension)

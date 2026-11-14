@@ -1,6 +1,6 @@
 //! The `scrust` binary: `--version`, `fingerprint` (environment fingerprint, M2),
 //! `doubletfinder`, `validate` and `knn` (M3), `sctransform` (M4), `pca` (M5), and the whole
-//! `doubletfinder` from the counts (M6).
+//! `doubletfinder` from the counts (M6), `neighbors` (M9) and `cluster` (M10).
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -275,4 +275,88 @@ fn neighbors_match_r_and_validate() {
     let r = scrust(&["neighbors", "--pca", &pca, "--out", &out.display().to_string(), "--dims", "1:51"]);
     assert!(!r.status.success());
     assert!(String::from_utf8_lossy(&r.stderr).contains("More dimensions specified in dims"));
+}
+
+/// `scrust cluster --snn` on a base object's SNN graph (M8's committed fixture, the portable
+/// instrumented R run) at the workflow's settings, then `scrust validate cluster` against that R
+/// run and the instrumented optimizer (K7): the optimizer's ids, the final ids, the labels and
+/// levels, the workflow's files, every start's iterations, modularity and partition. The same
+/// files at one and at four threads, with five resolutions. Then `scrust neighbors`' own output
+/// as the input (the chain's layout), and the refusals: Leiden, another starting point,
+/// resolutions that would overwrite each other. No BLAS: any kernel, any machine.
+#[test]
+fn cluster_matches_r_and_validates() {
+    let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/clustering/filtered_seurat_tenx_test");
+    let reference = base.join("reference");
+    let out = tmp("cluster_workflow");
+    let run = scrust(&[
+        "cluster", "--snn", &reference.join("graphs").display().to_string(), "--out", &out.display().to_string(),
+        "--seed", "12345", "--keep-stages",
+    ]);
+    assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
+    let err = String::from_utf8_lossy(&run.stderr);
+    assert!(err.contains("Maximum modularity in 10 random starts: "), "prints as Seurat does");
+    // --stats asks for silhouette and purity by default: the command says it does not compute them
+    assert!(err.contains("silhouette and purity asked for, but not computed"), "{err}");
+    let report = out.join("validate.json");
+    let v = scrust(&[
+        "validate", "cluster", "--reference", &reference.display().to_string(), "--candidate", &out.display().to_string(),
+        "--optimizer", &base.join("optimizer").display().to_string(), "--json", &report.display().to_string(),
+    ]);
+    assert!(v.status.success(), "{}", String::from_utf8_lossy(&v.stderr));
+    let text = std::fs::read_to_string(&report).unwrap();
+    assert!(text.contains("\"pass\": true"));
+    for check in ["optimizer ids", "final ids", "labels", "levels", "every start (iterations, modularity)", "every start's partition", "cluster_ids.txt", "nclusters.txt"] {
+        assert!(text.contains(check), "{check} not checked");
+    }
+    for f in ["seurat_clusters.tsv", "seurat_clusters_levels.txt", "cluster_ids.txt", "nclusters.txt", "SCT_snn_res.0.8_levels.txt"] {
+        assert!(out.join(f).is_file(), "{f}");
+    }
+    let sc = std::fs::read_to_string(out.join("seurat_clusters.tsv")).unwrap();
+    assert!(sc.starts_with("barcode\tseurat_clusters\n"));
+    assert_eq!(sc.lines().count(), 301);
+    // five resolutions, at one and at four threads: the same files
+    for t in ["1", "4"] {
+        let o = tmp(&format!("cluster_res_t{t}"));
+        let r = scrust(&[
+            "cluster", "--snn", &reference.join("graphs").display().to_string(), "--out", &o.display().to_string(),
+            "--seed", "12345", "--resolution", "0.2,0.4,0.8,1.2,2.0", "--threads", t, "--stats", "none", "--keep-stages",
+        ]);
+        assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
+        assert!(!String::from_utf8_lossy(&r.stderr).contains("not computed"), "--stats none");
+    }
+    let dir = |t: &str| PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("cli/cluster_res_t{t}"));
+    for f in ["clusters.tsv", "metadata.tsv", "optimizer_ids.tsv", "seurat_clusters.tsv", "seurat_clusters_levels.txt", "SCT_snn_res.2_levels.txt", "stages/SCT_snn_res.0.2_partitions.npy"] {
+        assert!(std::fs::read(dir("1").join(f)).unwrap() == std::fs::read(dir("4").join(f)).unwrap(), "{f} depends on the thread count");
+    }
+    let result = |t: &str| {
+        let s = scio::Json::parse(&std::fs::read_to_string(dir(t).join("summary.json")).unwrap()).unwrap();
+        scio::json::to_file_text(s.get("result").unwrap())
+    };
+    assert_eq!(result("1"), result("4"));
+    // scrust neighbors' output as the input: the same labels
+    let nn = tmp("cluster_from_neighbors");
+    let r = scrust(&["neighbors", "--pca", &reference.join("pca").display().to_string(), "--out", &nn.display().to_string(), "--dims", "1:30"]);
+    assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
+    let o = tmp("cluster_from_neighbors_out");
+    let r = scrust(&["cluster", "--snn", &nn.display().to_string(), "--out", &o.display().to_string(), "--seed", "12345", "--stats", "none"]);
+    assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
+    assert_eq!(std::fs::read(o.join("metadata.tsv")).unwrap(), std::fs::read(out.join("metadata.tsv")).unwrap());
+    // refusals
+    let snn = reference.join("graphs").display().to_string();
+    let refused = |extra: &[&str], needle: &str| {
+        let o = tmp("cluster_refused");
+        let mut a = vec!["cluster", "--snn", snn.as_str(), "--out", o.to_str().unwrap()];
+        a.extend_from_slice(extra);
+        let r = scrust(&a);
+        assert!(!r.status.success(), "{extra:?} accepted");
+        let e = String::from_utf8_lossy(&r.stderr);
+        assert!(e.contains(needle), "{extra:?}: {e}");
+    };
+    refused(&["--algorithm", "4"], "Leiden");
+    refused(&["--counts", "x"], "milestones M11");
+    refused(&["--resolution", "0.8,0.8"], "overwrite");
+    refused(&["--modularity", "2", "--resolution", "1.5"], "resolution<1 for alternative modularity");
+    refused(&["--starts", "0"], "Have to have at least one start");
+    refused(&["--seed", "1.5"], "not an integer");
 }
