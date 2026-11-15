@@ -966,6 +966,9 @@ fn compare_stages(g: &mut Grader, reference: &Path, candidate: &Path, r_summary:
             let st: &'static str = match inputs {
                 Inputs::Free | Inputs::Sct => "K1",
                 Inputs::Pca if key.starts_with("pca") || key.starts_with("irlba") || key == "total_variance" => "K2",
+                Inputs::Pca if key.starts_with("annoy") => "K4",
+                Inputs::Pca if key.starts_with("knn") => "K5",
+                Inputs::Pca if key.starts_with("optimizer") || key.contains("singleton") => "K7",
                 _ => "K8",
             };
             // numbers, graded (the floor lists irlba's iterations and products); the rest as text

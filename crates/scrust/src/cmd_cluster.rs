@@ -306,8 +306,10 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     };
     let (r, mut w) = result;
     let r = r.map_err(|e| e.to_string())?;
+    // the chain's stages, timed from the writer's making, on the command's clock
+    let offset = w.started().saturating_duration_since(phases.started()).as_secs_f64();
     for (name, t, rss) in &w.phases {
-        phases.marks.push((name.clone(), *t + phases.marks.first().map_or(0.0, |m| m.1), *rss));
+        phases.marks.push((name.clone(), *t + offset, *rss));
     }
     // what FindClusters prints, as Seurat prints it
     for x in &r.clusters.resolutions {

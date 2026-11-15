@@ -174,17 +174,20 @@ fn cluster_report(argv: &[String]) -> Result<bool, String> {
     for c in &report.checks {
         eprintln!("{:>11} {:<62} {:<14} {:<12} {} of {} differ; {}", c.stage, c.name, c.class.name(), c.status.as_str(), c.n_differ, c.n, c.detail);
     }
-    let within = report.checks.iter().filter(|c| c.status == cluster::validate::Status::WithinFloor).count();
-    eprintln!(
-        "{}",
-        if !report.pass() {
-            "FAIL".to_string()
-        } else if within > 0 {
-            format!("pass: {within} BLAS-dependent checks differ within the R-vs-R floor (tolerance mode), everything else is identical")
-        } else {
-            "pass: everything compared is identical".to_string()
-        }
-    );
+    use cluster::validate::Status as S;
+    let within = report.checks.iter().filter(|c| c.status == S::WithinFloor && c.stage != "saved").count();
+    let within_saved = report.checks.iter().filter(|c| c.status == S::WithinFloor && c.stage == "saved").count();
+    let mut verdict = if !report.pass() {
+        "FAIL".to_string()
+    } else if within > 0 {
+        format!("pass: {within} BLAS-dependent checks differ within the R-vs-R floor (tolerance mode), everything else compared with the R run is identical")
+    } else {
+        "pass: everything compared with the R run is identical".to_string()
+    };
+    if report.pass() && within_saved > 0 {
+        verdict.push_str(&format!("; against the saved object (made under another kernel), {within_saved} checks within the floor"));
+    }
+    eprintln!("{verdict}");
     Ok(report.pass())
 }
 

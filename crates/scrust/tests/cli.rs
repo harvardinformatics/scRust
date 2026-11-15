@@ -456,6 +456,15 @@ fn cluster_routes_agree_byte_for_byte() {
     }
     // the stages each route made itself are recorded too
     assert!(r1.get("rng_after_sha256").and_then(|x| x.get("RunPCA")).and_then(|x| x.as_str()).is_some());
+    // the run record's phases, in order, on one clock
+    for (d, want) in [(&one, "load sctransform pca neighbors cluster silhouette write"), (&from_sct, "load pca neighbors cluster silhouette write"), (&from_pca, "load neighbors cluster silhouette write"), (&from_snn, "load cluster silhouette write")] {
+        let s = scio::Json::parse(&std::fs::read_to_string(d.join("summary.json")).unwrap()).unwrap();
+        let Some(scio::Json::Object(phases)) = s.get("run").and_then(|r| r.get("phases")) else { panic!("{}: no run.phases", d.display()) };
+        let names: Vec<&str> = phases.iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(names.join(" "), want, "{}", d.display());
+        let t: Vec<f64> = phases.iter().map(|(_, v)| v.get("elapsed_s").and_then(|x| x.as_f64()).unwrap()).collect();
+        assert!(t.windows(2).all(|w| w[0] <= w[1]), "{}: the phases go back in time: {t:?}", d.display());
+    }
     assert_eq!(result(&from_pca).get("pca"), r1.get("pca"), "--pca copies scrust pca's result");
 }
 

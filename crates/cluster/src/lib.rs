@@ -1,9 +1,13 @@
-//! Seurat 5.5.1's `FindClusters` without Seurat (docs/PLAN.md A7b, C1 step 5, C2, C3, C3c, C3d;
-//! milestone M10): the modularity optimizer that `RunModularityClusteringCpp` runs, with its
-//! Java-style generator, then `GroupSingletons`, and the metadata columns and levels
-//! `FindClusters.Seurat` makes.
+//! The workflow's clustering without Seurat (docs/PLAN.md A7b, C1, C2, C3; milestones M10 and
+//! M11): Seurat 5.5.1's `FindClusters` (the modularity optimizer that `RunModularityClusteringCpp`
+//! runs, with its Java-style generator, then `GroupSingletons`, and the metadata columns and
+//! levels `FindClusters.Seurat` makes), bluster's `approxSilhouette` ([`silhouette`]), and the
+//! whole chain from the counts as one library entry point ([`chain`]: SCTransform, the workflow's
+//! PCA guard, RunPCA, FindNeighbors, FindClusters and the silhouette widths, through the
+//! `sctransform`, `pca` and `neighbors` crates), with its parameters ([`chain_params`]), its
+//! outputs ([`chain_output`]) and its comparison with R ([`validate`], kernel-gated).
 //!
-//! The chain, as `FindClusters(obj, random.seed = 12345)` runs it on the `SCT_snn` graph with
+//! FindClusters, as `FindClusters(obj, random.seed = 12345)` runs it on the `SCT_snn` graph with
 //! its defaults (modularity function 1, resolution 0.8, algorithm 1, 10 starts, 10 iterations):
 //!
 //! 1. **The network** ([`Network::from_snn`]): the SNN graph's strictly lower triangle, walked
@@ -17,9 +21,11 @@
 //! 4. **The result** ([`find_clusters`]): one column per resolution (`SCT_snn_res.0.8`) with
 //!    Seurat's level order, and `seurat_clusters`.
 //!
-//! None of it uses BLAS: the result is the same on any machine and for any thread count, given
-//! the same SNN graph. Silhouette widths (M11) and neighbourhood purity (M12) are added to this
-//! crate later. The standard library is the only dependency besides the workspace's crates.
+//! FindClusters and the silhouette use no BLAS: their results are the same on any machine and for
+//! any thread count, given the same SNN graph and embeddings. SCTransform and RunPCA call
+//! OpenBLAS, so the chain from the counts reproduces R bit for bit under R's kernel. Neighbourhood
+//! purity (M12) is added later. The standard library is the only dependency besides the
+//! workspace's crates.
 
 pub mod chain;
 pub mod chain_output;

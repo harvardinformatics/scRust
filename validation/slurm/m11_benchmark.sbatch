@@ -11,7 +11,7 @@
 #   threads.txt           every file of t1 and t<many> byte-identical (summary.json: its result
 #                         section), and the same files as the validation run's (VALIDATION_LABEL,
 #                         when given: its run/ minus stages/)
-# Nothing but this job runs on the node's CPUs (--exclusive is not used; 32 CPUs are reserved).
+# The job reserves 32 CPUs and 96 GiB of the node; --exclusive is not used, so other jobs may share it.
 #
 #SBATCH --job-name=scrust-m11-bench
 #SBATCH -A informatics

@@ -475,6 +475,71 @@ criterion = "exact"
 compare = ["SCT_nn", "SCT_snn"]
 detail = "dimensions, every stored entry in stored order, values bitwise"
 
+# K1, K2, K8 and the chain's thread criterion (M11; docs/validation/clustering.md): `scrust cluster
+# --counts --preset workflow` from each object's exported counts, with the stage dumps of M8's
+# instrumented runs, against every R run of M8 in the same OpenBLAS profile (the portable runs on
+# Sapphire Rapids and Cascade Lake with OPENBLAS_CORETYPE=Haswell, the production runs on Sapphire
+# Rapids with the kernel detected; validation/slurm/m11_cluster.sbatch, label m11-eedf376, binary
+# data/clustering/bin/scrust-m11-eedf376; jobs 60803803, 60803842, 60803843, 60803844), graded by
+# kernel (exact: the kernels match). Settled (M11): exact, in all 222 comparisons of the 27 tier-T
+# and 7 tier-P objects (portable 118, production 104), 20,383 checks and 1.11 billion values; the
+# only checks not identical are the portable runs' silhouette widths against the saved objects
+# (118), which are graded under the saved objects' kernel and stay within the floor, as M8 found.
+#
+# K1 SCTransform at seed 12345 (v5 and v3 assays: the emptyDrops objects' instrumented runs are v3,
+# and their v5 runs were compared too): every S2a-S2d array R dumped (scale.data and the residual
+# matrix wherever R kept them; R's digest of scale.data in its layout for the three light-level
+# objects), the RNG checkpoints of SCTransform, every SCTransform scalar both runs recorded, and R's
+# digest of .Random.seed after SCTransform.
+[clustering.K1]
+criterion = "exact"
+blas_dependent = true
+compare = ["S2a", "S2b", "S2c", "S2d", "scale_data (array, or its digest at level light)", "rng_vst_entry", "rng_after_cell_sampling", "rng_fits_entry", "rng_bin_entry", "rng_fits_exit", "rng_vst_exit", "rng_sctransform_exit", "rng_after_SCTransform_sha256", "stage_scalars"]
+otherwise = { criterion = "floor", floor = "clustering.floor.kernel" }
+
+# K2 RunPCA with 50 PCs at seed 12345 (work 66, capped for small objects): S3's embeddings,
+# loadings, standard deviations and irlba's d, the PCA features, irlba's iterations and products,
+# the total variance, the RNG checkpoints at RunPCA's and irlba's entry and exit, R's digest of
+# .Random.seed after RunPCA, and the files: pca/ (embeddings, loadings and their features in order,
+# standard deviations) against R's pca/.
+[clustering.K2]
+criterion = "exact"
+blas_dependent = true
+compare = ["S3_embeddings", "S3_loadings", "S3_sdev", "S3_irlba_d", "S2d_pca_features", "irlba_iter", "irlba_mprod", "total_variance", "rng_pca_entry", "rng_irlba_entry", "rng_irlba_exit", "rng_pca_exit", "rng_after_RunPCA_sha256", "pca/"]
+otherwise = { criterion = "floor", floor = "clustering.floor.kernel" }
+rng_state = "exact"
+
+# K8 end to end, from the counts: K3-K7 from the Rust run's own PCA (K3_items, annoy.ann, K5's ids
+# and distances, both graphs, K7's ids, labels, levels, printed numbers, singletons and
+# .Random.seed after GroupSingletons, the workflow's files and logged numbers), the silhouette
+# widths and closest clusters (K8_*, metadata.tsv), against the instrumented runs; the files
+# against the direct runs (the runs without RunUMAP included): metadata.tsv's columns, the levels,
+# cluster_ids.txt, nclusters.txt, pca/, the graphs, the result section's numbers; the labels and
+# levels against the saved objects, and the silhouette widths against them in the production
+# profile (graded under the saved objects' kernel, SapphireRapids). Not compared: the columns of
+# later milestones (neighborhood_purity: M12; nCount_SCT, nFeature_SCT: M13), R's K9 and K10
+# arrays, R's .Random.seed after RunUMAP (not ported; nothing later reads it). Silhouette is also
+# teacher-forced on R's own embeddings and labels (the K8_* arrays), BLAS-free, exact on any machine:
+# 98 comparisons with instrumented references, 490 checks identical.
+[clustering.K8]
+criterion = "exact"
+blas_dependent = true
+compare = ["K3", "K4", "K5", "K6", "K7", "K8_silhouette_width", "K8_silhouette_other", "K8_centroids", "K8_cluster_var", "metadata.tsv", "levels", "cluster_ids.txt", "nclusters.txt", "pca/", "graphs", "result", "saved labels and levels", "saved silhouette widths (production profile)"]
+otherwise = { criterion = "floor", floor = "clustering.floor.kernel" }
+teacher_forced_silhouette = "exact on any machine"
+not_compared = ["neighborhood_purity (M12)", "nCount_SCT, nFeature_SCT (M13)", "K9, K10 arrays", ".Random.seed after RunUMAP"]
+
+# Kernel-gated grading shown on deliberately mismatched pairs (M11): each Rust run against the
+# other profile's instrumented R run on Sapphire Rapids, 68 pairs of the 34 objects in both
+# directions: all in tolerance mode, every BLAS-free check identical, 1,028 BLAS-dependent checks
+# within [clustering.floor.kernel], none beyond it. DoubletFinder: 18 pairs of M6's runs (10 objects),
+# 16 within [doubletfinder.floor.kernel]; the two largest objects, whose per-stage floor M2 did not
+# measure, exceed it slightly (docs/validation/clustering.md, Findings).
+[clustering.kernel_gating_shown]
+pairs = 68
+passed = 68
+checks_within_floor = 1028
+
 # Threads (M9, scrust neighbors): 1 and 32 threads on both 79,409-cell objects give byte-identical
 # knn_index.tsv, knn_distance.tsv, nn.mtx.gz, snn.mtx.gz and annoy.ann (job 60383132,
 # validation/slurm/m9_benchmark.sbatch); cargo test compares 1, 3, 4 and 7 threads on tier T.
@@ -566,4 +631,71 @@ measured_m10 = [
   { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", resolutions = 1, threads = 1, clustering_s = 14.8, process_wall_s = 15.8, peak_rss_gib = 0.15 },
   { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", resolutions = 5, threads = 1, clustering_s = 70.3, process_wall_s = 71.3, peak_rss_gib = 0.15 },
   { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", resolutions = 5, threads = 32, clustering_s = 15.4, process_wall_s = 16.4, peak_rss_gib = 0.41 },
+]
+
+# Threads (M11), the chain: scrust cluster --counts --preset workflow at one thread and at many,
+# every file compared byte for byte, and summary.json's result section. Tier T, both profiles:
+# 8 and 1 threads on all 27 objects (m11_cluster.sbatch's second run; 62 files each: the outputs,
+# sct/, every start's partition, the stage dumps). Tier P, portable: 8 and 1 threads on all 7
+# (labels m11-eedf376 and m11-eedf376-t1, job 60805276, validation/slurm/m11_threads.sh; 55-56
+# files, the stage dumps included), and the 1-thread runs' 17 validation reports identical to the
+# 8-thread runs' check by check. Tier P, production: 1 and 32 threads (the benchmark, job
+# 60804011) and 8 (the validation run): the 17 output files. cargo test compares 1, 2 and 5
+# threads on tier T, and the staged starts with the one-process run. Settled (M11): byte-identical
+# in every comparison.
+[clustering.threads]
+criterion = "byte-identical"
+compared = [
+  { tier = "T", profile = "portable", objects = 27, threads = [8, 1], files = 62, differing = 0 },
+  { tier = "T", profile = "production", objects = 27, threads = [8, 1], files = 62, differing = 0 },
+  { tier = "P", profile = "portable", objects = 7, threads = [8, 1], files = "55-56", differing = 0 },
+  { tier = "P", profile = "production", objects = 7, threads = [1, 32, 8], files = 17, differing = 0 },
+]
+
+# Performance (M11), the chain: scrust cluster --counts --preset workflow on the seven tier-P
+# objects, without stage dumps, at 1 and 32 threads, one Sapphire Rapids node (Xeon Platinum 8480CL,
+# test partition, 32 CPUs reserved; job 60804011, validation/slurm/m11_benchmark.sbatch, binary
+# scrust-m11-eedf376), against M8's direct production R runs of the chain on the same inputs (R with
+# OpenBLAS at one thread, the same CPU type), without RunUMAP and, for context, with it. wall_s and
+# peak_rss_gib: the whole process (/usr/bin/time -v); R's to_silhouette_s: from the timer's start,
+# after loading the packages, to the end of the silhouette (reading the input included), R's
+# like-for-like with Rust's run, which computes no purity yet (M12) and writes no export (M13);
+# purity_s and write_s: R's shares that Rust does not have yet. Rust's stage times include writing
+# each stage's files (run.phases; the validation binary's chain times carried an offset of at most
+# 0.12 s, counted in SCTransform, fixed after the runs). Settled (M11): met. Rust at one thread takes
+# 2.7-5.7 times less time than R's whole run and 2.0-2.6 times less than R's chain alone, at 32
+# threads 8.6-17.4 times less than R's whole run, and peaks at 0.15-3.19 GiB against R's
+# 2.50-104.13 GiB; 3.15 GiB (1 thread) and 3.19 GiB (32) on the 79,409-cell objects.
+[clustering.performance]
+criterion = "peak RSS and wall time below R's direct run of the chain without RunUMAP, on the same input and CPU type; at most 10 GiB on the 79,409-cell objects"
+peak_rss_gib_max_79409_cells = 10
+measured_m11 = [
+  { object = "soupx_tenx_SRR18256555", side = "R", threads = 1, umap = false, wall_s = 47.1, to_silhouette_s = 30.3, purity_s = 0.2, write_s = 8.1, peak_rss_gib = 2.50 },
+  { object = "soupx_tenx_SRR18256555", side = "R", threads = 1, umap = true, wall_s = 71.4, runumap_s = 9.5, peak_rss_gib = 2.50 },
+  { object = "soupx_tenx_SRR18256555", side = "Rust", threads = 1, wall_s = 11.7, sctransform_s = 6.9, pca_s = 3.6, neighbors_s = 0.6, cluster_s = 0.2, silhouette_s = 0.04, peak_rss_gib = 0.15 },
+  { object = "soupx_tenx_SRR18256555", side = "Rust", threads = 32, wall_s = 3.0, sctransform_s = 1.4, pca_s = 0.7, neighbors_s = 0.3, cluster_s = 0.2, silhouette_s = 0.04, peak_rss_gib = 0.18 },
+  { object = "soupx_tenx_10xmousebrain", side = "R", threads = 1, umap = false, wall_s = 215.0, to_silhouette_s = 91.9, purity_s = 1.0, write_s = 113.6, peak_rss_gib = 12.02 },
+  { object = "soupx_tenx_10xmousebrain", side = "R", threads = 1, umap = true, wall_s = 295.0, runumap_s = 15.7, peak_rss_gib = 12.01 },
+  { object = "soupx_tenx_10xmousebrain", side = "Rust", threads = 1, wall_s = 38.0, sctransform_s = 21.2, pca_s = 7.7, neighbors_s = 2.6, cluster_s = 1.0, silhouette_s = 0.21, peak_rss_gib = 1.44 },
+  { object = "soupx_tenx_10xmousebrain", side = "Rust", threads = 32, wall_s = 14.7, sctransform_s = 5.6, pca_s = 1.7, neighbors_s = 1.0, cluster_s = 1.0, silhouette_s = 0.21, peak_rss_gib = 1.44 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "R", threads = 1, umap = false, wall_s = 211.5, to_silhouette_s = 87.3, purity_s = 0.9, write_s = 115.3, peak_rss_gib = 12.08 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "R", threads = 1, umap = true, wall_s = 226.4, runumap_s = 12.7, peak_rss_gib = 11.88 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "Rust", threads = 1, wall_s = 37.2, sctransform_s = 21.4, pca_s = 6.9, neighbors_s = 2.4, cluster_s = 1.1, silhouette_s = 0.21, peak_rss_gib = 1.44 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "Rust", threads = 32, wall_s = 14.9, sctransform_s = 5.6, pca_s = 1.7, neighbors_s = 1.1, cluster_s = 1.1, silhouette_s = 0.21, peak_rss_gib = 1.44 },
+  { object = "soupx_emptydrops_4500871lane", side = "R", threads = 1, umap = false, wall_s = 204.8, to_silhouette_s = 153.5, purity_s = 9.7, write_s = 33.5, peak_rss_gib = 23.36 },
+  { object = "soupx_emptydrops_4500871lane", side = "R", threads = 1, umap = true, wall_s = 240.8, runumap_s = 32.1, peak_rss_gib = 23.36 },
+  { object = "soupx_emptydrops_4500871lane", side = "Rust", threads = 1, wall_s = 75.2, sctransform_s = 42.6, pca_s = 16.0, neighbors_s = 6.4, cluster_s = 4.0, silhouette_s = 0.67, peak_rss_gib = 1.48 },
+  { object = "soupx_emptydrops_4500871lane", side = "Rust", threads = 32, wall_s = 23.9, sctransform_s = 8.3, pca_s = 3.1, neighbors_s = 2.5, cluster_s = 3.9, silhouette_s = 0.67, peak_rss_gib = 1.48 },
+  { object = "soupx_emptydrops_sscovelli", side = "R", threads = 1, umap = false, wall_s = 808.4, to_silhouette_s = 474.6, purity_s = 192.6, write_s = 131.9, peak_rss_gib = 62.13 },
+  { object = "soupx_emptydrops_sscovelli", side = "R", threads = 1, umap = true, wall_s = 883.2, runumap_s = 107.7, peak_rss_gib = 62.13 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 1, wall_s = 205.2, sctransform_s = 109.6, pca_s = 49.2, neighbors_s = 20.5, cluster_s = 15.0, silhouette_s = 2.38, peak_rss_gib = 3.15 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 32, wall_s = 59.8, sctransform_s = 19.5, pca_s = 8.4, neighbors_s = 6.2, cluster_s = 15.1, silhouette_s = 2.35, peak_rss_gib = 3.19 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "R", threads = 1, umap = false, wall_s = 778.0, to_silhouette_s = 456.8, purity_s = 180.3, write_s = 130.7, peak_rss_gib = 57.52 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "R", threads = 1, umap = true, wall_s = 1010.8, runumap_s = 117.1, peak_rss_gib = 57.53 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 1, wall_s = 203.0, sctransform_s = 108.7, pca_s = 47.8, neighbors_s = 20.2, cluster_s = 15.6, silhouette_s = 2.42, peak_rss_gib = 3.15 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 32, wall_s = 61.0, sctransform_s = 19.8, pca_s = 8.8, neighbors_s = 6.3, cluster_s = 15.4, silhouette_s = 2.44, peak_rss_gib = 3.19 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "R", threads = 1, umap = false, wall_s = 905.9, to_silhouette_s = 604.8, purity_s = 74.4, write_s = 202.8, peak_rss_gib = 104.13 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "R", threads = 1, umap = true, wall_s = 1144.7, runumap_s = 82.9, peak_rss_gib = 104.13 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, wall_s = 255.5, sctransform_s = 181.3, pca_s = 39.8, neighbors_s = 14.3, cluster_s = 9.6, silhouette_s = 1.10, peak_rss_gib = 2.65 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, wall_s = 52.1, sctransform_s = 20.8, pca_s = 7.2, neighbors_s = 4.5, cluster_s = 9.2, silhouette_s = 1.10, peak_rss_gib = 2.69 },
 ]

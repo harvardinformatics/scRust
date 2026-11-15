@@ -69,7 +69,8 @@ pub struct Writer {
     pub scale_data_sha256: Option<String>,
     /// The files written, relative to `out`.
     pub files: Vec<String>,
-    /// Elapsed time and peak memory after each stage, for the run record.
+    /// Elapsed time (since the writer was made, [`Writer::started`]) and peak memory after each
+    /// stage, for the run record.
     pub phases: Vec<(String, f64, Option<u64>)>,
     start: std::time::Instant,
 }
@@ -109,6 +110,11 @@ impl Writer {
             phases: Vec::new(),
             start: std::time::Instant::now(),
         }
+    }
+
+    /// When the writer was made: `phases` are timed from it.
+    pub fn started(&self) -> std::time::Instant {
+        self.start
     }
 
     /// Records stage dumps at `level` into `<out>/stages`.
@@ -419,6 +425,7 @@ impl Observer for Writer {
     fn phase(&mut self, name: &str) {
         self.phases.push((name.to_string(), self.start.elapsed().as_secs_f64(), peak_rss_kib()));
     }
+
 }
 
 #[cfg(test)]

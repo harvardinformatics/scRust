@@ -496,6 +496,27 @@ mod tests {
     }
 
     #[test]
+    fn fixtures_record_their_kernel() {
+        let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+        // from the fixture's own run record (reference/summary.json's fingerprint)
+        assert_eq!(fixture_kernel(&fx.join("doubletfinder/soupx_tenx_test")).as_deref(), Some("Haswell"));
+        // from tests/fixtures/kernels.tsv: a file, a directory, and a directory below an entry
+        assert_eq!(fixture_kernel(&fx.join("rcompat/nlminb.tsv")).as_deref(), Some("Haswell"));
+        assert_eq!(fixture_kernel(&fx.join("pca/cli_soupx_tenx_test")).as_deref(), Some("Haswell"));
+        assert_eq!(fixture_kernel(&fx.join("clustering/soupx_tenx_test/reference/stages")).as_deref(), Some("Haswell"));
+        assert_eq!(fixture_kernel(&fx.join("clustering/soupx_tenx_test/saved")).as_deref(), Some("SapphireRapids"));
+        // BLAS-free fixtures record none
+        assert_eq!(fixture_kernel(&fx.join("rcompat/order.tsv")), None);
+        // the check passes under the fixture's own kernel
+        let k = fixture_kernel(&fx.join("rcompat/nlminb.tsv")).unwrap();
+        if corename() == k {
+            require_fixture_kernel(&fx.join("rcompat/nlminb.tsv"), "test");
+        } else {
+            assert!(std::panic::catch_unwind(|| require_fixture_kernel(&fx.join("rcompat/nlminb.tsv"), "test")).is_err());
+        }
+    }
+
+    #[test]
     fn nan_falls_back_to_r_loop() {
         let x = [f64::NAN, 1.0];
         let z = tcrossprod(&x, 2, 1, &[2.0, 3.0], 2, 1);

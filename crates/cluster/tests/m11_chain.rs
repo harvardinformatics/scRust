@@ -10,7 +10,8 @@
 //!   and irlba's), and for the base objects the PCA embeddings and the K3, K5, K7 and K8 arrays.
 //!   SCTransform's and RunPCA's products are OpenBLAS calls and the references are portable runs,
 //!   so the test first checks that the kernel in use is the references' (Haswell), and stops with
-//!   both kernels named when it is not. The results do not depend on the thread count.
+//!   both kernels named when it is not. The results do not depend on the thread count (under
+//!   any kernel: that test compares Rust's runs with each other).
 //! - **Teacher-forced silhouette** (the base objects): R's own embeddings and labels give R's
 //!   `K8_*` arrays and `silhouette_width` column bit for bit. No BLAS: any kernel, any machine.
 
@@ -159,10 +160,10 @@ fn the_chain_from_the_counts_is_r_s() {
     }
 }
 
+/// Rust against Rust under one kernel: any kernel.
 #[test]
 fn independent_of_the_thread_count() {
     let object = "soupx_emptydrops_test";
-    rcompat::blas::require_fixture_kernel(&reference(object), "the clustering chain at several thread counts");
     let files = |t: usize| -> Vec<(String, Vec<u8>)> {
         let dir = out_dir(&format!("threads_{t}"));
         run(object, &dir, t);

@@ -37,7 +37,7 @@ scRust/
   Cargo.toml                 workspace
   crates/
     rcompat/                 R-compatible random numbers and R arithmetic semantics (A5)
-    scio/                    sparse matrix I/O (10x Matrix Market and HDF5); TSV/JSON/.npy; the output manifest
+    scio/                    sparse matrix I/O (10x Matrix Market and HDF5); TSV/JSON/.npy/TOML; stage dumps; kernel-gated grading; the output manifest
     sctransform/             SCTransform v2 port (with glmGamPoi's fitting), and its corrected counts
     pca/                     port of irlba as Seurat calls it
     knn/                     exact nearest neighbours, memory-bounded, parallel over cells (DoubletFinder; purity)
@@ -183,8 +183,8 @@ Exact matching depends on copying R's behaviour in these places. Each is unit-te
    - thread count and glibc version;
    - library and package versions.
 
-   The harness runs exact checks only when the BLAS-relevant fields match. Otherwise it switches to tolerance mode (the R-vs-R floor) and says so in the report. A different machine therefore produces neither false failures nor false "exact" claims. Step 1's `scrust validate` records the kernels as one more check but grades the others as usual. M11 adds the switch to both validators, and a kernel check to the tests that read portable fixtures (C6).
-4. **Teacher forcing keeps most tests machine-independent.** Each stage can take the reference's own intermediate as input. Stages without BLAS are then exact on any machine: RNG, sampling, filters, the glmGamPoi Newton fits and `nlminb`, regularisation, distances, ranks, pANN, BC and pK. For DoubletFinder, only the Cox–Reid term in S2b, S2d and S3 depend on BLAS.
+   The harness runs exact checks only when the BLAS-relevant fields match. Otherwise it switches to tolerance mode (the R-vs-R floor) and says so in the report. A different machine therefore produces neither false failures nor false "exact" claims. Since M11 both validators do this (`scio::grade`): exact when the two runs' recorded OpenBLAS kernels match; otherwise, and whenever a run records none, BLAS-free checks stay exact and BLAS-dependent ones are graded against `[<tool>.floor.kernel]` (`validation/tolerances.toml`). The tests that compare a BLAS-dependent result with a portable fixture first compare the kernel in use (`openblas_get_corename`) with the fixture's, and stop with both kernels named when they differ (`rcompat::blas::require_fixture_kernel`).
+4. **Teacher forcing keeps most tests machine-independent.** Each stage can take the reference's own intermediate as input. Stages without BLAS are then exact on any machine: RNG, sampling, filters, the glmGamPoi Newton fits and `nlminb`, regularisation, distances, ranks, pANN, BC and pK. For DoubletFinder, only S2b (glmGamPoi's Cox–Reid term, a `dgemv`, and `nlminb`, whose PORT routines call `ddot` and `dnrm2`), S2d and S3 depend on BLAS (M11 corrected this: the `nlminb` calls).
 5. **Fixtures are recipes.** The manifest stores a sha256 for each portable fixture. Developers on another cluster regenerate the fixtures from the pinned env instead of copying gigabytes; matching checksums prove the environment is identical before any Rust test runs.
 6. **Non-x86 machines (ARM, macOS):** stages that use BLAS or libm run in tolerance mode; BLAS-free stages stay exact.
 7. **CI:** a GitHub Actions x86-64 runner uses the portable profile with the small committed fixtures. Production-profile tests are `#[ignore]`d and run through sbatch on Cannon.
@@ -647,21 +647,21 @@ scrust cluster     --snn <dir> [--pca <dir>] --out <dir> [--resolution 0.8[,1.2,
                    [--starts 10] [--iterations 10] [--seed 0] [--modularity 1|2] [--no-group-singletons]
                    [--graph-name SCT_snn] [--keep-stages] [--threads N]
                    [--stats silhouette,purity|none] [--purity-k 50] [--purity-weighted true|false]
-                                                                       (--snn exists, M10; --pca and the scores: M11, M12)
+                                                                       (--snn: M10; --pca and silhouette: M11; purity: M12)
 ```
 
 The whole chain also runs in one process, for the workflow:
 
 ```
 scrust cluster --counts <10x dir> --out <dir> [--preset workflow] [--params <file.toml>]
-               [--export] [--keep-stages] [--metadata <tsv>] [--threads N]
+               [--export] [--keep-stages] [--dump-stages none|light|standard|full] [--metadata <tsv>] [--threads N]
 ```
 
-`scrust cluster` can start from any stage's output (`--sct`, `--pca`, `--snn`), so a sweep over k or the resolution reuses one SCTransform and PCA. The scores need the PCA, so starting from `--snn` they need `--pca` too.
+`scrust cluster` can start from any stage's output (`--sct`, `--pca`, `--snn`), so a sweep over k or the resolution reuses one SCTransform and PCA. The scores need the PCA, so starting from `--snn` they need `--pca` too. Each route writes the same files (M11): `scrust sctransform` writes the counts' per-cell columns (`cell_metadata.tsv`: `nCount_RNA`, `nFeature_RNA`), and `scrust pca` and `scrust neighbors` carry them forward. Every SCTransform, RunPCA and FindNeighbors parameter has a flag of its own (`--sct-seed`, `--ncells`, `--variable-features`, `--clip-range`, `--npcs`, `--pca-seed`, `--weight-by-var`, `--pca-guard`, `--dims`, `--k`, `--trees`, `--metric`, `--prune`, `--search-k`); `--seed` stays FindClusters' `random.seed`. `--dump-stages` writes the stage dumps of M8's instrumented runs, which `scrust validate cluster` compares.
 
 **Parameters.**
 - **Every Seurat argument listed in A7b** is a parameter, with Seurat's default. It is set by a flag or in a TOML file, read by a small parser in `scio` (standard library only).
-- **`--preset workflow`** sets the workflow's calls: seed 12345 in SCTransform, RunPCA and FindClusters, and `dims = 1:30`.
+- **`--preset workflow`** sets the workflow's calls: seed 12345 in SCTransform, RunPCA and FindClusters, `dims = 1:30`, and the workflow's PCA guard (`require_min_cells_for_pca`: 50 cells or fewer stop the run, with the workflow's message). Without the preset the guard is off, as it is not Seurat's.
 - **Other code paths are refused.** Options that would take Seurat down another code path, such as `l2.norm`, `nn.method = "rann"` or `"hnsw"`, Leiden and `vars.to.regress`, are rejected with an error, as `SctParams::check` does now.
 - **Fractions are divided.** A value written as `1/15` is parsed and divided, so it is R's double.
 - **The scores** (`--stats`, both by default, as in the workflow) use the neighbour search's PCA dims, so 1:30 under the preset. Purity takes bluster's defaults, k = 50 and weights.
@@ -698,7 +698,7 @@ The clustering changes no counts, so it writes no new count data (A3). The expor
 - **`pca`:** used as it is.
 - **`knn`:** new: the search `neighborPurity` makes, with knncolle's arithmetic (C3e).
 - **`rcompat`:** `set.seed` and `sample` for GroupSingletons; long-double `mean` and `sum`, whose accumulator R's `colMeans`, `colSums` and `rowSums` also use (small additions); R's `median`; R's number formatting for the `res.` names; and `order`. `set.seed`, `sample`, the long-double `mean` and the number formatting exist since M1, and GroupSingletons and the `res.` names use them as they are (M10).
-- **`scio`:** 10x reading, TSV, `.npy` and JSON. New: the TOML reader; Matrix Market writers for real and integer matrices, with comment lines; the manifest; copying a directory with its checksums.
+- **`scio`:** 10x reading, TSV, `.npy` and JSON. New: the TOML reader, the stage-dump layout (moved from `doubletfinder`, so the chain and DoubletFinder share it) and kernel-gated grading (M11); Matrix Market writers for real and integer matrices, with comment lines; the manifest; copying a directory with its checksums (M13).
 - **`scrust`:** the commands above, `scrust validate cluster`, and the new options of `scrust doubletfinder` (C3h).
 - **`loaders/`** (new, outside the Cargo workspace): the R and Python packages (C3g).
 
@@ -1039,8 +1039,10 @@ M9 and M10 come before M11 for the reason M3 came first in Step 1: the new code 
 - **PCA's bits across kernels:** labels may move between the portable and production profiles.
   - Mitigation: profiles and CPU types matched (A5b, M7); the floor measures how often (M8).
 - **irlba with 50 PCs at scale:** a larger `work` and more restarts than in DoubletFinder's runs, and M5 checked 50 components on one tier-T object only.
+  - Outcome (M11): K2 identical under the reference's kernel on every tier-T and tier-P object. Across kernels, irlba restarts once or twice more or fewer on 5 of the 34 objects (small post-hoc tier-T objects), with no extra draws; the floor records it.
   - Mitigation: K2 on every P object.
 - **SCTransform at seed 12345:** new RNG states, and the v3 path for the emptyDrops objects.
+  - Outcome (M11): K1 identical under the reference's kernel on all 34 objects, with every RNG checkpoint, through both assay paths (the emptyDrops objects' instrumented runs are v3, and their v5 runs compare the same).
   - Mitigation: K1, with the RNG checkpoints.
 - **GroupSingletons** depends on order and draws at random among ties; 36 production objects have singletons.
   - Mitigation: three P objects with 18 to 40 singletons, and isolated cells constructed in tests.
