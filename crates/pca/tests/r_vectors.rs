@@ -1,7 +1,8 @@
 //! irlba 2.4.1 and Seurat's RowVar against the installed R packages, on the synthetic inputs of
 //! validation/R/pca_vectors.R (tests/fixtures/pca/): the branches the reference data never reach.
 //! irlba's products are OpenBLAS calls and the vectors were made under the portable profile's
-//! kernel, so the irlba test needs `OPENBLAS_CORETYPE=Haswell` (env.sh's default).
+//! kernel, so the irlba test first checks that the kernel in use is the vectors' (Haswell,
+//! env.sh's default), and stops with both kernels named when it is not.
 
 use pca::{irlba, IrlbaParams, Products};
 use rcompat::RRng;
@@ -81,10 +82,7 @@ fn make_input(recipe: &str, m: usize, n: usize, data_seed: i32) -> Vec<f64> {
 
 #[test]
 fn irlba_against_r() {
-    if std::env::var("OPENBLAS_CORETYPE").ok().as_deref() != Some("Haswell") {
-        eprintln!("skipped: needs OPENBLAS_CORETYPE=Haswell (source env.sh)");
-        return;
-    }
+    rcompat::blas::require_fixture_kernel(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/pca/irlba.tsv"), "irlba against R");
     let rows = fixture("irlba.tsv");
     assert_eq!(rows.len(), 19);
     let (mut tiny, mut invariant, mut expanded, mut unconverged, mut nv1) = (0, 0, 0, 0, 0);

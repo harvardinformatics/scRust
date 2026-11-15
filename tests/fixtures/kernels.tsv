@@ -1,0 +1,25 @@
+# The OpenBLAS kernel each BLAS-dependent fixture without its own run record was made under
+# (docs/PLAN.md A5b; milestone M11). Tests that compare a BLAS-dependent result with a fixture
+# first check that the kernel in use is this one (rcompat::blas::require_fixture_kernel). Fixtures
+# that hold their R run's summary.json (tests/fixtures/doubletfinder/<object>/reference/) are read
+# from it instead. The kernel is the one the fixture's R run recorded: in its fingerprint
+# (run.fingerprint.openblas_corename of the run named), or in validation/manifest.toml's profile.
+# fixture	openblas_corename	recorded in
+rcompat/nlminb.tsv	Haswell	validation/manifest.toml: profile portable (OPENBLAS_CORETYPE=Haswell), validation/R/rcompat_vectors.R
+sctransform/cli_soupx_tenx_test	Haswell	validation/manifest.toml: profile portable (OPENBLAS_CORETYPE=Haswell), validation/R/sctransform_cli_reference.R
+pca/irlba.tsv	Haswell	validation/manifest.toml: profile portable (OPENBLAS_CORETYPE=Haswell), validation/R/pca_vectors.R
+pca/cli_soupx_tenx_test	Haswell	validation/manifest.toml: profile portable (OPENBLAS_CORETYPE=Haswell), validation/R/runpca_reference.R
+clustering/filtered_seurat_tenx_test/reference	Haswell	data/clustering/filtered_seurat_tenx_test/runs/instrumented-portable-sapphirerapids/summary.json
+clustering/filtered_seurat_emptydrops_test/reference	Haswell	data/clustering/filtered_seurat_emptydrops_test/runs/instrumented-portable-sapphirerapids/summary.json
+clustering/soupx_tenx_test/reference	Haswell	data/clustering/soupx_tenx_test/runs/instrumented-portable-sapphirerapids/summary.json
+clustering/soupx_emptydrops_test/reference	Haswell	data/clustering/soupx_emptydrops_test/runs/instrumented-portable-sapphirerapids/summary.json
+clustering/decontx_raw_tenx_test/reference	Haswell	data/clustering/decontx_raw_tenx_test/runs/instrumented-portable-sapphirerapids/summary.json
+clustering/decontx_raw_emptydrops_test/reference	Haswell	data/clustering/decontx_raw_emptydrops_test/runs/instrumented-portable-sapphirerapids/summary.json
+clustering/cellbender_fromraw_test/reference	Haswell	data/clustering/cellbender_fromraw_test/runs/instrumented-portable-sapphirerapids/summary.json
+clustering/filtered_seurat_tenx_test/saved	SapphireRapids	the saved object's workflow job (Sapphire Rapids, kernel detected; docs/validation/clustering_m8.md)
+clustering/filtered_seurat_emptydrops_test/saved	SapphireRapids	the saved object's workflow job (Sapphire Rapids, kernel detected; docs/validation/clustering_m8.md)
+clustering/soupx_tenx_test/saved	SapphireRapids	the saved object's workflow job (Sapphire Rapids, kernel detected; docs/validation/clustering_m8.md)
+clustering/soupx_emptydrops_test/saved	SapphireRapids	the saved object's workflow job (Sapphire Rapids, kernel detected; docs/validation/clustering_m8.md)
+clustering/decontx_raw_tenx_test/saved	SapphireRapids	the saved object's workflow job (Sapphire Rapids, kernel detected; docs/validation/clustering_m8.md)
+clustering/decontx_raw_emptydrops_test/saved	SapphireRapids	the saved object's workflow job (Sapphire Rapids, kernel detected; docs/validation/clustering_m8.md)
+clustering/cellbender_fromraw_test/saved	SapphireRapids	the saved object's workflow job (Sapphire Rapids, kernel detected; docs/validation/clustering_m8.md)

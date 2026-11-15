@@ -164,6 +164,56 @@ pub fn corename() -> String {
     }
 }
 
+/// The OpenBLAS kernel a portable fixture was made under, as its run recorded it (docs/PLAN.md
+/// A5b, milestone M11): `openblas_corename` in the fixture's `summary.json` or
+/// `reference/summary.json` (the R run's environment fingerprint), else the fixture's row of
+/// `tests/fixtures/kernels.tsv` (the kernel each other BLAS-dependent fixture's run recorded,
+/// with where it is recorded). `fixture` is a path under `tests/fixtures/` (a directory or a
+/// file) or a run directory under `data/` holding its `summary.json`.
+pub fn fixture_kernel(fixture: &std::path::Path) -> Option<String> {
+    let from_summary = |p: &std::path::Path| -> Option<String> {
+        let text = std::fs::read_to_string(p).ok()?;
+        let key = "\"openblas_corename\": \"";
+        let i = text.find(key)? + key.len();
+        let j = text[i..].find('"')? + i;
+        Some(text[i..j].to_string())
+    };
+    for s in ["summary.json", "reference/summary.json"] {
+        if let Some(k) = from_summary(&fixture.join(s)) {
+            return Some(k);
+        }
+    }
+    // the fixtures' table: the path relative to tests/fixtures/
+    let mut root = fixture;
+    let mut rel: Vec<String> = Vec::new();
+    while root.file_name().is_some_and(|n| n != "fixtures") {
+        rel.push(root.file_name()?.to_string_lossy().into_owned());
+        root = root.parent()?;
+    }
+    rel.reverse();
+    let rel = rel.join("/");
+    let table = std::fs::read_to_string(root.join("kernels.tsv")).ok()?;
+    table.lines().filter(|l| !l.starts_with('#')).find_map(|l| {
+        let mut f = l.split('\t');
+        let (path, kernel) = (f.next()?, f.next()?);
+        (path == rel || rel.starts_with(&format!("{path}/"))).then(|| kernel.to_string())
+    })
+}
+
+/// Stops (panics) unless the OpenBLAS kernel in use, as `openblas_get_corename()` reports it, is
+/// the one `fixture` was made under ([`fixture_kernel`]), naming both kernels. Tests that compare
+/// a BLAS-dependent result with a portable fixture call it first: products differ in their last
+/// bits between kernels, so the comparison is exact only under the fixture's kernel (A5b).
+pub fn require_fixture_kernel(fixture: &std::path::Path, what: &str) {
+    let running = corename();
+    let recorded = fixture_kernel(fixture).unwrap_or_else(|| panic!("{what}: {} records no OpenBLAS kernel (summary.json, or tests/fixtures/kernels.tsv)", fixture.display()));
+    assert!(
+        running == recorded,
+        "{what}: this result depends on OpenBLAS's kernel. The fixture ({}) was made under kernel {recorded}, but this process runs kernel {running}. Run the tests under the fixture's kernel: OPENBLAS_CORETYPE={recorded} (env.sh's default), on a CPU that supports it.",
+        fixture.display()
+    );
+}
+
 /// OpenBLAS's own thread count (`openblas_get_num_threads()`).
 pub fn num_threads() -> usize {
     // SAFETY: no arguments; reads OpenBLAS's thread setting.

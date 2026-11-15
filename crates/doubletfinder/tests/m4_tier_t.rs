@@ -106,6 +106,8 @@ fn s2b_fits_are_exact() {
     let mut failures = 0;
     for object in OBJECTS {
         let dir = fixture(object);
+        // glmGamPoi's Cox-Reid term (dgemv) and nlminb (ddot, dnrm2) call BLAS
+        rcompat::blas::require_fixture_kernel(&dir, "S2b (teacher-forced)");
         let counts = read_mtx(&dir.join("input")).unwrap();
         let stages = StageDir::open(&dir.join("stages")).unwrap();
         let rng = RngCheckpoints::open(&stages).unwrap();
@@ -146,16 +148,13 @@ fn s2c_regularisation_is_exact() {
 
 #[test]
 fn s2d_residuals_are_exact() {
-    // the residuals' products are OpenBLAS calls: the fixtures are the portable runs (Haswell)
-    if std::env::var("OPENBLAS_CORETYPE").ok().as_deref() != Some("Haswell") {
-        eprintln!("skipped: S2d needs OPENBLAS_CORETYPE=Haswell (source env.sh)");
-        return;
-    }
     use doubletfinder::sct::{check_s2d, Scalars, RS2a};
     let params = sctransform::SctParams::default();
     let mut failures = 0;
     for object in OBJECTS {
         let dir = fixture(object);
+        // the residuals' products are OpenBLAS calls: the fixtures are the portable runs
+        rcompat::blas::require_fixture_kernel(&dir, "S2d (teacher-forced)");
         let counts = read_mtx(&dir.join("input")).unwrap();
         let stages = StageDir::open(&dir.join("stages")).unwrap();
         let rng = RngCheckpoints::open(&stages).unwrap();
@@ -174,15 +173,12 @@ fn s2d_residuals_are_exact() {
 
 #[test]
 fn s2_chained_run_is_exact() {
-    if std::env::var("OPENBLAS_CORETYPE").ok().as_deref() != Some("Haswell") {
-        eprintln!("skipped: the chained run needs OPENBLAS_CORETYPE=Haswell (source env.sh)");
-        return;
-    }
     use doubletfinder::sct::{check_chained, Scalars};
     let params = sctransform::SctParams::default();
     let mut failures = 0;
     for object in OBJECTS {
         let dir = fixture(object);
+        rcompat::blas::require_fixture_kernel(&dir, "S2 chained");
         let counts = read_mtx(&dir.join("input")).unwrap();
         let stages = StageDir::open(&dir.join("stages")).unwrap();
         let rng = RngCheckpoints::open(&stages).unwrap();

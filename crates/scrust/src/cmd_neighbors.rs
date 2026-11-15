@@ -3,8 +3,7 @@
 
 use crate::cli::{self, Args, Phases};
 use neighbors::{parse_dims, parse_number, Metric, NeighborParams};
-use scio::{fmt17, parse17, Json, Npy, Table};
-use std::fmt::Write as _;
+use scio::{parse17, Json, Npy, Table};
 use std::path::{Path, PathBuf};
 
 pub const USAGE: &str = "\
@@ -121,23 +120,6 @@ pub fn params_from_args(args: &Args) -> Result<NeighborParams, String> {
     Ok(p)
 }
 
-fn knn_table(barcodes: &[String], k: usize, value: impl Fn(usize, usize) -> String) -> String {
-    let mut t = String::from("barcode");
-    for r in 1..=k {
-        let _ = write!(t, "\tnn_{r}");
-    }
-    t.push('\n');
-    for (i, b) in barcodes.iter().enumerate() {
-        t.push_str(b);
-        for r in 0..k {
-            t.push('\t');
-            t.push_str(&value(i, r));
-        }
-        t.push('\n');
-    }
-    t
-}
-
 pub fn main(argv: &[String]) -> Result<(), String> {
     let mut phases = Phases::new();
     let start_time = cli::utc_now();
@@ -162,80 +144,19 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     phases.mark("neighbors");
 
     std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
-    let k = r.k;
-    write(&out.join("knn_index.tsv"), &knn_table(&emb.barcodes, k, |i, j| (r.nn_idx[i * k + j] + 1).to_string()))?;
-    write(&out.join("knn_distance.tsv"), &knn_table(&emb.barcodes, k, |i, j| fmt17(r.nn_dist[i * k + j] as f64)))?;
-    let version = env!("CARGO_PKG_VERSION");
-    let describe = |what: &str| {
-        vec![
-            format!(" scrust {version} neighbors: {what}"),
-            format!(" rows and columns are the cells, in the order of knn_index.tsv ({} cells)", emb.n),
-        ]
-    };
-    scio::mtx::write_gz(&out.join("nn.mtx.gz"), &r.nn, &describe("Seurat's SCT_nn graph (FindNeighbors): 1 at (cell, neighbour)"), threads).map_err(|e| e.to_string())?;
-    scio::mtx::write_gz(&out.join("snn.mtx.gz"), &r.snn, &describe("Seurat's SCT_snn graph (FindNeighbors, ComputeSNN): s / (k + (k - s)) for s shared neighbours"), threads).map_err(|e| e.to_string())?;
-    if write_annoy {
-        r.index.save(&out.join("annoy.ann")).map_err(|e| format!("{}: {e}", out.join("annoy.ann").display()))?;
-    }
+    neighbors::output::write_outputs(&out, &emb.barcodes, &r, write_annoy, threads).map_err(|e| e.to_string())?;
+    // the counts' per-cell metadata, carried forward for `scrust cluster` (M11)
+    cluster::metadata::carry(&pca, &out).map_err(|e| e.to_string())?;
     phases.mark("write");
 
-    let self_first = (0..r.n).filter(|&i| k > 0 && r.nn_idx[i * k] == i as i32).count();
-    let self_missing = (0..r.n).filter(|&i| !r.nn_idx[i * k..(i + 1) * k].contains(&(i as i32))).count();
-    let mut distinct: Vec<u64> = r.snn.x.iter().map(|v| v.to_bits()).collect();
-    distinct.sort_unstable();
-    distinct.dedup();
-    let st = r.index.stats();
     let fingerprint = Json::parse(&crate::fingerprint::json()).unwrap_or(Json::Null);
     let int = |v: usize| Json::Int(v as i64);
     let summary = Json::obj(vec![
         ("tool", Json::Str("scrust neighbors".into())),
         ("reference", Json::Str(neighbors::REFERENCE.into())),
-        ("scrust_version", Json::Str(version.into())),
-        (
-            "parameters",
-            Json::obj(vec![
-                ("dims", Json::Vector(params.dims.iter().map(|&d| int(d)).collect())),
-                ("k_param", int(params.k_param)),
-                ("n_trees", Json::Int(params.n_trees as i64)),
-                ("metric", Json::Str(params.metric.seurat_name().into())),
-                ("annoy_index", Json::Str(format!("Annoy{}", match params.metric { Metric::Euclidean => "Euclidean", Metric::Angular => "Angular", Metric::Manhattan => "Manhattan" }))),
-                ("prune_snn", Json::Num(params.prune_snn)),
-                ("search_k", Json::Int(params.search_k as i64)),
-                ("annoy_seed", Json::Str(neighbors::Kiss64Random::DEFAULT_SEED.to_string())),
-            ]),
-        ),
-        (
-            "result",
-            Json::obj(vec![
-                ("n_cells", int(r.n)),
-                ("n_components", int(emb.ncol)),
-                ("k", int(k)),
-                ("annoy_f", int(r.index.f())),
-                ("annoy_node_bytes", int(r.index.node_bytes())),
-                ("annoy_n_nodes", int(r.index.n_nodes())),
-                ("annoy_n_trees", int(r.index.n_trees())),
-                ("annoy_file_bytes", int(r.index.n_nodes() * r.index.node_bytes())),
-                (
-                    "annoy_build",
-                    Json::obj(vec![
-                        ("split_nodes", int(st.split_nodes)),
-                        ("leaves", int(st.leaves)),
-                        ("accepted_at_attempt", Json::Vector(st.accepted_at_attempt.iter().map(|&v| int(v)).collect())),
-                        ("kept_imbalanced", int(st.kept_imbalanced)),
-                        ("random_fallbacks", int(st.random_fallbacks)),
-                        ("random_rounds", int(st.random_rounds)),
-                        ("zero_margins", int(st.zero_margins)),
-                        ("draws", Json::Int(st.draws as i64)),
-                        ("max_depth", int(st.max_depth)),
-                    ]),
-                ),
-                ("knn_self_first", int(self_first)),
-                ("knn_self_missing", int(self_missing)),
-                ("nn_nnz", int(r.nn.nnz())),
-                ("snn_nnz", int(r.snn.nnz())),
-                ("snn_distinct_values", int(distinct.len())),
-            ]),
-        ),
+        ("scrust_version", Json::Str(env!("CARGO_PKG_VERSION").into())),
+        ("parameters", neighbors::output::params_json(&params)),
+        ("result", neighbors::output::result_json(&r, emb.ncol)),
         (
             "run",
             Json::obj(vec![
@@ -256,9 +177,10 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     ]);
     write(&out.join("summary.json"), &scio::json::to_file_text(&summary))?;
     eprintln!(
-        "scrust neighbors: {} cells, {} dims, k = {k}, {} trees ({}): {} nodes; nn {} entries, snn {}; build {:.2} s, search {:.2} s, graphs {:.2} s; {threads} threads",
+        "scrust neighbors: {} cells, {} dims, k = {}, {} trees ({}): {} nodes; nn {} entries, snn {}; build {:.2} s, search {:.2} s, graphs {:.2} s; {threads} threads",
         r.n,
         params.dims.len(),
+        r.k,
         params.n_trees,
         params.metric,
         r.index.n_nodes(),

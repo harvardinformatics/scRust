@@ -7,8 +7,10 @@ name = "cluster"
 version = "0.1.0"
 dependencies = [
  "neighbors",
+ "pca",
  "rcompat",
  "scio",
+ "sctransform",
 ]
 
 [[package]]
@@ -52,6 +54,7 @@ name = "pca"
 version = "0.1.0"
 dependencies = [
  "rcompat",
+ "scio",
 ]
 
 [[package]]

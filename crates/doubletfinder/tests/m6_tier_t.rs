@@ -16,7 +16,9 @@
 //! - The results do not depend on the number of threads, `singlets/` included.
 //!
 //! SCTransform's and RunPCA's products are OpenBLAS calls and the fixtures are the portable
-//! runs, so the tests need `OPENBLAS_CORETYPE=Haswell` (env.sh's default).
+//! runs, so the tests first check that the kernel in use is the fixtures' (Haswell, env.sh's
+//! default), and stop with both kernels named when it is not
+//! (rcompat::blas::require_fixture_kernel).
 
 use doubletfinder::chain::{rng_digest, RustSource};
 use doubletfinder::input::{read_counts, read_input};
@@ -68,14 +70,6 @@ fn fixture(object: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/doubletfinder").join(object)
 }
 
-fn haswell() -> bool {
-    let ok = std::env::var("OPENBLAS_CORETYPE").ok().as_deref() == Some("Haswell");
-    if !ok {
-        eprintln!("skipped: the tier-T fixtures need OPENBLAS_CORETYPE=Haswell (source env.sh)");
-    }
-    ok
-}
-
 fn out_dir(name: &str) -> PathBuf {
     let d = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("m6_tier_t").join(name);
     if d.exists() {
@@ -119,11 +113,9 @@ fn failures(object: &str, checks: &[Check]) -> usize {
 
 #[test]
 fn every_stage_from_the_counts_is_r_s() {
-    if !haswell() {
-        return;
-    }
     let mut bad = 0;
     for object in OBJECTS {
+        rcompat::blas::require_fixture_kernel(&fixture(object), "DoubletFinder from the counts");
         let dir = out_dir(object);
         let (out, state) = run_object(object, 3, Some(&dir));
         out.write_tables(&dir).unwrap();
@@ -172,10 +164,9 @@ fn every_stage_from_the_counts_is_r_s() {
 
 #[test]
 fn independent_of_the_thread_count() {
-    if !haswell() {
-        return;
-    }
     let object = "soupx_tenx_test";
+    // the runs are also compared with the reference run's files
+    rcompat::blas::require_fixture_kernel(&fixture(object), "DoubletFinder at several thread counts");
     let (one, s1) = run_object(object, 1, None);
     for threads in [2, 7] {
         let (many, s) = run_object(object, threads, None);

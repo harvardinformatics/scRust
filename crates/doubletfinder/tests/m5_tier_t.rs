@@ -2,8 +2,9 @@
 //! instrumented R runs' S3 dumps in all 7 contexts of each of the five test objects, after Rust's
 //! own SCTransform (the chained run: the counts, R's S1 draws and R's RNG state at SCTransform's
 //! entry); and, with the tier-P data in `data/`, teacher-forced on R's own PCA input.
-//! irlba's products are OpenBLAS calls and the fixtures are the portable runs, so the tests need
-//! `OPENBLAS_CORETYPE=Haswell` (env.sh's default).
+//! irlba's products are OpenBLAS calls and the fixtures are the portable runs, so the S3 tests
+//! first check that the kernel in use is the fixtures' (Haswell, env.sh's default), and stop with
+//! both kernels named when it is not (rcompat::blas::require_fixture_kernel).
 
 use doubletfinder::pca::{check_chained, check_teacher};
 use doubletfinder::sct::{context, sct_contexts, RngCheckpoints, Scalars};
@@ -24,14 +25,6 @@ fn fixture(object: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/doubletfinder").join(object)
 }
 
-fn haswell() -> bool {
-    let ok = std::env::var("OPENBLAS_CORETYPE").ok().as_deref() == Some("Haswell");
-    if !ok {
-        eprintln!("skipped: S3 needs OPENBLAS_CORETYPE=Haswell (source env.sh)");
-    }
-    ok
-}
-
 fn report(object: &str, checks: &[Check]) -> usize {
     let bad: Vec<&Check> = checks.iter().filter(|c| c.status != Status::Identical).collect();
     for c in &bad {
@@ -42,13 +35,11 @@ fn report(object: &str, checks: &[Check]) -> usize {
 
 #[test]
 fn s3_after_rust_sctransform_is_exact() {
-    if !haswell() {
-        return;
-    }
     let params = sctransform::SctParams::default();
     let mut failures = 0;
     for object in OBJECTS {
         let dir = fixture(object);
+        rcompat::blas::require_fixture_kernel(&dir, "S3 after Rust's SCTransform");
         let counts = read_mtx(&dir.join("input")).unwrap();
         let stages = StageDir::open(&dir.join("stages")).unwrap();
         let rng = RngCheckpoints::open(&stages).unwrap();
@@ -72,7 +63,7 @@ fn s3_after_rust_sctransform_is_exact() {
 /// portable instrumented run of the tier-T objects, when `SCRUST_DATA_TESTS` is set.
 #[test]
 fn s3_teacher_forced_on_data() {
-    if std::env::var_os("SCRUST_DATA_TESTS").is_none() || !haswell() {
+    if std::env::var_os("SCRUST_DATA_TESTS").is_none() {
         return;
     }
     let params = sctransform::SctParams::default();
@@ -84,6 +75,7 @@ fn s3_teacher_forced_on_data() {
             if !sdir.join("index.tsv").exists() {
                 continue;
             }
+            rcompat::blas::require_fixture_kernel(&base.join("runs").join(run), "S3 teacher-forced on R's PCA input");
             let counts = read_mtx(&base.join("input")).unwrap();
             let stages = StageDir::open(&sdir).unwrap();
             let rng = RngCheckpoints::open(&stages).unwrap();

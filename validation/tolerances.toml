@@ -4,7 +4,8 @@
 #   agreement  fraction identical, correlation
 # Exact checks run only when the BLAS-relevant fields of the environment fingerprint match the
 # reference's; otherwise the harness switches to tolerance mode (the R-vs-R floor, measured at
-# M2) and says so in its report (A5b).
+# M2) and says so in its report (A5b). From M11 both validators do this (kernel-gated grading,
+# [doubletfinder.kernel_gating] and [clustering.kernel_gating] below; scio::grade).
 #
 # The criteria are the plan's (B5) and the key names a proposal. Each stage is uncommented and
 # settled when its milestone lands (S0: M1; S1 and S4-S7: M3; S2a-S2d: M4; S3: M5; the end-to-end,
@@ -44,6 +45,41 @@ S2d_scale_data = { max_abs = 2.2e-14, max_scaled = 1.2e-15, max_fraction_differi
 S3_sdev = { max_rel = 7.3e-15 }
 S3_embeddings = { max_abs = 3.6e-11, max_scaled = 2.5e-13 }
 S3_loadings = { max_abs = 8.1e-14, max_scaled = 3.0e-13 }
+# M11: irlba's d, from M2's own measurement (docs/validation/doubletfinder_m2.md, R-vs-R floor),
+# which `scrust validate floor` reproduces on the same eight runs (validation/slurm/m11_floor.sbatch,
+# data/doubletfinder/compare/floor_kernel_m11/: 7.503e-12, 3.799e-15). Every other entry above is
+# reproduced by that measurement too, and every scalar (irlba's iterations and products, the total
+# variance) is identical across kernels in all eight runs.
+S3_irlba_d = { max_abs = 7.6e-12, max_scaled = 3.8e-15 }
+
+# Kernel-gated grading (M11; docs/PLAN.md A5b mechanism 3): `scrust validate doubletfinder` grades
+# every check exactly when the reference's and the candidate's recorded OpenBLAS kernels
+# (run.fingerprint.openblas_corename) are the same; otherwise, or when either run records none, in
+# tolerance mode: each BLAS-free check stays exact, each BLAS-dependent stage array and scalar is
+# graded against [doubletfinder.floor.kernel] (bounds: the keys starting with max_), and what the
+# floor does not list stays exact, since the floor found it identical across kernels. The report
+# gives the mode, why, and each check's class and criterion. A check is BLAS-dependent when any of
+# its inputs passed through a BLAS product in the candidate's run (crates/doubletfinder/src/
+# validate.rs, Grading::class):
+#   - teacher-forced runs (on R's own embeddings, --from-stages): every check is BLAS-free;
+#   - runs from the counts: BLAS-free are S1 and S2a, and the RNG states of the sampling and of
+#     SCTransform's fits (whose draw counts are fixed), in the contexts whose doublets are drawn
+#     from a fresh set.seed(12345) (the first sweep iteration, sweep_pN0.05, and the final run), and
+#     the checks made from R's own states or arrays (S1 redrawn from R's checkpoints, S6 and S7
+#     recomputed from R's S5); BLAS-dependent is everything else: S2b (glmGamPoi's Cox-Reid term
+#     calls dgemv, nlminb calls ddot and dnrm2), S2c, S2d, S3 and every later stage, irlba's draw
+#     counts, the other sweep iterations (their doublets are drawn after the previous irlba), the
+#     final files and the result section.
+# With the same kernel every verdict is the one Step 1's validator gave before M11 (the kernel
+# check itself is identical, and nothing else changes): validation/slurm/m11_doubletfinder.sbatch
+# re-graded M6's and M7's Rust runs (docs/validation/clustering.md, "Kernel-gated grading").
+[doubletfinder.kernel_gating]
+exact_when = "the reference's and the candidate's recorded OpenBLAS kernels match"
+otherwise = "tolerance: BLAS-free checks exact; BLAS-dependent checks within [doubletfinder.floor.kernel], exact where it lists nothing"
+no_kernel_recorded = "tolerance (never exact)"
+blas_free = ["S1 and S2a in sweep_pN0.05 and final", "RNG states of the sampling and of SCTransform's fits in those contexts", "S1 redrawn from R's checkpoints", "S6 and S7 recomputed from R's S5", "every check of a teacher-forced run"]
+blas_dependent = ["S2b", "S2c", "S2d", "S3", "S4", "S5", "S6", "S7", "S1 and S2a of the other sweep iterations", "irlba's RNG states", "cells.tsv, sweep_stats.tsv, bcmvn.tsv", "the result section", "the saved output's checks"]
+floor = "doubletfinder.floor.kernel"
 
 # S1 sampling: subsample and doublet index pairs, RNG state after each step. Settled (M3):
 # exact. From R's own .Random.seed before each draw, rcompat redraws the sweep subsample
@@ -340,18 +376,65 @@ all_stages = "identical"
 # sign; max_scaled is max|a - b| / max|a| within one array; S2d identical on tier T. scale.data
 # on tier P: the four objects whose runs dumped it, and the three light-level objects measured by
 # validation/R/floor_scale_data.R against their saved objects, which the production runs reproduce:
+#
+# M11 measured the floor again with the statistics kernel-gated grading uses (scio::grade,
+# `scrust validate floor`; validation/slurm/m11_floor.sbatch, job 60798602, the 34 objects'
+# instrumented runs in both profiles; data/clustering/floor_kernel_m11/: blocks.tsv, summary.md):
+# every entry M8 listed is reproduced, and the arrays and scalars M8 did not tabulate are added
+# (S3_irlba_d, S3_loadings, irlba_iter, irlba_mprod, K4_annoy_index, K8_centroids,
+# K8_cluster_var). Values are the maxima over the 34 objects, rounded up (two entries M8 rounded
+# down by less than their last digit are corrected: S2d_residual_stats max_scaled 3.2e-17 ->
+# 3.21e-17, measured 3.204e-17; K5_nn_dist max_abs 1.9e-6 -> 1.91e-6, measured 1.907e-6).
+# Identical across kernels in every object, and so not listed: everything else, including the
+# total variance and every scalar of SCTransform, Annoy and the optimizer.
+# How tolerance mode reads an entry (scio::grade): keys starting with max_ are bounds, and so are
+# values_differing and cells_differing (totals over the objects measured, so they bound one object
+# too); may_differ = true means the floor found the bytes differing in every object, without a
+# numeric measure; other keys (note, fraction_differing, objects, ...) are measurements only.
 [clustering.floor.kernel]
-S2d_residual_stats = { max_abs = 1.5e-14, max_scaled = 3.2e-17 }
+S2d_residual_stats = { max_abs = 1.5e-14, max_scaled = 3.21e-17 }
 S2d_scale_data = { max_abs = 4.3e-14, max_fraction_differing = 0.0072 }
 S3_sdev = { max_abs = 1.9e-13, max_scaled = 3.6e-14 }
+S3_irlba_d = { max_abs = 6.94e-12, max_scaled = 3.56e-14 }
 S3_embeddings_dims_1_30 = { max_abs = 1.6e-10, max_scaled = 2.4e-12 }
 S3_embeddings_dims_31_50 = { max_abs = 4.3e-6, note = "trailing components of the smallest tier-T objects" }
+S3_loadings = { max_abs = 1.2e-7, max_scaled = 4.5e-7, note = "component 50 of the smallest tier-T objects; 1.6e-12 on tier P" }
+irlba_iter = { max_abs = 2, objects_differing = 5, note = "five small post-hoc tier-T objects restart once or twice more or fewer; .Random.seed is identical (no extra draws)" }
+irlba_mprod = { max_abs = 12, objects_differing = 5 }
 K3_items = { values_differing = 121, cells_differing = 121, max_abs = 9.6e-7, float_ulps = "116 values 1, 3 values 2-4, 2 values near 0 more" }
-K5_nn_dist = { cells_differing = 10, max_abs = 1.9e-6 }
+K4_annoy_index = { may_differ = true, objects_differing = 34, note = "the stored split vectors carry the PCA's sign flips and last bits; the neighbour ids (K5) and both graphs (K6) are identical in all 34" }
+K5_nn_dist = { cells_differing = 10, values_differing = 11, max_abs = 1.91e-6 }
 K8_silhouette_width = { max_abs = 3.3e-13, fraction_differing = 0.99 }
+K8_centroids = { max_abs = 6.68e-11, max_scaled = 4.67e-13, note = "after aligning each dimension's sign" }
+K8_cluster_var = { max_abs = 1.75e-9, max_scaled = 1.67e-13 }
 K9_dist50 = { max_abs = 6.5e-11, max_scaled = 2.8e-13 }
 K9_neighbor_count = { cells_differing = 22, objects = 11 }
 K9_purity = { cells_differing = 19, objects = 10, max_abs = 0.019 }
+
+# Kernel-gated grading (M11; docs/PLAN.md A5b mechanism 3): `scrust validate cluster` grades every
+# check exactly when the reference's and the candidate's recorded OpenBLAS kernels match;
+# otherwise, or when either run records none, BLAS-free checks stay exact and BLAS-dependent ones
+# are graded against [clustering.floor.kernel] (bounds as described there; what it does not list
+# stays exact). The checks against the saved object are graded under the saved object's kernel
+# (SapphireRapids, the kernel of every workflow job, M8). The report gives the mode, why, and each
+# check's class and criterion. A check is BLAS-dependent when any of its inputs passed through a
+# BLAS product in the candidate's run (crates/cluster/src/validate.rs, Grader::class):
+#   - from the counts (--counts): BLAS-free are the settings, the barcodes, the counts' columns
+#     (nCount_RNA, nFeature_RNA), S2a, the RNG states of SCTransform and RunPCA's entry (fixed
+#     draw counts) and the teacher-forced silhouette; BLAS-dependent is everything from S2b on
+#     (glmGamPoi's Cox-Reid term and nlminb call BLAS): S2b-S2d, S3, irlba's exit state, K3-K8,
+#     the labels, the graphs, the files and the result section;
+#   - from SCTransform's output (--sct): RunPCA (S3) and everything after it;
+#   - from R's own embeddings or SNN graph (--pca, --snn): nothing (teacher forcing, as M9's and
+#     M10's runs).
+[clustering.kernel_gating]
+exact_when = "the reference's and the candidate's recorded OpenBLAS kernels match"
+otherwise = "tolerance: BLAS-free checks exact; BLAS-dependent checks within [clustering.floor.kernel], exact where it lists nothing"
+no_kernel_recorded = "tolerance (never exact)"
+saved_object_kernel = "SapphireRapids"
+blas_free = ["FindClusters' settings", "barcodes", "nCount_RNA", "nFeature_RNA", "S2a", "SCTransform's RNG states", "RunPCA's entry and irlba's entry states", "approxSilhouette teacher-forced on R's embeddings and labels", "every check of a run started from R's embeddings or SNN graph"]
+blas_dependent = ["S2b", "S2c", "S2d", "scale.data's digest", "S3", "irlba's exit state", "K3", "K4", "K5", "K6", "K7", "K8", "the result section's numbers", "the saved object's labels and silhouette widths"]
+floor = "clustering.floor.kernel"
 
 # K0, Kiss64Random (M9): RcppAnnoy 0.0.23's kissrandom.h, compiled with the R env's compiler and
 # flags (tests/fixtures/clustering/k0/, M8), against crates/neighbors (tests/k0_kiss64.rs):

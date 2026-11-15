@@ -10,3 +10,4 @@ publish.workspace = true
 
 [dependencies]
 rcompat.workspace = true
+scio.workspace = true

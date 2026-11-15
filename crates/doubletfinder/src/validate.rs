@@ -23,9 +23,18 @@
 //! singlets' pANN as R wrote them, the column names (so pK and nExp), and, where they were
 //! exported (M6b), the singlets' counts: barcodes, feature lines and every stored entry.
 //!
-//! Every criterion is exact (`validation/tolerances.toml`).
+//! **Kernel-gated grading** (docs/PLAN.md A5b mechanism 3, milestone M11; [`scio::grade`]):
+//! every check is exact when the reference and the candidate recorded the same OpenBLAS kernel
+//! (`run.fingerprint.openblas_corename`). Otherwise, or when one of them records none, the
+//! comparison runs in tolerance mode: each check is classified BLAS-free or BLAS-dependent
+//! (BLAS-dependent when any of its inputs passed through a BLAS product in the candidate's run),
+//! BLAS-free checks stay exact, and BLAS-dependent stage arrays and scalars are graded against
+//! `[doubletfinder.floor.kernel]` (M2's R-vs-R floor, `validation/tolerances.toml`, embedded at
+//! build time); what the floor found identical across kernels stays exact. The report says which
+//! mode it ran in, and why.
 
 use crate::pann::classify;
+use scio::grade::{self, Class, Floor, Mode};
 use crate::stages::StageDir;
 use crate::summary::bc_of_pann;
 use crate::DfError;
@@ -41,6 +50,8 @@ pub enum Status {
     Missing,
     /// Not produced by this kind of run (e.g. the RNG digest under teacher forcing).
     NotApplicable,
+    /// It differs, within the R-vs-R floor (tolerance mode, BLAS-dependent checks only).
+    WithinFloor,
 }
 
 impl Status {
@@ -50,6 +61,7 @@ impl Status {
             Status::Differ => "differ",
             Status::Missing => "missing",
             Status::NotApplicable => "n/a",
+            Status::WithinFloor => "within floor",
         }
     }
 }
@@ -72,37 +84,57 @@ pub struct Report {
     pub reference: PathBuf,
     pub candidate: PathBuf,
     pub checks: Vec<Check>,
+    /// The grading mode (`None`: a report without kernel gating, `scrust validate sctransform`
+    /// and `pca`, which compare this process's results under its own kernel).
+    pub mode: Option<Mode>,
+    /// Per check (same order as `checks`, when graded): its class and the criterion applied.
+    pub grading: Vec<(Class, String)>,
+}
+
+/// `validation/tolerances.toml`, as built: the floor tolerance mode grades against.
+pub const TOLERANCES: &str = include_str!("../../../validation/tolerances.toml");
+
+/// DoubletFinder's R-vs-R floor across OpenBLAS kernels (M2).
+pub fn floor() -> Floor {
+    Floor::from_toml(TOLERANCES, "doubletfinder.floor.kernel").expect("validation/tolerances.toml has [doubletfinder.floor.kernel]")
 }
 
 impl Report {
-    /// True when nothing differs (missing and not-applicable checks are listed, not failed).
+    /// True when nothing differs beyond the floor (missing and not-applicable checks are listed,
+    /// not failed; checks within the floor pass, in tolerance mode).
     pub fn pass(&self) -> bool {
         self.checks.iter().all(|c| c.status != Status::Differ)
     }
 
-    /// Per stage: (checks identical, checks differing, elements compared, elements differing).
-    pub fn by_stage(&self) -> Vec<(String, usize, usize, usize, usize)> {
-        let mut out: Vec<(String, usize, usize, usize, usize)> = Vec::new();
+    /// Per stage: (checks identical, checks within the floor, checks differing, elements
+    /// compared, elements differing).
+    pub fn by_stage(&self) -> Vec<(String, usize, usize, usize, usize, usize)> {
+        let mut out: Vec<(String, usize, usize, usize, usize, usize)> = Vec::new();
         for c in &self.checks {
-            if !matches!(c.status, Status::Identical | Status::Differ) {
+            if !matches!(c.status, Status::Identical | Status::Differ | Status::WithinFloor) {
                 continue;
             }
             let i = match out.iter().position(|o| o.0 == c.stage) {
                 Some(i) => i,
                 None => {
-                    out.push((c.stage.clone(), 0, 0, 0, 0));
+                    out.push((c.stage.clone(), 0, 0, 0, 0, 0));
                     out.len() - 1
                 }
             };
-            if c.status == Status::Identical {
-                out[i].1 += 1;
-            } else {
-                out[i].2 += 1;
+            match c.status {
+                Status::Identical => out[i].1 += 1,
+                Status::WithinFloor => out[i].2 += 1,
+                _ => out[i].3 += 1,
             }
-            out[i].3 += c.n;
-            out[i].4 += c.n_differ;
+            out[i].4 += c.n;
+            out[i].5 += c.n_differ;
         }
         out
+    }
+
+    /// The mode's name and reason, for reports.
+    pub fn mode_text(&self) -> Option<(String, String)> {
+        self.mode.as_ref().map(|m| (m.name().to_string(), m.reason()))
     }
 
     pub fn to_json(&self) -> Json {
@@ -111,14 +143,22 @@ impl Report {
             ("candidate", Json::Str(self.candidate.display().to_string())),
             ("pass", Json::Bool(self.pass())),
             (
+                "grading",
+                match self.mode_text() {
+                    Some((m, r)) => Json::obj(vec![("mode", Json::Str(m)), ("reason", Json::Str(r))]),
+                    None => Json::Null,
+                },
+            ),
+            (
                 "by_stage",
                 Json::List(
                     self.by_stage()
                         .into_iter()
-                        .map(|(s, ok, bad, n, nd)| {
+                        .map(|(s, ok, within, bad, n, nd)| {
                             Json::obj(vec![
                                 ("stage", Json::Str(s)),
                                 ("checks_identical", Json::Int(ok as i64)),
+                                ("checks_within_floor", Json::Int(within as i64)),
                                 ("checks_differing", Json::Int(bad as i64)),
                                 ("elements", Json::Int(n as i64)),
                                 ("elements_differing", Json::Int(nd as i64)),
@@ -132,10 +172,14 @@ impl Report {
                 Json::List(
                     self.checks
                         .iter()
-                        .map(|c| {
+                        .enumerate()
+                        .map(|(i, c)| {
+                            let (class, criterion) = self.grading.get(i).map(|(k, t)| (Json::Str(k.name().into()), Json::Str(t.clone()))).unwrap_or((Json::Null, Json::Null));
                             Json::obj(vec![
                                 ("stage", Json::Str(c.stage.clone())),
                                 ("name", Json::Str(c.name.clone())),
+                                ("class", class),
+                                ("criterion", criterion),
                                 ("status", Json::Str(c.status.as_str().into())),
                                 ("n", Json::Int(c.n as i64)),
                                 ("n_differ", Json::Int(c.n_differ as i64)),
@@ -149,19 +193,30 @@ impl Report {
     }
 
     pub fn to_markdown(&self) -> String {
+        let within = self.checks.iter().any(|c| c.status == Status::WithinFloor);
         let mut s = format!(
-            "# DoubletFinder: Rust against R\n\n- reference: `{}`\n- candidate: `{}`\n- result: **{}**\n\n",
+            "# DoubletFinder: Rust against R\n\n- reference: `{}`\n- candidate: `{}`\n- result: **{}**\n",
             self.reference.display(),
             self.candidate.display(),
-            if self.pass() { "pass (everything compared is identical)" } else { "FAIL" }
+            if !self.pass() {
+                "FAIL"
+            } else if within {
+                "pass (BLAS-dependent checks within the R-vs-R floor, everything else identical)"
+            } else {
+                "pass (everything compared is identical)"
+            }
         );
-        s.push_str("| stage | checks identical | checks differing | elements | elements differing |\n|---|---|---|---|---|\n");
-        for (st, ok, bad, n, nd) in self.by_stage() {
-            s.push_str(&format!("| {st} | {ok} | {bad} | {n} | {nd} |\n"));
+        if let Some((m, r)) = self.mode_text() {
+            s.push_str(&format!("- grading: **{m} mode**: {r}\n"));
         }
-        s.push_str("\n| stage | check | status | elements | differing | detail |\n|---|---|---|---|---|---|\n");
-        for c in &self.checks {
-            s.push_str(&format!("| {} | {} | {} | {} | {} | {} |\n", c.stage, c.name, c.status.as_str(), c.n, c.n_differ, c.detail));
+        s.push_str("\n| stage | checks identical | checks within floor | checks differing | elements | elements differing |\n|---|---|---|---|---|---|\n");
+        for (st, ok, wf, bad, n, nd) in self.by_stage() {
+            s.push_str(&format!("| {st} | {ok} | {wf} | {bad} | {n} | {nd} |\n"));
+        }
+        s.push_str("\n| stage | check | class | criterion | status | elements | differing | detail |\n|---|---|---|---|---|---|---|---|\n");
+        for (i, c) in self.checks.iter().enumerate() {
+            let (class, crit) = self.grading.get(i).map(|(k, t)| (k.name(), t.as_str())).unwrap_or(("-", "-"));
+            s.push_str(&format!("| {} | {} | {class} | {} | {} | {} | {} | {} |\n", c.stage, c.name, crit.replace('|', "\\|"), c.status.as_str(), c.n, c.n_differ, c.detail));
         }
         s
     }
@@ -173,6 +228,89 @@ fn check(stage: &str, name: &str, status: Status, n: usize, n_differ: usize, det
 
 fn same_bits(a: f64, b: f64) -> bool {
     a.to_bits() == b.to_bits()
+}
+
+/// How a comparison grades: the mode, the floor, and what the candidate computed.
+pub struct Grading {
+    pub mode: Mode,
+    pub floor: Floor,
+    /// The candidate ran from the counts (every stage Rust's own), not on R's embeddings.
+    pub from_counts: bool,
+}
+
+/// Contexts whose doublets are drawn before any BLAS product of the run: the first sweep
+/// iteration's (from `set.seed(12345)` at paramSweep's entry) and the final run's
+/// (`doubletFinder` calls `set.seed(12345)` again). The other sweep iterations draw their
+/// doublets after the previous iteration's irlba.
+fn fresh_context(ctx: &str) -> bool {
+    ctx == "sweep" || ctx == "final" || ctx == "sweep_pN0.05"
+}
+
+impl Grading {
+    /// A check's class: BLAS-dependent when any of its inputs passed through a BLAS product in
+    /// the candidate's run. A teacher-forced run (on R's embeddings) has none; from the counts,
+    /// S1 and S2a (and the RNG states SCTransform's sampling takes) are BLAS-free in the contexts
+    /// whose doublets are drawn from a fresh seed, and everything else is BLAS-dependent: S2b's
+    /// Cox-Reid term and nlminb, S2d's residuals and S3's irlba call BLAS, and every later stage
+    /// and context reads their results.
+    pub fn class(&self, c: &Check) -> Class {
+        if !self.from_counts {
+            return Class::BlasFree;
+        }
+        let ctx = c.name.split(": ").next().unwrap_or("");
+        let free_label = ["paramSweep_entry", "before_doublets", "after_doublets", "vst_entry", "after_cell_sampling", "fits_entry", "fits_exit", "vst_exit", "sctransform_exit", "pca_entry", "irlba_entry"];
+        let is_rng = c.name.contains(": RNG ");
+        let label = c.name.rsplit("RNG ").next().unwrap_or("");
+        let free = match c.stage.as_str() {
+            "environment" | "stages" | "RNG" | "scalars" => true,
+            _ if c.name.contains("(from R's RNG") || c.name.contains("(teacher-forced on R's S5)") => true,
+            _ if is_rng => fresh_context(ctx) && (free_label.contains(&label) || label.starts_with("bin")),
+            "S1" | "S2a" => fresh_context(ctx),
+            _ => false,
+        };
+        if free {
+            Class::BlasFree
+        } else {
+            Class::BlasDependent
+        }
+    }
+
+    /// The criterion applied to a check, for the report.
+    fn criterion(&self, c: &Check, class: Class) -> String {
+        if c.status == Status::NotApplicable {
+            return "-".into();
+        }
+        let key = c.name.rsplit(": ").next().unwrap_or("");
+        if c.status == Status::WithinFloor {
+            return self.floor.describe(key);
+        }
+        if class == Class::BlasDependent && !self.mode.is_exact() {
+            if self.floor.get(key).is_some() {
+                return self.floor.describe(key);
+            }
+            return "exact (the floor: identical across kernels)".into();
+        }
+        "exact".into()
+    }
+}
+
+/// Re-grades a differing block of doubles in tolerance mode: `Some(true)` when it stays within
+/// the floor's entry for `array`, `Some(false)` when it does not, `None` when it cannot be graded
+/// (an exact mode, a BLAS-free check, an array the floor does not list, integers).
+#[allow(clippy::too_many_arguments)]
+fn regrade(g: &Grading, check: &Check, array: &str, rb: &crate::stages::Block, ra: &Npy, cb: &crate::stages::Block, ca: &Npy) -> Option<(bool, String)> {
+    if g.mode.is_exact() || g.class(check) == Class::BlasFree || !rb.dtype.contains('f') {
+        return None;
+    }
+    let entry = g.floor.get(array)?;
+    let a: Vec<f64> = (0..rb.ncol).flat_map(|c| ra.col_f64(c, rb.row_start, rb.nrow)).collect();
+    let b: Vec<f64> = (0..cb.ncol).flat_map(|c| ca.col_f64(c, cb.row_start, cb.nrow)).collect();
+    let align = matches!(array, "S3_embeddings" | "S3_loadings");
+    let s = grade::stats(&a, &b, rb.nrow, rb.ncol, align);
+    match grade::within(&s, entry) {
+        Ok(()) => Some((true, s.describe())),
+        Err(m) => Some((false, format!("{}; {m}", s.describe()))),
+    }
 }
 
 /// Final files, byte for byte, with row counts when they differ.
@@ -291,7 +429,7 @@ struct Gathered {
 /// bit. One check per array and context; S6's summary contexts (one per pN and pK) are gathered
 /// in one check per array. Files the reference lists but does not hold (the tier-T fixtures
 /// leave out the per-context matrices) are reported missing, not compared.
-fn compare_stage_blocks(rs: &StageDir, cs: &StageDir, checks: &mut Vec<Check>) -> Result<(), DfError> {
+fn compare_stage_blocks(rs: &StageDir, cs: &StageDir, checks: &mut Vec<Check>, g: &Grading) -> Result<(), DfError> {
     let mut files: Vec<String> = rs.blocks.iter().map(|b| b.file.clone()).collect();
     files.sort();
     files.dedup();
@@ -328,7 +466,17 @@ fn compare_stage_blocks(rs: &StageDir, cs: &StageDir, checks: &mut Vec<Check>) -
             let name = format!("{}: {array}", rb.ctx);
             checks.push(match outcome {
                 Outcome::Compared(n, 0) => check(&rb.stage, &name, Status::Identical, n, 0, ""),
-                Outcome::Compared(n, nd) => check(&rb.stage, &name, Status::Differ, n, nd, format!("{nd} of {n} elements differ")),
+                Outcome::Compared(n, nd) => {
+                    let c = check(&rb.stage, &name, Status::Differ, n, nd, format!("{nd} of {n} elements differ"));
+                    match (ra.as_ref(), cs.block(file, &rb.ctx), ca.as_ref()) {
+                        (Some(ra), Some(cb), Some(ca)) => match regrade(g, &c, &array, rb, ra, cb, ca) {
+                            Some((true, d)) => check(&rb.stage, &name, Status::WithinFloor, n, nd, d),
+                            Some((false, d)) => check(&rb.stage, &name, Status::Differ, n, nd, d),
+                            None => c,
+                        },
+                        _ => c,
+                    }
+                }
                 Outcome::Missing(why) => check(&rb.stage, &name, Status::Missing, 0, 0, why),
                 Outcome::Mismatch(why, n) => check(&rb.stage, &name, Status::Differ, n, n, why),
             });
@@ -427,7 +575,7 @@ fn atoms(v: &Json) -> Vec<Result<f64, String>> {
 
 /// Every scalar of the reference's `stages.json`, per context, against the candidate's, bit for
 /// bit (R wrote them with `%.17g`, which reads back exactly).
-fn compare_scalars(rs: &StageDir, cs: &StageDir, checks: &mut Vec<Check>) -> Result<(), DfError> {
+fn compare_scalars(rs: &StageDir, cs: &StageDir, checks: &mut Vec<Check>, g: &Grading) -> Result<(), DfError> {
     let read = |d: &StageDir| -> Option<Json> { Json::parse(&std::fs::read_to_string(d.dir.join("stages.json")).ok()?).ok()?.get("scalars").cloned() };
     let Some(Json::Object(r)) = read(rs) else { return Ok(()) };
     let Some(c) = read(cs) else {
@@ -460,7 +608,22 @@ fn compare_scalars(rs: &StageDir, cs: &StageDir, checks: &mut Vec<Check>) -> Res
                             .count()
                     };
                     let detail = if nd == 0 { String::new() } else { format!("R {}, Rust {}", rv.to_text(0), cv.to_text(0)) };
-                    checks.push(check(stage, &name, if nd == 0 { Status::Identical } else { Status::Differ }, a.len(), nd, detail));
+                    let mut c = check(stage, &name, if nd == 0 { Status::Identical } else { Status::Differ }, a.len(), nd, detail);
+                    // a numeric scalar of a BLAS-dependent stage, in tolerance mode: the floor
+                    if nd > 0 && !g.mode.is_exact() && g.class(&c) == Class::BlasDependent {
+                        if let Some(entry) = g.floor.get(key) {
+                            let xs: Vec<f64> = a.iter().filter_map(|v| v.clone().ok()).collect();
+                            let ys: Vec<f64> = b.iter().filter_map(|v| v.clone().ok()).collect();
+                            if xs.len() == a.len() && ys.len() == xs.len() {
+                                let s = grade::stats(&xs, &ys, xs.len(), 1, false);
+                                if grade::within(&s, entry).is_ok() {
+                                    c.status = Status::WithinFloor;
+                                    c.detail = format!("{}; {}", c.detail, s.describe());
+                                }
+                            }
+                        }
+                    }
+                    checks.push(c);
                 }
             }
         }
@@ -584,20 +747,17 @@ fn s1_from_rng(rs: &StageDir, n_cells: Option<usize>, checks: &mut Vec<Check>) -
 }
 
 /// The OpenBLAS kernel each run recorded (`run.fingerprint.openblas_corename` in `summary.json`):
-/// the BLAS-relevant field of the environment fingerprint (plan A5b). The exact criteria for
-/// SCTransform's residuals and the PCA hold under the same kernel only.
-fn compare_kernel(reference: &Path, candidate: &Path, checks: &mut Vec<Check>) {
-    let core = |p: &Path| -> Option<String> {
-        let j = Json::parse(&std::fs::read_to_string(p.join("summary.json")).ok()?).ok()?;
-        j.get("run")?.get("fingerprint")?.get("openblas_corename")?.as_str().map(String::from)
-    };
-    match (core(reference), core(candidate)) {
-        (Some(r), Some(c)) => {
-            let same = r == c;
-            checks.push(check("environment", "OpenBLAS kernel", if same { Status::Identical } else { Status::Differ }, 1, (!same) as usize, format!("R {r}, Rust {c}")));
-        }
-        _ => checks.push(check("environment", "OpenBLAS kernel", Status::Missing, 0, 0, "not recorded by one of the runs")),
-    }
+/// the BLAS-relevant field of the environment fingerprint (plan A5b), which decides the grading
+/// mode. With the same kernel the check is identical and every check exact; otherwise it records
+/// why the comparison runs in tolerance mode.
+fn compare_kernel(reference: &Path, candidate: &Path, checks: &mut Vec<Check>) -> Mode {
+    let core = |p: &Path| -> Option<String> { grade::recorded_kernel(Json::parse(&std::fs::read_to_string(p.join("summary.json")).ok()?).ok().as_ref()) };
+    let (r, c) = (core(reference), core(candidate));
+    let mode = grade::mode(r.as_deref(), c.as_deref());
+    let detail = format!("R {}, Rust {}; {} mode: {}", r.as_deref().unwrap_or("none recorded"), c.as_deref().unwrap_or("none recorded"), mode.name(), mode.reason());
+    let status = if mode.is_exact() { Status::Identical } else { Status::NotApplicable };
+    checks.push(check("environment", "OpenBLAS kernel", status, 1, 0, detail));
+    mode
 }
 
 /// Compares the candidate (a Rust output directory: the final files, `summary.json` and
@@ -608,7 +768,13 @@ pub fn compare(reference: &Path, reference_stages: &Path, candidate: &Path, thre
     let mut checks = Vec::new();
     compare_files(reference, candidate, &mut checks);
     let result = compare_results(reference, candidate, &mut checks);
-    compare_kernel(reference, candidate, &mut checks);
+    let mode = compare_kernel(reference, candidate, &mut checks);
+    // a teacher-forced candidate (on R's embeddings) records where it read them
+    let from_counts = Json::parse(&std::fs::read_to_string(candidate.join("summary.json")).unwrap_or_default())
+        .ok()
+        .and_then(|j| j.get("run").and_then(|r| r.get("from_stages")).cloned())
+        .is_none_or(|v| v == Json::Null);
+    let g = Grading { mode, floor: floor(), from_counts };
     let (rsd, csd) = (reference_stages.to_path_buf(), candidate.join("stages"));
     if !rsd.join("index.tsv").exists() {
         checks.push(check("stages", "stage dumps", Status::NotApplicable, 0, 0, "the reference has none (a direct run)"));
@@ -616,14 +782,18 @@ pub fn compare(reference: &Path, reference_stages: &Path, candidate: &Path, thre
         checks.push(check("stages", "stage dumps", Status::Missing, 0, 0, "the candidate has none"));
     } else {
         let (rs, cs) = (StageDir::open(&rsd)?, StageDir::open(&csd)?);
-        compare_stage_blocks(&rs, &cs, &mut checks)?;
+        compare_stage_blocks(&rs, &cs, &mut checks, &g)?;
         compare_rng(&rs, &cs, &mut checks)?;
-        compare_scalars(&rs, &cs, &mut checks)?;
+        compare_scalars(&rs, &cs, &mut checks, &g)?;
         teacher_forced_s6_s7(reference, &rs, result.as_ref(), &mut checks, threads)?;
         let n_cells = result.as_ref().and_then(|r| r.get("n_cells")).and_then(Json::as_f64).map(|v| v as usize);
         s1_from_rng(&rs, n_cells, &mut checks)?;
     }
-    Ok(Report { reference: reference.to_path_buf(), candidate: candidate.to_path_buf(), checks })
+    let grading = checks.iter().map(|c| {
+        let class = g.class(c);
+        (class, g.criterion(c, class))
+    }).collect();
+    Ok(Report { reference: reference.to_path_buf(), candidate: candidate.to_path_buf(), checks, mode: Some(g.mode), grading })
 }
 
 /// Compares a run's outputs (`cells.tsv` and the `result` section of `summary.json`) with the
@@ -674,7 +844,7 @@ pub fn compare_saved(saved: &Path, candidate: &Path) -> Result<Report, DfError> 
     };
     checks.push(check(stage, "singlet pANN", if nd == 0 { Status::Identical } else { Status::Differ }, saved_singlets.len(), nd, format!("{} kept cells, in order, barcode and pANN text", saved_singlets.len())));
     compare_singlets(&saved.join(crate::singlets::DIR), &candidate.join(crate::singlets::DIR), &mut checks)?;
-    Ok(Report { reference: saved.to_path_buf(), candidate: candidate.to_path_buf(), checks })
+    Ok(Report { reference: saved.to_path_buf(), candidate: candidate.to_path_buf(), checks, mode: None, grading: Vec::new() })
 }
 
 /// The run's singlets (`singlets/`) against the saved object's RNA counts as exported

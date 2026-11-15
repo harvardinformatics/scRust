@@ -21,14 +21,19 @@
 //! the same SNN graph. Silhouette widths (M11) and neighbourhood purity (M12) are added to this
 //! crate later. The standard library is the only dependency besides the workspace's crates.
 
+pub mod chain;
+pub mod chain_output;
+pub mod chain_params;
 pub mod clustering;
 pub mod find_clusters;
 pub mod input;
 pub mod java_random;
+pub mod metadata;
 pub mod network;
 pub mod optimizer;
 pub mod output;
 pub mod params;
+pub mod silhouette;
 pub mod singletons;
 pub mod validate;
 pub mod vos;
@@ -38,7 +43,10 @@ pub use find_clusters::{find_clusters, ClusterError, Factor, FindClusters, Resol
 pub use java_random::JavaRandom;
 pub use network::Network;
 pub use optimizer::{OptimizerParams, OptimizerResult};
+pub use chain::{Chain, ChainError, Observer};
+pub use chain_params::{ChainParams, Stats};
 pub use params::{parse_resolutions, ClusterParams};
+pub use silhouette::{approx_silhouette, Silhouette};
 
 /// What this crate reproduces, for run records.
 pub const REFERENCE: &str = "Seurat 5.5.1 FindClusters: RunModularityClusteringCpp (ModularityOptimizer 1.3.0 by Waltman and van Eck, Seurat's C++ translation, JavaRandom), GroupSingletons, FindClusters.Seurat's columns and levels";

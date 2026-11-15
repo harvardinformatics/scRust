@@ -25,6 +25,7 @@ xgboost 3.2.0                          Apache-2.0
 fields 17.3                            GPL (>= 2)
 RcppAnnoy 0.0.23 (Annoy 1.17.3)        GPL (>= 2); Annoy itself is Apache-2.0
                                        (see "Ported code" below)
+bluster 1.20.0                         GPL-3
 matrixStats 1.5.0                      Artistic-2.0
 KernSmooth 2.23-27                     Unlimited
 Matrix 1.7-6                           GPL (>= 2)
@@ -80,6 +81,22 @@ crates/cluster (milestone M10) is a Rust port of:
   seurat_clusters (R/clustering.R), in crates/cluster/src/singletons.rs and
   find_clusters.rs. GroupSingletons' tie-breaking draw uses R's set.seed and
   sample, and its connectivity R's mean, from crates/rcompat (R, GPL (>= 2)).
+
+crates/cluster (milestone M11) also ports:
+
+- bluster 1.20.0 (Aaron Lun, GPL-3): approxSilhouette (R/approxSilhouette.R),
+  translated into Rust in crates/cluster/src/silhouette.rs. Changes: the
+  centroids, within-cluster variances and root-mean-square distances are
+  computed with R's long-double colMeans, colSums and sum (from crates/rcompat)
+  in the order R computes them; the closest other cluster is returned as a
+  position among the levels present, and the widths of the workflow's guard
+  (fewer than two cells or clusters) are NA, as add_silhouette_to_metadata
+  leaves them.
+- Seurat 5.5.1's and SeuratObject 5.4.0's R code (MIT): CreateSeuratObject's
+  nCount_RNA and nFeature_RNA (.CalcN.default), in
+  crates/cluster/src/metadata.rs; and the workflow's own
+  require_min_cells_for_pca() (scRNAseq-preprocessing, silhouette_utils.R), in
+  crates/cluster/src/chain.rs.
 
 Planned, with licensing to be handled when the work starts
 ----------------------------------------------------------

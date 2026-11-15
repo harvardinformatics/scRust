@@ -10,5 +10,7 @@ publish.workspace = true
 
 [dependencies]
 neighbors.workspace = true
+pca.workspace = true
 rcompat.workspace = true
 scio.workspace = true
+sctransform.workspace = true
