@@ -4,11 +4,20 @@
 #   bash validation/slurm/m11_manifest.sh > /path/to/section.toml
 # and put the section in the manifest before "# FindClusters (plan C4 and C7)". Lists the committed
 # fixture of the kernel checks, the pinned binary, the R-vs-R floor measurements, the run of cargo
-# test under another kernel and the DoubletFinder re-grading's summary. Rust's validation and
-# benchmark runs (data/clustering/<object>/rust/<label>/) are not listed, as in M9 and M10; their
+# test under another kernel and the DoubletFinder re-grading's summary; then DoubletFinder's two
+# large objects: their instrumented production-profile R runs, each one's check against its direct
+# run, the floor measured again on all ten objects, and the re-grading with it. Rust's validation
+# and benchmark runs (data/clustering/<object>/rust/<label>/) are not listed, as in M9 and M10; their
 # results are in docs/validation/clustering.md and clustering_m11.tsv.
 set -euo pipefail
 label=${1:-m11-eedf376}
+# the second part: the R runs' jobs, the reference checks' job, the floor's, and the re-grading's
+# label and job
+r_jobs=(soupx_emptydrops_sscovelli:61097286 cellbender_fromraw_ghirsutum2:61097287)
+dfref_job=61102374
+floor10_job=61102448
+relabel=${2:-m11-63e7b3b}
+regrade_job=61104652
 cat <<'EOF'
 # M11: the clustering chain and kernel-gated grading (plan A5b, C5, C6) ---------------------------
 #
@@ -27,6 +36,16 @@ cat <<'EOF'
 #               (validation/slurm/m11_kernel_tests.sbatch): cargo_test.txt, results.tsv
 #   data/doubletfinder/compare/m11_verdicts_<label>.tsv   M6's and M7's Rust runs re-graded with
 #               kernel gating, verdict by verdict (validation/slurm/m11_doubletfinder.sbatch)
+#   data/doubletfinder/<object>/runs/instrumented-production-sapphirerapids/   the instrumented
+#               production-profile R runs of DoubletFinder's two large objects (soupx_emptydrops_
+#               sscovelli, cellbender_fromraw_ghirsutum2; validation/slurm/reference_doubletfinder.
+#               sbatch), listed as M2 listed its runs
+#   data/doubletfinder/compare/<object>/instr_vs_direct_production-sapphirerapids.tsv   each against
+#               its object's direct production run (validation/slurm/m11_df_references.sbatch)
+#   data/doubletfinder/compare/floor_kernel_m11_ten_objects/   DoubletFinder's floor measured again,
+#               on all ten objects with instrumented runs in both profiles (m11_floor.sbatch)
+#   data/clustering/bin/scrust-m11-<commit>, data/doubletfinder/compare/m11_verdicts_<label>.tsv
+#               the binary with that floor and its re-grading of M6's and M7's runs
 
 EOF
 entry() {  # <path> <role> <note> [<job>]
@@ -46,7 +65,50 @@ for d in data/clustering/floor_kernel_m11 data/doubletfinder/compare/floor_kerne
     done
 done
 for f in data/clustering/m11_kernel_tests/*/cargo_test.txt data/clustering/m11_kernel_tests/*/results.tsv; do
-    [ -f "$f" ] && entry "$f" check "cargo test --workspace --release under kernel $(basename "$(dirname "$f")")" 60815653
+    [ -f "$f" ] && entry "$f" check "cargo test --workspace --release under kernel $(basename "$(dirname "$f")")" 61108077
 done
 f=data/doubletfinder/compare/m11_verdicts_$label.tsv
 [ -f "$f" ] && entry "$f" check "scrust validate doubletfinder with kernel gating on M6's and M7's Rust runs: the verdicts, check by check" 60804010
+
+# DoubletFinder's two large objects: the R runs, in M2's format (validation/R/manifest_doubletfinder.R)
+note_run='run-specific bytes (timings, node, job or plot timestamp); summary.json'"'"'s \"result\" section is deterministic'
+jfield() { grep -m1 "\"$1\": " "$2" | sed 's/,$//; s/^[^:]*: "\{0,1\}\([^"]*\)"\{0,1\}$/\1/'; }
+df_run() {  # <object> <job>
+    local o=$1 job=$2
+    local run=data/doubletfinder/$o/runs/instrumented-production-sapphirerapids
+    local s=$run/summary.json
+    local level fp f role stage note
+    level=$(jfield dump_level "$s")
+    fp="$(jfield cpu_model "$s"); OpenBLAS $(jfield openblas_corename "$s"), $(jfield openblas_num_threads "$s") thread(s); glibc $(jfield glibc "$s"); R $(jfield R "$s" | awk '{print $3}'); $(jfield SLURMD_NODENAME "$s"), job $job"
+    while IFS= read -r f; do
+        role=reference note=
+        case $f in
+            bcmvn.tsv | sweep_stats.tsv) stage=S6 ;;
+            cells.tsv) stage=S7 ;;
+            summary.json) stage=S7 note=$note_run ;;
+            find_pK.pdf) role=run-record stage=S6 note=$note_run ;;
+            stages/S*) stage=${f#stages/} stage=${stage%%_*} ;;
+            stages/*) stage=S1-S7 ;;
+            *) role=run-record stage= note=$note_run ;;
+        esac
+        printf '[[file]]\npath = "%s"\nsha256 = "%s"\nbytes = %s\ntool = "doubletfinder"\ndataset = "%s"\ntier = "P"\nrole = "%s"\nstage = "%s"\nprofile = "production"\nsource = "data/doubletfinder/%s/input"\nrecipe = "validation/slurm/reference_doubletfinder.sbatch production instrumented %s (validation/R/instrumented_doubletfinder.R --level %s)"\nenv = "envs/r-reference"\nfingerprint = "%s"\nmilestone = "M11"\nslurm_job_id = "%s"\n' \
+            "$run/$f" "$(sha256sum "$run/$f" | cut -d' ' -f1)" "$(stat -c %s "$run/$f")" "$o" "$role" "$stage" "$o" "$o" "$level" "$fp" "$job"
+        [ -n "$note" ] && printf 'note = "%s"\n' "$note"
+        printf '\n'
+    done < <(cd "$run" && find . -type f | sed 's|^\./||' | LC_ALL=C sort)
+}
+for oj in "${r_jobs[@]}"; do
+    df_run "${oj%%:*}" "${oj##*:}"
+done
+for oj in "${r_jobs[@]}"; do
+    f=data/doubletfinder/compare/${oj%%:*}/instr_vs_direct_production-sapphirerapids.tsv
+    [ -f "$f" ] && entry "$f" check "the instrumented production R run against the direct production run: the final files, the result section and the run's hook checks" "$dfref_job"
+done
+d=data/doubletfinder/compare/floor_kernel_m11_ten_objects
+for f in pairs.tsv blocks.tsv summary.md time_v.txt; do
+    [ -f "$d/$f" ] && entry "$d/$f" check "R-vs-R floor across OpenBLAS kernels (Haswell against SapphireRapids, Sapphire Rapids) on DoubletFinder's ten objects, the two large ones included: $f" "$floor10_job"
+done
+b=data/clustering/bin/scrust-$relabel
+[ -f "$b" ] && entry "$b" binary "scrust built from commit ${relabel#m11-}: DoubletFinder's re-grading with the floor of ten objects"
+f=data/doubletfinder/compare/m11_verdicts_$relabel.tsv
+[ -f "$f" ] && entry "$f" check "scrust validate doubletfinder with kernel gating and the floor of ten objects on M6's and M7's Rust runs: the verdicts, check by check" "$regrade_job"

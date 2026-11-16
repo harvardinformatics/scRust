@@ -197,7 +197,10 @@ blas_dependent = true
 # S4 neighbours: the first `ind` (sweep) or k + 1 (final) order positions of every real cell.
 # Plan floor: identical for >= 99.99% of cells, each difference explained by a near-tie.
 # Floor (M2): identical across kernels and CPU types on every object (the S3 differences above
-# move no neighbour), so S5-S7 are identical too.
+# move no neighbour), so S5-S7 are identical too. M11, measuring the two large objects per stage:
+# across kernels R orders 3 of cellbender_fromraw_ghirsutum2's 59,323 cells' neighbours differently
+# in the final run, near-ties within the same k + 1 neighbours ([doubletfinder.floor.kernel]
+# S4_digest); S5-S7 stay identical.
 # Settled (M3): exact. On R's own S3 embeddings, every cell's S4 digest is identical in all 24
 # instrumented runs of the 10 objects, and on tier T the full order positions (15 runs,
 # 3.1 million positions), including the lower-index twins of cellbender_fromraw_ghirsutum2 that
@@ -547,9 +550,10 @@ not_compared = ["neighborhood_purity (M12)", "nCount_SCT, nFeature_SCT (M13)", "
 # Kernel-gated grading shown on deliberately mismatched pairs (M11): each Rust run against the
 # other profile's instrumented R run on Sapphire Rapids, 68 pairs of the 34 objects in both
 # directions: all in tolerance mode, every BLAS-free check identical, 1,028 BLAS-dependent checks
-# within [clustering.floor.kernel], none beyond it. DoubletFinder: 18 pairs of M6's runs (10 objects),
-# 16 within [doubletfinder.floor.kernel]; the two largest objects, whose per-stage floor M2 did not
-# measure, exceed it slightly (docs/validation/clustering.md, Findings).
+# within [clustering.floor.kernel], none beyond it. DoubletFinder: 20 pairs of M6's runs (10 objects,
+# both directions), all within [doubletfinder.floor.kernel] as measured on all ten objects (674
+# BLAS-dependent checks within it; job 61104652). With M2's floor, which had the two large objects
+# end to end only, 16 of the first 18 pairs passed (job 60804010; docs/validation/clustering.md).
 [clustering.kernel_gating_shown]
 pairs = 68
 passed = 68
