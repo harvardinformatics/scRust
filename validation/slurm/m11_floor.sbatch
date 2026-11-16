@@ -4,13 +4,17 @@
 # instrumented R runs M2 and M8 made in both profiles on Sapphire Rapids:
 #   - clustering: every object with instrumented-production-sapphirerapids and
 #     instrumented-portable-sapphirerapids runs (27 tier-T, 7 tier-P);
-#   - DoubletFinder: every object with both (5 tier-T, 3 tier-P).
+#   - DoubletFinder: every object with both (at first 5 tier-T and 3 tier-P; with the two large
+#     objects' production runs, made later in M11, all 10).
 # No R is run: the measurement reads the runs' stage dumps. From the repository's top directory,
 # after `cargo build --release -p scrust`:
-#   sbatch validation/slurm/m11_floor.sbatch
-# Outputs (data/, listed in the manifest): data/clustering/floor_kernel_m11/{pairs,blocks}.tsv and
-# summary.md; data/doubletfinder/compare/floor_kernel_m11/ likewise. summary.md is the table
-# behind [clustering.floor.kernel] and [doubletfinder.floor.kernel] (validation/tolerances.toml).
+#   sbatch validation/slurm/m11_floor.sbatch [all|clustering|doubletfinder] [<output name>]
+# (default: all, into floor_kernel_m11). Outputs (data/, listed in the manifest):
+# data/clustering/<output name>/{pairs,blocks}.tsv, summary.md and time_v.txt;
+# data/doubletfinder/compare/<output name>/ likewise. An existing output is never overwritten.
+# summary.md is the table behind [clustering.floor.kernel] and [doubletfinder.floor.kernel]
+# (validation/tolerances.toml): M11 measured both into floor_kernel_m11 (job 60798602), then
+# DoubletFinder's ten objects into floor_kernel_m11_ten_objects.
 #
 #SBATCH --job-name=scrust-m11-floor
 #SBATCH -A informatics
@@ -41,6 +45,7 @@ echo "binary $bin sha256 $(sha256sum "$bin" | cut -d' ' -f1)"
 measure() {
     local data=$1 out=$2
     shift 2
+    [ ! -e "$out" ] || { echo "$out exists; not overwriting" >&2; exit 1; }
     mkdir -p "$out"
     {
         printf 'label\ta\tb\n'
@@ -55,7 +60,14 @@ measure() {
     cat "$out/summary.md"
 }
 
-clustering_objects=$(tail -n +2 validation/clustering_datasets.tsv | cut -f1)
-measure data/clustering data/clustering/floor_kernel_m11 $clustering_objects
-df_objects=$(ls data/doubletfinder | grep -v -e '^compare$' -e '^logs$')
-measure data/doubletfinder data/doubletfinder/compare/floor_kernel_m11 $df_objects
+tools=${1:-all}
+name=${2:-floor_kernel_m11}
+case $tools in all|clustering|doubletfinder) ;; *) echo "usage: m11_floor.sbatch [all|clustering|doubletfinder] [<output name>]" >&2; exit 2 ;; esac
+if [ "$tools" != doubletfinder ]; then
+    clustering_objects=$(tail -n +2 validation/clustering_datasets.tsv | cut -f1)
+    measure data/clustering "data/clustering/$name" $clustering_objects
+fi
+if [ "$tools" != clustering ]; then
+    df_objects=$(ls data/doubletfinder | grep -v -e '^compare$' -e '^logs$')
+    measure data/doubletfinder "data/doubletfinder/compare/$name" $df_objects
+fi

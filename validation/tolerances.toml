@@ -24,7 +24,8 @@ criterion = "exact"
 # R-vs-R floor (M2; docs/validation/doubletfinder_m2.md): how far R itself moves when only the
 # machine changes. Measured with instrumented runs (every stage array and .Random.seed
 # checkpoint, block by block) on the five tier-T objects and on soupx_tenx_SRR18256555,
-# soupx_tenx_10xmousebrain and soupx_emptydrops_4500871lane; the two large objects end to end.
+# soupx_tenx_10xmousebrain and soupx_emptydrops_4500871lane; the two large objects end to end
+# (M2), and per stage from M11, which made their production-profile instrumented runs.
 # Settled as measurements; the stage criteria below are settled at their milestones.
 #
 # Same kernel, different CPU types: OPENBLAS_CORETYPE=Haswell (the portable profile) on Sapphire
@@ -34,33 +35,47 @@ criterion = "exact"
 all_stages = "identical"
 
 # Different kernels, same CPU type: Haswell against SapphireRapids (the production profile, by
-# detection) on Sapphire Rapids. Maxima over objects and contexts; max_scaled is
-# max|a - b| / max|a| within one block; S3 embeddings and loadings after aligning each
-# component's sign (irlba's signs can flip between kernels). Everything not listed is identical:
-# S1, S2a, S2b, S2c, all RNG checkpoints (so irlba's draw count), S4, S5, S6, S7 and the final
-# cells.tsv, sweep_stats.tsv and bcmvn.tsv.
+# detection) on Sapphire Rapids, on all ten objects. Maxima over objects and contexts, rounded up
+# to two significant digits; max_scaled is max|a - b| / max|a| within one block; S3 embeddings and
+# loadings after aligning each component's sign (irlba's signs can flip between kernels); counts
+# (values_differing, cells_differing) are totals over the ten objects. Everything not listed is
+# identical: S1, S2a, S2b, S2c, all RNG checkpoints (so irlba's draw count), every scalar, S5, S6,
+# S7 and the final cells.tsv, sweep_stats.tsv and bcmvn.tsv.
+#
+# M11 measured it again with `scrust validate floor` (validation/slurm/m11_floor.sbatch): first on
+# M2's eight objects (data/doubletfinder/compare/floor_kernel_m11/, job 60798602), reproducing M2's
+# table, then on all ten (floor_kernel_m11_ten_objects/, job 61102448), with the two large objects'
+# instrumented production runs, which M11 made (jobs 61097286 and 61097287). The large objects
+# raise three bounds: S3's embeddings (max_abs 3.548e-11 -> 3.665e-11, scaled 2.407e-13 ->
+# 3.133e-13, was 3.6e-11 and 2.5e-13) and loadings (8.034e-14 -> 8.370e-14, was 8.1e-14), both at
+# soupx_emptydrops_sscovelli's sweep_pN0.1; and S4's digest (below). Everything else of theirs
+# stays within the eight objects' bounds.
 [doubletfinder.floor.kernel]
 S2d_residual_stats = { max_abs = 5.7e-14, max_scaled = 1.4e-16 }
 S2d_scale_data = { max_abs = 2.2e-14, max_scaled = 1.2e-15, max_fraction_differing = 0.008 }
 S3_sdev = { max_rel = 7.3e-15 }
-S3_embeddings = { max_abs = 3.6e-11, max_scaled = 2.5e-13 }
-S3_loadings = { max_abs = 8.1e-14, max_scaled = 3.0e-13 }
-# M11: irlba's d, from M2's own measurement (docs/validation/doubletfinder_m2.md, R-vs-R floor),
-# which `scrust validate floor` reproduces on the same eight runs (validation/slurm/m11_floor.sbatch,
-# data/doubletfinder/compare/floor_kernel_m11/: 7.503e-12, 3.799e-15). Every other entry above is
-# reproduced by that measurement too, and every scalar (irlba's iterations and products, the total
-# variance) is identical across kernels in all eight runs.
+S3_embeddings = { max_abs = 3.7e-11, max_scaled = 3.2e-13 }
+S3_loadings = { max_abs = 8.4e-14, max_scaled = 3.0e-13 }
+# irlba's d (M11), from M2's own measurement (docs/validation/doubletfinder_m2.md, R-vs-R floor);
+# the ten objects give the same maxima (7.503e-12, 3.799e-15).
 S3_irlba_d = { max_abs = 7.6e-12, max_scaled = 3.8e-15 }
+# S4's digest of each real cell's first ind (sweep) or k + 1 (final) order() positions (M11, the
+# ten objects). A digest has no magnitude to bound, so the entry bounds how many cells' digests
+# differ. Identical in every block of nine objects; in cellbender_fromraw_ghirsutum2's final run
+# (k = 2,373) R orders 3 of the 59,323 cells' neighbours differently under the two kernels: the
+# same k + 1 neighbours, with two or three of them, at distances equal to within 1.1e-15 (exact
+# ties under one kernel), in another order. pANN (S5) and the calls (S7) stay identical.
+S4_digest = { cells_differing = 3, values_differing = 6, objects = 1 }
 
 # Kernel-gated grading (M11; docs/PLAN.md A5b mechanism 3): `scrust validate doubletfinder` grades
 # every check exactly when the reference's and the candidate's recorded OpenBLAS kernels
 # (run.fingerprint.openblas_corename) are the same; otherwise, or when either run records none, in
 # tolerance mode: each BLAS-free check stays exact, each BLAS-dependent stage array and scalar is
-# graded against [doubletfinder.floor.kernel] (bounds: the keys starting with max_), and what the
-# floor does not list stays exact, since the floor found it identical across kernels. The report
-# gives the mode, why, and each check's class and criterion. A check is BLAS-dependent when any of
-# its inputs passed through a BLAS product in the candidate's run (crates/doubletfinder/src/
-# validate.rs, Grading::class):
+# graded against [doubletfinder.floor.kernel] (bounds: the keys starting with max_, and the counts
+# values_differing and cells_differing), and what the floor does not list stays exact, since the
+# floor found it identical across kernels. The report gives the mode, why, and each check's class
+# and criterion. A check is BLAS-dependent when any of its inputs passed through a BLAS product in
+# the candidate's run (crates/doubletfinder/src/validate.rs, Grading::class):
 #   - teacher-forced runs (on R's own embeddings, --from-stages): every check is BLAS-free;
 #   - runs from the counts: BLAS-free are S1 and S2a, and the RNG states of the sampling and of
 #     SCTransform's fits (whose draw counts are fixed), in the contexts whose doublets are drawn

@@ -29,9 +29,9 @@
 //! comparison runs in tolerance mode: each check is classified BLAS-free or BLAS-dependent
 //! (BLAS-dependent when any of its inputs passed through a BLAS product in the candidate's run),
 //! BLAS-free checks stay exact, and BLAS-dependent stage arrays and scalars are graded against
-//! `[doubletfinder.floor.kernel]` (M2's R-vs-R floor, `validation/tolerances.toml`, embedded at
-//! build time); what the floor found identical across kernels stays exact. The report says which
-//! mode it ran in, and why.
+//! `[doubletfinder.floor.kernel]` (the R-vs-R floor of M2, measured per stage on all ten objects
+//! in M11; `validation/tolerances.toml`, embedded at build time); what the floor found identical
+//! across kernels stays exact. The report says which mode it ran in, and why.
 
 use crate::pann::classify;
 use scio::grade::{self, Class, Floor, Mode};
@@ -94,7 +94,7 @@ pub struct Report {
 /// `validation/tolerances.toml`, as built: the floor tolerance mode grades against.
 pub const TOLERANCES: &str = include_str!("../../../validation/tolerances.toml");
 
-/// DoubletFinder's R-vs-R floor across OpenBLAS kernels (M2).
+/// DoubletFinder's R-vs-R floor across OpenBLAS kernels (M2; on all ten objects from M11).
 pub fn floor() -> Floor {
     Floor::from_toml(TOLERANCES, "doubletfinder.floor.kernel").expect("validation/tolerances.toml has [doubletfinder.floor.kernel]")
 }
@@ -898,4 +898,32 @@ pub fn compare_singlets(saved: &Path, candidate: &Path, checks: &mut Vec<Check>)
 /// Reads a `.npy` file (for callers outside this crate).
 pub fn read_npy(path: &Path) -> Result<Npy, DfError> {
     Npy::read(path).map_err(|e| DfError::Input(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The floor as built holds R's own differences across kernels on the two large objects
+    /// (M11: their instrumented production runs against the portable ones, at the maxima of
+    /// `scrust validate floor`), and no more.
+    #[test]
+    fn floor_bounds_the_large_objects() {
+        let floor = floor();
+        let tolerance = grade::mode(Some("Haswell"), Some("SapphireRapids"));
+        let graded = |key: &str, s: &grade::Stats| grade::grade(s, Class::BlasDependent, &tolerance, &floor, key);
+        // soupx_emptydrops_sscovelli, sweep_pN0.1: S3's embeddings and loadings
+        let embeddings = grade::Stats { n: 1, n_differ: 1, rows_differ: 1, max_abs: 3.664735181985179e-11, max_scaled: 3.132760670588407e-13, ..Default::default() };
+        assert_eq!(graded("S3_embeddings", &embeddings), grade::Outcome::WithinFloor);
+        let loadings = grade::Stats { n: 1, n_differ: 1, rows_differ: 1, max_abs: 8.369932351370846e-14, max_scaled: 2.6742371891372684e-13, ..Default::default() };
+        assert_eq!(graded("S3_loadings", &loadings), grade::Outcome::WithinFloor);
+        // cellbender_fromraw_ghirsutum2, final: S4's digests differ for 3 cells (6 values), not more
+        let s4 = |cells: usize| grade::Stats { n: 118_646, n_differ: 2 * cells, rows_differ: cells, max_abs: 1.9e9, max_scaled: 0.012, max_rel: 27.0, ..Default::default() };
+        assert_eq!(graded("S4_digest", &s4(3)), grade::Outcome::WithinFloor);
+        assert!(matches!(graded("S4_digest", &s4(4)), grade::Outcome::Differ(m) if m.contains("cells_differing")));
+        // the same kernel: exact; and what the floor does not list (pANN) stays exact
+        let exact = grade::mode(Some("SapphireRapids"), Some("SapphireRapids"));
+        assert!(matches!(grade::grade(&s4(1), Class::BlasDependent, &exact, &floor, "S4_digest"), grade::Outcome::Differ(_)));
+        assert!(matches!(graded("S5_pann_final", &s4(1)), grade::Outcome::Differ(_)));
+    }
 }
