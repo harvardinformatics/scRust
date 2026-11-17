@@ -5,8 +5,9 @@
 # and put the section in the manifest before "# FindClusters (plan C4 and C7)". Lists the committed
 # fixture of the kernel checks, the pinned binary, the R-vs-R floor measurements, the run of cargo
 # test under another kernel and the DoubletFinder re-grading's summary; then DoubletFinder's two
-# large objects: their instrumented production-profile R runs, each one's check against its direct
-# run, the floor measured again on all ten objects, and the re-grading with it. Rust's validation
+# large objects: their instrumented production-profile R runs ([[file]] entries and a [[run]] table
+# each, as M2 listed its runs), each one's check against its direct run, the floor measured again on
+# all ten objects, and the re-grading with it. Rust's validation
 # and benchmark runs (data/clustering/<object>/rust/<label>/) are not listed, as in M9 and M10; their
 # results are in docs/validation/clustering.md and clustering_m11.tsv.
 set -euo pipefail
@@ -112,3 +113,23 @@ b=data/clustering/bin/scrust-$relabel
 [ -f "$b" ] && entry "$b" binary "scrust built from commit ${relabel#m11-}: DoubletFinder's re-grading with the floor of ten objects"
 f=data/doubletfinder/compare/m11_verdicts_$relabel.tsv
 [ -f "$f" ] && entry "$f" check "scrust validate doubletfinder with kernel gating and the floor of ten objects on M6's and M7's Rust runs: the verdicts, check by check" "$regrade_job"
+
+# ... and a [[run]] table for each of the two R runs, with M2's keys from M2's sources
+# (validation/R/manifest_doubletfinder.R): summary.json's run section and fingerprint, stages.json's
+# level, time_v.txt's peak RSS and wall time, the result section's pK label and nExp
+df_run_table() {  # <object>
+    local o=$1 run=instrumented-production-sapphirerapids
+    local d=data/doubletfinder/$o/runs/$run
+    local s=$d/summary.json t=$d/time_v.txt
+    local mode=${run%%-*} rest=${run#*-}
+    local profile=${rest%%-*} arch=${rest#*-}
+    printf '[[run]]\nid = "%s/%s"\npath = "%s"\ntool = "doubletfinder"\ndataset = "%s"\ntier = "%s"\nmode = "%s"\nprofile = "%s"\ncpu_arch = "%s"\nlevel = "%s"\nslurm_job_id = "%s"\nnode = "%s"\ncpu_model = "%s"\nopenblas_core = "%s"\nopenblas_threads = %s\nglibc = "%s"\nR = "%s"\nmax_rss_kib = %s\nelapsed = "%s"\npK = "%s"\nnExp = %s\nmilestone = "M11"\n\n' \
+        "$o" "$run" "$d" "$o" "$(awk -F'\t' -v o="$o" '$1 == o {print $2}' validation/doubletfinder_datasets.tsv)" \
+        "$mode" "$profile" "$arch" "$(jfield level "$d/stages/stages.json")" "$(jfield slurm_job_id "$s")" \
+        "$(jfield host "$s")" "$(jfield cpu_model "$s")" "$(jfield openblas_corename "$s")" "$(jfield openblas_num_threads "$s")" \
+        "$(jfield glibc "$s")" "$(jfield R "$s")" "$(sed -n '/Maximum resident set size/s/.*: //p' "$t")" \
+        "$(sed -n '/Elapsed (wall clock)/s/.*: //p' "$t")" "$(jfield pK_label "$s")" "$(jfield nExp "$s")"
+}
+for oj in "${r_jobs[@]}"; do
+    df_run_table "${oj%%:*}"
+done

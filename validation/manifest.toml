@@ -2345,6 +2345,52 @@ milestone = "M11"
 note = "scrust validate doubletfinder with kernel gating and the floor of ten objects on M6's and M7's Rust runs: the verdicts, check by check"
 slurm_job_id = "61104652"
 
+[[run]]
+id = "soupx_emptydrops_sscovelli/instrumented-production-sapphirerapids"
+path = "data/doubletfinder/soupx_emptydrops_sscovelli/runs/instrumented-production-sapphirerapids"
+tool = "doubletfinder"
+dataset = "soupx_emptydrops_sscovelli"
+tier = "P"
+mode = "instrumented"
+profile = "production"
+cpu_arch = "sapphirerapids"
+level = "light"
+slurm_job_id = "61097286"
+node = "holy8a26501.rc.fas.harvard.edu"
+cpu_model = "Intel(R) Xeon(R) Platinum 8480CL"
+openblas_core = "SapphireRapids"
+openblas_threads = 1
+glibc = "2.28"
+R = "R version 4.5.3 (2026-03-11)"
+max_rss_kib = 133712212
+elapsed = "35:02.34"
+pK = "0.19"
+nExp = 9909
+milestone = "M11"
+
+[[run]]
+id = "cellbender_fromraw_ghirsutum2/instrumented-production-sapphirerapids"
+path = "data/doubletfinder/cellbender_fromraw_ghirsutum2/runs/instrumented-production-sapphirerapids"
+tool = "doubletfinder"
+dataset = "cellbender_fromraw_ghirsutum2"
+tier = "P"
+mode = "instrumented"
+profile = "production"
+cpu_arch = "sapphirerapids"
+level = "light"
+slurm_job_id = "61097287"
+node = "holy8a26501.rc.fas.harvard.edu"
+cpu_model = "Intel(R) Xeon(R) Platinum 8480CL"
+openblas_core = "SapphireRapids"
+openblas_threads = 1
+glibc = "2.28"
+R = "R version 4.5.3 (2026-03-11)"
+max_rss_kib = 160968908
+elapsed = "35:25.04"
+pK = "0.03"
+nExp = 6769
+milestone = "M11"
+
 # FindClusters (plan C4 and C7) --------------------------------------------------------------
 #
 # Milestone M10: R references for the cluster crate (FindClusters: the modularity optimizer and
