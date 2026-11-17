@@ -19,6 +19,13 @@
 //!
 //! Memory is the points (N x dim doubles), two O(N) buffers per thread and whatever the caller
 //! keeps per query.
+//!
+//! [`purity`] (milestone M12) is the search `bluster::neighborPurity` makes: each cell's k-th
+//! distance, their median as a radius, and each cell's neighbours within it, with knncolle's
+//! arithmetic (the same sums, compared before the square root), and a certificate that KMKNN,
+//! BiocNeighbors' algorithm, finds the same.
+
+pub mod purity;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;

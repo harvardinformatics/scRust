@@ -1,11 +1,13 @@
-//! The workflow's clustering without Seurat (docs/PLAN.md A7b, C1, C2, C3; milestones M10 and
-//! M11): Seurat 5.5.1's `FindClusters` (the modularity optimizer that `RunModularityClusteringCpp`
-//! runs, with its Java-style generator, then `GroupSingletons`, and the metadata columns and
-//! levels `FindClusters.Seurat` makes), bluster's `approxSilhouette` ([`silhouette`]), and the
-//! whole chain from the counts as one library entry point ([`chain`]: SCTransform, the workflow's
-//! PCA guard, RunPCA, FindNeighbors, FindClusters and the silhouette widths, through the
-//! `sctransform`, `pca` and `neighbors` crates), with its parameters ([`chain_params`]), its
-//! outputs ([`chain_output`]) and its comparison with R ([`validate`], kernel-gated).
+//! The workflow's clustering without Seurat (docs/PLAN.md A7b, C1, C2, C3; milestones M10, M11
+//! and M12): Seurat 5.5.1's `FindClusters` (the modularity optimizer that
+//! `RunModularityClusteringCpp` runs, with its Java-style generator, then `GroupSingletons`, and the
+//! metadata columns and levels `FindClusters.Seurat` makes), bluster's `approxSilhouette`
+//! ([`silhouette`]) and `neighborPurity` ([`purity`], on `knn::purity`'s exhaustive search with its
+//! certificate), and the whole chain from the counts as one library entry point ([`chain`]:
+//! SCTransform, the workflow's PCA guard, RunPCA, FindNeighbors, FindClusters, the silhouette
+//! widths and the purities, through the `sctransform`, `pca`, `neighbors` and `knn` crates), with
+//! its parameters ([`chain_params`]), its outputs ([`chain_output`]) and its comparison with R
+//! ([`validate`], kernel-gated).
 //!
 //! FindClusters, as `FindClusters(obj, random.seed = 12345)` runs it on the `SCT_snn` graph with
 //! its defaults (modularity function 1, resolution 0.8, algorithm 1, 10 starts, 10 iterations):
@@ -21,11 +23,10 @@
 //! 4. **The result** ([`find_clusters`]): one column per resolution (`SCT_snn_res.0.8`) with
 //!    Seurat's level order, and `seurat_clusters`.
 //!
-//! FindClusters and the silhouette use no BLAS: their results are the same on any machine and for
-//! any thread count, given the same SNN graph and embeddings. SCTransform and RunPCA call
-//! OpenBLAS, so the chain from the counts reproduces R bit for bit under R's kernel. Neighbourhood
-//! purity (M12) is added later. The standard library is the only dependency besides the
-//! workspace's crates.
+//! FindClusters, the silhouette and the purity use no BLAS: their results are the same on any
+//! machine and for any thread count, given the same SNN graph and embeddings. SCTransform and
+//! RunPCA call OpenBLAS, so the chain from the counts reproduces R bit for bit under R's kernel.
+//! The standard library is the only dependency besides the workspace's crates.
 
 pub mod chain;
 pub mod chain_output;
@@ -39,6 +40,7 @@ pub mod network;
 pub mod optimizer;
 pub mod output;
 pub mod params;
+pub mod purity;
 pub mod silhouette;
 pub mod singletons;
 pub mod validate;
@@ -53,6 +55,7 @@ pub use chain::{Chain, ChainError, Observer};
 pub use chain_params::{ChainParams, Stats};
 pub use params::{parse_resolutions, ClusterParams};
 pub use silhouette::{approx_silhouette, Silhouette};
+pub use purity::{neighbor_purity, Purity};
 
 /// What this crate reproduces, for run records.
 pub const REFERENCE: &str = "Seurat 5.5.1 FindClusters: RunModularityClusteringCpp (ModularityOptimizer 1.3.0 by Waltman and van Eck, Seurat's C++ translation, JavaRandom), GroupSingletons, FindClusters.Seurat's columns and levels";

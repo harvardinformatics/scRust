@@ -6,6 +6,7 @@ version = 4
 name = "cluster"
 version = "0.1.0"
 dependencies = [
+ "knn",
  "neighbors",
  "pca",
  "rcompat",

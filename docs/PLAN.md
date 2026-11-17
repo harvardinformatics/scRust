@@ -623,7 +623,7 @@ There are four generators. R's is reseeded before each stage that draws from it,
 | Annoy search, SNN, `correct()`, silhouette, purity's sums | none | | |
 | Modularity optimizer | `JavaRandom`, java.util.Random's 48-bit LCG | created once per resolution, with `random.seed` (12345) | each local-moving pass draws a permutation of its network's nodes: n calls to `nextInt(n)`. This happens at every level of every iteration of every start, in one continuing stream |
 | GroupSingletons | R's | `set.seed(1)` before each candidate cluster's connectivity | one `sample(<tied clusters>, 1)` per singleton; none with `group.singletons = FALSE` |
-| Purity's search index (KMKNN) | `std::mt19937_64`, in knncolle's k-means++ | the library's fixed seed, 6523 | k-means++'s draws for the index's ⌈√n⌉ centres. They decide only where the search looks, not what it finds (C3e) |
+| Purity's search index (KMKNN) | `std::mt19937_64`, in knncolle's k-means++ | the library's fixed seed, 6523 | k-means++'s draws for the index's ⌈√n⌉ centres. They decide only where the search looks, not what it finds, except possibly at the pairs C3e's certificate flags (M12: the median pair of an odd-sized object, reported) |
 
 Consequences:
 - **R's stream needs no tracking past PCA.** RunUMAP's draws reach nothing that is compared, and GroupSingletons reseeds before its draw. R's `.Random.seed` is compared after SCTransform and after RunPCA, as in M6, and after GroupSingletons for objects with singletons.
@@ -631,7 +631,7 @@ Consequences:
 - **`nextInt` rejects as Java does.** Its loop `while (bits - val + (n - 1) < 0)` relies on 32-bit signed wrap-around, which is undefined behaviour in C++. The compiled `Seurat.so` keeps the check (an `add` and a `js` on 32-bit registers), so the port implements Java's semantics.
   - When n is a power of two, `nextInt` takes Java's multiply-and-shift branch instead. Reduced networks can be that small.
 - **Each resolution starts the optimizer afresh** from `random.seed`. Resolutions are therefore independent and can run in parallel. Within a resolution, the 10 starts are sequential.
-- **KMKNN's generator needs no port,** unless C3e's certificate finds a cell at a rounding boundary (M12's decision point).
+- **KMKNN's generator needs no port.** C3e's certificate does find pairs at a rounding boundary: on an object with an odd number of cells, the median cell and its 50th neighbour lie on the radius by construction (M12). At M12's decision point the user chose to keep the exhaustive result and report those pairs; M17's saved purities check them (C3e).
 
 ### C3. Rust design
 
@@ -654,7 +654,8 @@ The whole chain also runs in one process, for the workflow:
 
 ```
 scrust cluster --counts <10x dir> --out <dir> [--preset workflow] [--params <file.toml>]
-               [--export] [--keep-stages] [--dump-stages none|light|standard|full] [--metadata <tsv>] [--threads N]
+               [--export] [--keep-stages] [--dump-stages none|light|standard|full] [--purity-lists auto|yes|no]
+               [--metadata <tsv>] [--threads N]
 ```
 
 `scrust cluster` can start from any stage's output (`--sct`, `--pca`, `--snn`), so a sweep over k or the resolution reuses one SCTransform and PCA. The scores need the PCA, so starting from `--snn` they need `--pca` too. Each route writes the same files (M11): `scrust sctransform` writes the counts' per-cell columns (`cell_metadata.tsv`: `nCount_RNA`, `nFeature_RNA`), and `scrust pca` and `scrust neighbors` carry them forward. Every SCTransform, RunPCA and FindNeighbors parameter has a flag of its own (`--sct-seed`, `--ncells`, `--variable-features`, `--clip-range`, `--npcs`, `--pca-seed`, `--weight-by-var`, `--pca-guard`, `--dims`, `--k`, `--trees`, `--metric`, `--prune`, `--search-k`); `--seed` stays FindClusters' `random.seed`. `--dump-stages` writes the stage dumps of M8's instrumented runs, which `scrust validate cluster` compares.
@@ -793,17 +794,19 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
   - knncolle computes each Euclidean distance squared, in double, as `out += delta * delta` over the dims in order, and compares the squares.
   - Any exact search that computes and compares distances in that order finds the same neighbours. `knn`'s distance kernel already sums in that order (`fields::rdist`'s); only its selection changes.
 - **Steps:**
-  1. each cell's distance to its 50th nearest other cell (`findDistance`): the 50th smallest squared distance to the other cells, then its square root. The cell itself, at distance 0, is excluded;
+  1. each cell's distance to its 50th nearest other cell (`findDistance`): the 50th smallest squared distance to the other cells, then its square root. The cell itself, at distance 0, is excluded. BiocNeighbors caps k at n − 1, with a warning (M12);
   2. the radius: R's `median` of those n distances. With an even n, it is the long-double mean of the middle two;
   3. each cell's neighbours (`findNeighbors`): every other cell whose squared distance is `<=` the radius times itself, in double (knncolle's `denormalize`). Squaring a square root doesn't always give back the starting value, so the comparison is computed exactly as written;
   4. the weights: 1/(cluster size) per cell (`1/table(clusters)`);
   5. per cell, one sum per cluster (`sum_neighbor_weights`): the cell's own weight, then each neighbour's weight added to its cluster's sum. Within a cluster every added weight is the same, so the order of the neighbours doesn't change the sums;
   6. the total: R's `rowSums` over the clusters in level order, in long double. The purity is the own cluster's sum divided by the total. A cell always counts itself, so the total is never 0.
-- **Memory and time:** there is no n × n matrix. As in DoubletFinder's search (B3), each cell's distances to all cells go into a buffer per thread. Step 1 takes the 50th from it, and step 3 counts the cells within the radius by cluster. That makes two passes over all pairs: about 4·10¹¹ multiply-adds on the 79,409-cell objects, spread over threads.
+- **Memory and time:** there is no n × n matrix. The distances are computed for tiles of 8 cells against blocks of 256 cells and consumed at once (M12): step 1 keeps each cell's 51 smallest squared distances (the cell itself among them), and step 3 counts the cells within the radius by cluster. That makes two passes over all pairs: about 4·10¹¹ multiply-adds on the 79,409-cell objects, spread over threads by tile, each result placed by its cell.
 - **Where KMKNN could differ.** KMKNN skips groups of cells by the triangle inequality, with bounds computed in floating point.
-  - In exact arithmetic those bounds never skip a cell that belongs in the result. With rounding, they can skip one only if its distance is within a few units in the last place of the radius (step 3) or of the cell's 50th distance (step 1).
-  - The Rust search reports every pair that close, as a certificate. If none is reported, the result is identical to KMKNN's, whatever KMKNN's k-means did.
-  - If some are reported, M12's decision point applies: port knncolle's KMKNN as BiocNeighbors 2.4.0 builds it, or agree with you how to treat the flagged cells. The KMKNN port means ⌈√n⌉ centres, k-means++ seeded with 6523 through `std::mt19937_64`, Hartigan–Wong refinement, and the bounds as written; the upper bound is compiled out (`KNNCOLLE_KMKNN_USE_UPPER` is undefined).
+  - KMKNN computes and compares every pair it visits exactly as the exhaustive search does, so it can only drop cells. In exact arithmetic its bounds never drop a cell that belongs in the result. With rounding, they can drop one only if the pair's distance lies within a margin of the radius (step 3), or if another cell's squared distance lies just above the cell's 50th (step 1).
+  - The margin is not a few units in the last place: it grows with the data's extent, B (any cell's distance to any k-means centre, bounded by the cells' bounding box), times about 2(dims + 3)·2⁻⁵³. On the reference objects it is 220 to 12,760 ulps of the radius squared (M12). Its derivation from knncolle's code as BiocNeighbors 2.4.0 builds it is in `crates/knn/src/purity.rs` and the M12 report.
+  - The Rust search reports every pair that close, as a certificate, each labelled by kind. If none is reported, the result is identical to KMKNN's, whatever KMKNN's k-means did.
+  - **The median pair.** When the radius is a cell's own 50th distance (always, with an odd number of cells), that cell and its 50th neighbour lie on the radius by construction, and the certificate flags them, both ways, whenever they are within it (kind `median_pair`; anything else is `other`). On the 34 reference objects nothing else is flagged, and R's KMKNN kept every flagged pair (M12).
+  - **M12's decision point, settled:** the user chose to keep the exhaustive result, report every flagged pair (`summary.json`, the stage dumps, the report) and grade the certificate "flagged, reported" rather than failing; M17's saved purities check the flagged pairs. A KMKNN port can follow (C6): ⌈√n⌉ centres, k-means++ seeded with 6523 through `std::mt19937_64`, Hartigan–Wong refinement, and the bounds as written; the upper bound is compiled out (`KNNCOLLE_KMKNN_USE_UPPER` is undefined).
 - **`neighborPurity`'s other output,** `maximum`, is the cluster with the largest share, ties to the first (`max.col`). It is written as `purity_maximum`.
 
 **C3f. Corrected counts and the export.**
@@ -893,7 +896,7 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
 - **Cluster-ID ordering:** numbering by size before the singletons are merged; numeric level sorting; character labels after a merge.
 - **PCA's last bits** depend on the OpenBLAS kernel (A5b). Rounding to float absorbs most differences, but not all. End-to-end runs therefore use the reference's profile, and the full panel uses each job's CPU type.
 - **The emptyDrops objects' v3 assay** takes `SCTransform.Assay` directly. M8's instrumented runs check that it gives the same RNG checkpoints and outputs as the v5 path.
-- **Purity:** the squared distances' summation order; the exact 50th distance, never an approximation; R's `median`; the radius squared in double and compared with `<=`; the long-double `rowSums`; and C3e's certificate.
+- **Purity:** the squared distances' summation order; the exact 50th distance, never an approximation; R's `median`; the radius squared in double and compared with `<=`; the long-double `rowSums`; and C3e's certificate, whose flagged pairs are reported (M12).
 - **Corrected counts:**
   - the same `dgemm` calls as R, with the same bin shapes. The kernel's last bits can move a value across a .5 boundary, so exact checks use the reference's kernel;
   - vst's residuals as `correct()` reads them, floored at `min_variance` but not yet clipped; θ = ∞; `round` half to even; glibc's `exp` and `log1p`.
@@ -988,7 +991,7 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
 | K6 graphs | `SCT_nn` and `SCT_snn`: dimensions, stored entries in order, values bitwise | identical |
 | K7 clustering | given R's SNN graph: the labels, the levels and every `res.` column; the nodes, edges, communities and singletons; the maximum modularity (`%.4f`, as logged) and every start's modularity as a double (against the instrumented optimizer) | identical |
 | K8 end to end | from the counts: K1–K7, the labels and the silhouette widths against the instrumented runs; the files against the direct runs | identical under the reference's kernel |
-| K9 purity | given R's embeddings and labels: each cell's 50th distance, the radius, each cell's neighbour count and purity; the certificate | identical; no flagged pair (otherwise M12's decision point) |
+| K9 purity | given R's embeddings and labels: each cell's 50th distance, the radius, each cell's neighbour count (and list, where R kept them), the weights, sums, totals, purity and maximum; the certificate. From the counts: the same against the instrumented runs, the files against the direct runs | identical (from the counts, under the reference's kernel); flagged pairs reported, not failed, each labelled by kind (M12's decision: the median pair of an odd-sized object lies on the radius by construction) |
 | K10 corrected counts | given R's model parameters: every corrected count, the log1p data, `nCount_SCT` and `nFeature_SCT`; the same from the counts, end to end | identical under the reference's kernel |
 | K11 export and loaders | each loader's object against the saved object: the counts, the SCT layers and model, the metadata, the PCA and the graphs; `Read10X` and `read_10x_mtx` on `sct/` and on the export's top level; a file offered to the wrong slot | identical; both readers fail; the loader refuses |
 | K12 on the fly | `scrust doubletfinder` given no `--clusters`, on the 150 DoubletFinder inputs: the labels it computed against the inputs' `seurat_clusters`; the outputs against the saved outputs (M7's criteria) and against M7's Rust outputs | identical; files byte-identical apart from timings and the clustering's own outputs |
@@ -1008,12 +1011,12 @@ K3–K7 and K9 use no BLAS, so under teacher forcing they are exact on any machi
 | M9 | `neighbors`: `Kiss64Random`; the Annoy build (Euclidean, Angular, Manhattan) and its file format; the search; the nn and SNN graphs; `scrust neighbors` | K0 (Kiss64) and K3–K6 exact on T and P from R's own embeddings; time and memory measured on the largest object |
 | M10 | `cluster`: `JavaRandom`; the network; algorithms 1–3 and modularity functions 1 and 2; the best start and the numbering; GroupSingletons; FindClusters' columns and levels; several resolutions; `scrust cluster --snn` | K0 (Java) and K7 exact on T and P from R's own SNN graphs, the objects with singletons included |
 | M11 | The chain at the workflow's settings:<br>- SCTransform with seed 12345 (v5 and v3 assays) and 50 PCs;<br>- `approxSilhouette`;<br>- `scrust cluster --counts` and the staged starts, with the parameters, the preset and the TOML file;<br>- `scrust validate cluster`;<br>- kernel-gated grading (A5b mechanism 3) in `scrust validate cluster` and `scrust validate doubletfinder`: exact checks only when the reference's and the candidate's OpenBLAS kernels match. Otherwise the BLAS-dependent checks are graded against the R-vs-R floor (M8's, or M2's for DoubletFinder, which M11 measures per stage on all ten objects: M2 had the two large objects end to end only), the BLAS-free checks stay exact, and the report says so;<br>- a kernel check at the start of the tests that read portable fixtures;<br>- the benchmark | K1–K8 met on T and P in both profiles; the direct runs' files and the saved labels identical; independent of the thread count; a kernel mismatch puts both validators' reports in tolerance mode, shown on a deliberately mismatched pair of runs; the fixture tests stop with a message naming both kernels when run under another kernel; the benchmark in `docs/validation/clustering.md` |
-| M12 | Neighbourhood purity: `knn`'s exact search with knncolle's arithmetic (the 50th distance, the radius, the range query) and the certificate; `neighborPurity`'s weights and sums; purity in `scrust cluster` | K9 on T and P, teacher-forced and end to end; the saved purities identical on T and P; time measured on the largest objects. **Decision point:** if the certificate flags any pair, port KMKNN (C3e) or agree with you how to treat the flagged cells |
+| M12 | Neighbourhood purity: `knn`'s exact search with knncolle's arithmetic (the 50th distance, the radius, the range query) and the certificate; `neighborPurity`'s weights and sums; purity in `scrust cluster` | K9 on T and P, teacher-forced and end to end; the saved purities identical on T and P in the production profile (the portable runs' differences graded by the floor, as M8 measured); time measured on the largest objects. **Decision point:** if the certificate flags any pair, port KMKNN (C3e) or agree with you how to treat the flagged cells. **Outcome:** it flags the median pair of every odd-sized object and nothing else; the user chose to keep the exhaustive result and report the flagged pairs, graded "flagged, reported" (C3e, C5) |
 | M13 | Corrected counts and the export:<br>- the port of `correct()`, the log1p, `nCount_SCT` and `nFeature_SCT`;<br>- `scrust sctransform --corrected-counts` and `scrust cluster --export`;<br>- the export's layout, comment lines and README;<br>- the manifest for every command, `scrust doubletfinder`'s included | K10 on T and P in both profiles; every file the manifest lists present and described; `Read10X` and `read_10x_mtx` fail on the export as designed; the export's memory and time measured |
 | M14 | Loaders: the R package (Seurat, SingleCellExperiment) and the Python package (AnnData), with their commands, in `loaders/`; their tests in hermetic envs (A2) | K11 and K13 on T and P; the R loader ready for M17's comparisons |
 | M15 | Clustering on the fly: the chain as a library entry point in `cluster`, for later ports too (C3h); `scrust doubletfinder` given no `--clusters` (`--cluster-preset`, `--cluster-params`, `--cluster-stats`) | K12 on all 150 DoubletFinder inputs; the memory peak measured against M7's runs |
 | M16 | The parameter grid (C4) | every grid cell identical, or A7b's floor met with every difference traced |
-| M17 | Full panel: the exports (sbatch arrays); the Rust runs with `--export`, on each job's CPU type; the comparison with the saved labels, silhouette widths, purities and logged numbers; the R loader's comparison of the SCT layers, the PCA and the graphs | all 840 objects identical; a summary table and TSV |
+| M17 | Full panel: the exports (sbatch arrays); the Rust runs with `--export`, on each job's CPU type; the comparison with the saved labels, silhouette widths, purities and logged numbers (the purities cover the pairs M12's certificate flags, so any such pair R's KMKNN dropped would show there); the R loader's comparison of the SCT layers, the PCA and the graphs | all 840 objects identical; a summary table and TSV |
 
 M9 and M10 come before M11 for the reason M3 came first in Step 1: the new code is checked on R's own inputs, on any machine, before it is chained after the stages that depend on BLAS.
 
@@ -1022,7 +1025,7 @@ M9 and M10 come before M11 for the reason M3 came first in Step 1: the new code 
 **What belongs in Step 2, and what can follow:**
 - **In Step 2:** M8–M17. Step 2 is complete when M11–M15 are met, with M16 and M17 as confirmation (Verification).
 - **Can follow, outside Step 2:**
-  - a port of KMKNN for purity, if M12's certificate never fires. It would only make the search faster on very large objects;
+  - a port of KMKNN for purity. It would decide the pairs M12's certificate flags exactly (the median pair of odd-sized objects, which M12 reports and M17's saved purities check), and make the search faster on very large objects. Nothing in Step 2 depends on it (M12's decision);
   - in decontX's port, its three sources of clusters (A7b): `--clusters`, clustering on the fly through C3h's entry point, and decontX's own clustering with the workflow's fallback when there are fewer than two clusters. Which is the default is decided in decontX's planning;
   - in SoupX's port, the same entry point;
   - publishing the loaders (Bioconductor or CRAN, PyPI, conda-forge);
@@ -1050,7 +1053,8 @@ M9 and M10 come before M11 for the reason M3 came first in Step 1: the new code 
   - Mitigation: sbatch arrays, as in M7; label-only exports where the counts already exist; each export's large files deleted after its comparison.
 - **Purity at a rounding boundary:** KMKNN's floating-point bounds could skip a cell that an exhaustive search keeps.
   - Mitigation: C3e's certificate on every object (T, P and the full panel), and M12's decision point.
-  - Fallback: the KMKNN port.
+  - Outcome (M12): the certificate flags the median pair of every odd-sized object, which lies on the radius by construction, and nothing else; R's KMKNN kept every flagged pair in all 68 reference runs. Decided: keep the exhaustive result and report the flagged pairs, labelled by kind; M17's saved purities check them.
+  - Fallback: the KMKNN port (C6, "Can follow").
 - **Corrected counts near .5:** μ's last bits depend on the OpenBLAS kernel, and rounding can then move a count by one.
   - Mitigation: exact checks under the reference's kernel (A5b) and K10 teacher-forced; the floor (M8) measures how often kernels disagree.
 - **The loaders follow Seurat's internals** (`SCTAssay`, `SCTModel`), which change between versions.

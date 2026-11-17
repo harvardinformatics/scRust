@@ -1,6 +1,6 @@
 [package]
 name = "knn"
-description = "Exact nearest neighbours, memory-bounded and parallel over cells"
+description = "Exact nearest neighbours, memory-bounded and parallel over cells: DoubletFinder's ranking (fields::rdist) and the search of bluster's neighborPurity (knncolle's arithmetic), with its certificate"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,7 +9,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+rcompat.workspace = true
 
 [dev-dependencies]
-rcompat.workspace = true
 scio.workspace = true

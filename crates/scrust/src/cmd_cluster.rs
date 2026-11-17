@@ -1,7 +1,7 @@
-//! `scrust cluster`: the workflow's clustering chain (docs/PLAN.md C1, C3; milestones M10 and
-//! M11): SCTransform, RunPCA, FindNeighbors, FindClusters and the silhouette widths, from the
-//! counts in one process, or from any stage's output (`scrust sctransform`, `scrust pca`,
-//! `scrust neighbors`).
+//! `scrust cluster`: the workflow's clustering chain (docs/PLAN.md C1, C3; milestones M10, M11
+//! and M12): SCTransform, RunPCA, FindNeighbors, FindClusters, the silhouette widths and the
+//! neighbourhood purities, from the counts in one process, or from any stage's output
+//! (`scrust sctransform`, `scrust pca`, `scrust neighbors`).
 
 use crate::cli::{self, Args, Phases};
 use cluster::chain::{self, Options};
@@ -16,8 +16,8 @@ pub const USAGE: &str = "\
 Usage: scrust cluster (--counts <10x dir> | --sct <dir> | --pca <dir> | --snn <dir> [--pca <dir>])
                       --out <dir> [--preset workflow] [--params <file.toml>] [parameters]
                       [--metadata <tsv>] [--stats silhouette,purity|silhouette|none]
-                      [--keep-stages] [--dump-stages none|light|standard|full] [--annoy yes|no]
-                      [--threads N]
+                      [--keep-stages] [--dump-stages none|light|standard|full]
+                      [--purity-lists auto|yes|no] [--annoy yes|no] [--threads N]
 
 The workflow's clustering chain as Seurat 5.5.1 runs it, bit for bit (under the reference's
 OpenBLAS kernel, for the stages that use BLAS):
@@ -27,7 +27,9 @@ OpenBLAS kernel, for the stages that use BLAS):
   RunPCA(obj, npcs, seed.use)             irlba 2.4.1
   FindNeighbors(obj, dims, k.param, ...)  RcppAnnoy 0.0.23's Annoy, the SNN graph
   FindClusters(obj, resolution, ...)      the modularity optimizer, GroupSingletons
-  add_silhouette_to_metadata(obj)         bluster 1.20.0's approxSilhouette (purity: M12)
+  add_silhouette_to_metadata(obj)         bluster 1.20.0's approxSilhouette and neighborPurity
+                                          (its search exhaustive, with knncolle's arithmetic, and
+                                          a certificate that BiocNeighbors' KMKNN finds the same)
 
 RunUMAP, which the workflow runs after RunPCA, changes nothing downstream and is left out.
 
@@ -55,8 +57,7 @@ Numbers are read as R reads them; a fraction such as 1/15 is divided in double.
                  --seed 0  --modularity 1|2  --no-group-singletons  --graph-name SCT_snn
   Scores:        --stats silhouette,purity (default) | silhouette | purity | none
                  --purity-k 50  --purity-weighted true
-                 The scores use the neighbour search's dims. Purity comes with milestone M12:
-                 asked for, the command says it is not computed yet.
+                 The scores use the neighbour search's dims (1:30 with the preset).
   Other code paths are refused: --vars-to-regress, --vst-flavor other than v2, --sct-method
   other than glmGamPoi_offset, --do-scale true, --nn-method rann|hnsw, --l2-norm true,
   --metric hamming, --algorithm 4 (Leiden).
@@ -67,17 +68,20 @@ Outputs (--out, which must not hold a previous run):
   cluster_ids.txt, nclusters.txt                    as the workflow's write_cluster_metadata
   optimizer_ids.tsv                                 each resolution's optimizer result
   metadata.tsv      barcode, nCount_RNA, nFeature_RNA, each res. column, seurat_clusters,
-                    silhouette_width, silhouette_other (the closest other cluster), then the
-                    columns of --metadata (a TSV with a barcode column), by barcode
+                    silhouette_width, silhouette_other (the closest other cluster),
+                    neighborhood_purity, purity_maximum (the cluster with the largest share),
+                    then the columns of --metadata (a TSV with a barcode column), by barcode
   pca/              embeddings.tsv, loadings.tsv, stdev.tsv, random_seed.txt (scrust pca's)
   neighbors/        knn_index.tsv, knn_distance.tsv, nn.mtx.gz, snn.mtx.gz (scrust neighbors'),
                     and annoy.ann with --annoy yes
   sct/              with --keep-stages, from the counts: scrust sctransform's layout
   stages/           with --keep-stages, every random start's partition; with --dump-stages,
                     the stage dumps of the instrumented R runs, for scrust validate cluster
+                    (--purity-lists: purity's neighbour lists among them; auto: at level full)
   summary.json      result: FindClusters' (the network, every start, the best start, what
                     FindClusters printed, the singletons, the levels), each stage's, R's digests
-                    of .Random.seed after SCTransform and RunPCA and of scale.data; run:
+                    of .Random.seed after SCTransform and RunPCA and of scale.data, the scores
+                    (purity: the radius and the certificate, every flagged pair); run:
                     parameters, timings and peak memory per stage, the environment fingerprint
   --export (the corrected counts and the normalised data) comes with milestone M13.
 ";
@@ -163,7 +167,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     if args.get("export").is_some() || args.flag("export") {
         return Err("--export: the export of the corrected counts and the normalised data comes with milestone M13".into());
     }
-    let mut known: Vec<&str> = vec!["counts", "sct", "pca", "snn", "out", "preset", "params", "metadata", "keep-stages", "dump-stages", "annoy", "threads"];
+    let mut known: Vec<&str> = vec!["counts", "sct", "pca", "snn", "out", "preset", "params", "metadata", "keep-stages", "dump-stages", "purity-lists", "annoy", "threads"];
     known.extend(PARAM_FLAGS);
     known.extend(PARAM_SWITCHES);
     args.only(&known)?;
@@ -176,6 +180,13 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         "yes" => true,
         "no" => false,
         v => return Err(format!("--annoy: expected yes or no, not '{v}'")),
+    };
+    // neighborPurity's neighbour lists in the dumps, as R's instrumented runs choose them
+    let purity_lists = match args.get("purity-lists").unwrap_or("auto") {
+        "auto" => dumps == Some(DumpLevel::Full),
+        "yes" => dumps.is_some(),
+        "no" => false,
+        v => return Err(format!("--purity-lists: expected auto, yes or no, not '{v}'")),
     };
     let start = match (args.get("counts"), args.get("sct"), args.get("pca"), args.get("snn")) {
         (Some(_), None, None, None) => "counts",
@@ -190,7 +201,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     if out.join("summary.json").exists() || out.join("clusters.tsv").exists() {
         return Err(format!("{}: holds a previous run; choose another --out", out.display()));
     }
-    let opts = Options { keep_partitions: keep, keep_residuals: dumps == Some(DumpLevel::Full) };
+    let opts = Options { keep_partitions: keep, keep_residuals: dumps == Some(DumpLevel::Full), keep_purity_lists: purity_lists };
     std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
 
     let mut inputs: Vec<(&str, Json)> = Vec::new();
@@ -210,6 +221,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
             w.rna = Some(RnaMetadata::of(&counts));
             w.keep_stages = keep;
             w.annoy = annoy;
+            w.purity_lists = purity_lists;
             w.neighbor_params = Some(params.neighbors.clone());
             if let Some(level) = dumps {
                 w = w.with_dumps(level);
@@ -294,10 +306,12 @@ pub fn main(argv: &[String]) -> Result<(), String> {
             if let Some((p, _)) = &emb {
                 w.pca_result = w.copy_stage(p, "pca", &pca::output::FILES).map_err(|e| e.to_string())?;
             }
-            if params.stats.silhouette && emb.is_none() {
-                let m = "silhouette asked for, but not computed: the scores need the PCA (give --pca with --snn)".to_string();
-                eprintln!("scrust cluster: {m}");
-                stats_note.push(m);
+            for (asked, name) in [(params.stats.silhouette, "silhouette"), (params.stats.purity, "purity")] {
+                if asked && emb.is_none() {
+                    let m = format!("{name} asked for, but not computed: the scores need the PCA (give --pca with --snn)");
+                    eprintln!("scrust cluster: {m}");
+                    stats_note.push(m);
+                }
             }
             phases.mark("load");
             let r = chain::from_snn(&input.snn, emb.as_ref().map(|(_, e)| (e.data.as_slice(), e.ncol)), &params, threads, opts, &mut w);
@@ -327,7 +341,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         w.extra = Some(cluster::metadata::extra_columns(Path::new(m), &w.barcodes, &taken)?);
         inputs.push(("metadata", Json::Str(m.to_string())));
     }
-    w.finish_labels(&r.clusters, r.silhouette.as_ref()).map_err(|e| e.to_string())?;
+    w.finish_labels(&r.clusters, r.silhouette.as_ref(), r.purity.as_ref()).map_err(|e| e.to_string())?;
     w.finish_dumps().map_err(|e| e.to_string())?;
     phases.mark("write");
 
@@ -335,10 +349,25 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     if r.silhouette.is_some() {
         computed.push("silhouette");
     }
-    if params.stats.purity {
-        let m = "purity asked for, but not computed: neighborhood_purity comes with milestone M12".to_string();
-        eprintln!("scrust cluster: {m}");
-        stats_note.push(m);
+    if let Some(p) = &r.purity {
+        computed.push("purity");
+        if p.k < p.k_requested {
+            // BiocNeighbors' warning
+            let m = format!("neighborPurity: 'k' capped at the number of observations minus 1 ({})", p.k);
+            eprintln!("scrust cluster: {m}");
+            stats_note.push(m);
+        }
+        let c = &p.certificate;
+        if c.n_flagged() > 0 {
+            let m = format!(
+                "neighborPurity's certificate flags {} pair(s) ({} the median pair, on the radius by construction; {} other), reported in summary.json (result.purity.certificate): KMKNN's floating-point bounds could treat them differently from this exhaustive search, whose result is kept",
+                c.n_flagged(),
+                c.n_flagged_kind(knn::purity::Kind::MedianPair),
+                c.n_flagged_kind(knn::purity::Kind::Other)
+            );
+            eprintln!("scrust cluster: {m}");
+            stats_note.push(m);
+        }
     }
     if params.stats.names().is_empty() {
         stats_note.push("none asked for".into());
@@ -348,7 +377,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     let t = &r.timings;
     let summary = Json::obj(vec![
         ("tool", Json::Str("scrust cluster".into())),
-        ("reference", Json::Str(format!("{}; {}; {}; {}; bluster 1.20.0 approxSilhouette", sctransform::REFERENCE, pca::REFERENCE, neighbors::REFERENCE, cluster::REFERENCE))),
+        ("reference", Json::Str(format!("{}; {}; {}; {}; bluster 1.20.0 approxSilhouette and neighborPurity (BiocNeighbors 2.4.0, knncolle's KMKNN: searched exhaustively with its arithmetic, with a certificate)", sctransform::REFERENCE, pca::REFERENCE, neighbors::REFERENCE, cluster::REFERENCE))),
         ("scrust_version", Json::Str(version.into())),
         ("result", w.result_json(&r.clusters)),
         (
@@ -365,6 +394,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
                 ),
                 ("keep_stages", Json::Bool(keep)),
                 ("dump_stages", Json::Str(dumps.map_or("none", |d| d.name()).into())),
+                ("purity_lists", Json::Bool(purity_lists)),
                 ("threads", Json::Int(threads as i64)),
                 ("start_time", Json::Str(start_time)),
                 ("slurm_job_id", cli::env_json("SLURM_JOB_ID")),
@@ -373,6 +403,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
                 ("neighbors_s", Json::Num(t.neighbors)),
                 ("cluster_s", Json::Num(t.cluster)),
                 ("silhouette_s", Json::Num(t.silhouette)),
+                ("purity_s", Json::Num(t.purity)),
                 ("network_s", Json::Num(r.clusters.network_seconds)),
                 ("resolutions_s", Json::Num(r.clusters.resolutions_seconds)),
                 ("optimizer_s", Json::nums(&r.clusters.resolutions.iter().map(|x| x.optimizer.seconds).collect::<Vec<_>>())),
@@ -387,13 +418,27 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     ]);
     write(&out.join("summary.json"), &scio::json::to_file_text(&summary))?;
     eprint!("scrust cluster: {} cells; {}", r.n_cells, cluster::output::describe(&r.clusters));
+    if let Some(p) = r.purity.as_ref().filter(|p| p.computed) {
+        let c = &p.certificate;
+        eprintln!(
+            "scrust cluster: neighborPurity: radius {}, {:.2} neighbours per cell; certificate: {}",
+            scio::fmt17(p.radius),
+            p.mean_neighbors(),
+            if c.n_flagged() == 0 {
+                "no pair flagged".to_string()
+            } else {
+                format!("{} pair(s) flagged and reported ({} the median pair, {} other)", c.n_flagged(), c.n_flagged_kind(knn::purity::Kind::MedianPair), c.n_flagged_kind(knn::purity::Kind::Other))
+            }
+        );
+    }
     eprintln!(
-        "scrust cluster: SCTransform {:.1} s, RunPCA {:.1} s, FindNeighbors {:.1} s, FindClusters {:.1} s, silhouette {:.2} s; {:.1} s in all, {threads} threads",
+        "scrust cluster: SCTransform {:.1} s, RunPCA {:.1} s, FindNeighbors {:.1} s, FindClusters {:.1} s, silhouette {:.2} s, purity {:.2} s; {:.1} s in all, {threads} threads",
         t.sctransform,
         t.pca,
         t.neighbors,
         t.cluster,
         t.silhouette,
+        t.purity,
         phases.elapsed()
     );
     Ok(())

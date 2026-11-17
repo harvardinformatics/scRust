@@ -26,6 +26,8 @@ fields 17.3                            GPL (>= 2)
 RcppAnnoy 0.0.23 (Annoy 1.17.3)        GPL (>= 2); Annoy itself is Apache-2.0
                                        (see "Ported code" below)
 bluster 1.20.0                         GPL-3
+BiocNeighbors 2.4.0                    GPL-3
+knncolle (assorthead 1.4.0)            MIT (see "Ported code" below)
 matrixStats 1.5.0                      Artistic-2.0
 KernSmooth 2.23-27                     Unlimited
 Matrix 1.7-6                           GPL (>= 2)
@@ -97,6 +99,36 @@ crates/cluster (milestone M11) also ports:
   crates/cluster/src/metadata.rs; and the workflow's own
   require_min_cells_for_pca() (scRNAseq-preprocessing, silhouette_utils.R), in
   crates/cluster/src/chain.rs.
+
+crates/knn and crates/cluster (milestone M12) port:
+
+- bluster 1.20.0 (Aaron Lun, GPL-3): neighborPurity (R/neighborPurity.R) and
+  its C++ sum_neighbor_weights (src/sum_neighbor_weights.cpp), translated into
+  Rust in crates/cluster/src/purity.rs. Changes: each cell's per-cluster sums
+  are taken from a table of repeated sums of the cluster's weight (every cell
+  of a cluster has the same weight, so the sums equal the C++'s additions in
+  any order); the totals are R's long-double rowSums (with crates/rcompat's
+  long double) and the maxima R's max.col(ties.method = "first") (R 4.5.3's
+  do_colsum and R_max_col, GPL (>= 2)); the maximum is returned
+  as a position among the levels present; with fewer than two cells or
+  clusters the purities are NA, as add_silhouette_to_metadata leaves them.
+- BiocNeighbors 2.4.0 (Aaron Lun, GPL-3): findDistance's and findNeighbors'
+  semantics as generic_find_knn and generic_find_all implement them (src/
+  generics.cpp: k capped at the number of observations minus 1, the last
+  distance only, 0 when no neighbour is left, the cell itself excluded),
+  in crates/knn/src/purity.rs.
+- knncolle (Copyright (c) 2023 Aaron Lun, MIT; the version vendored by
+  assorthead 1.4.0, inst/include/knncolle/distances.hpp, NeighborQueue.hpp and
+  report_all_neighbors.hpp; third_party/licenses/MIT-knncolle.txt):
+  EuclideanDistance's raw, normalize and denormalize arithmetic, and the order
+  in which neighbours are reported (by raw distance), in
+  crates/knn/src/purity.rs. Changes: the search is exhaustive rather than
+  knncolle_kmknn's KMKNN (Copyright (c) 2025 Aaron Lun, MIT), whose
+  triangle-inequality bounds (knncolle_kmknn.hpp, as BiocNeighbors 2.4.0
+  builds it) and whose k-means centres (kmeans, Copyright (c) 2021 Aaron Lun,
+  MIT) are not ported but analysed, to bound where they could treat a pair
+  differently (the certificate). Equal raw distances are reported by cell
+  index, where KMKNN orders them by its own internal index.
 
 Planned, with licensing to be handled when the work starts
 ----------------------------------------------------------
