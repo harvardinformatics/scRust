@@ -22,7 +22,9 @@
 pub mod fit;
 pub mod glm;
 pub mod matrix;
+pub mod output;
 pub mod params;
+pub mod record;
 pub mod reg;
 pub mod residuals;
 pub mod setup;

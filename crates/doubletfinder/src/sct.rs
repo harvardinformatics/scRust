@@ -650,5 +650,5 @@ pub fn validate(input: &std::path::Path, stages_dir: &std::path::Path, params: &
             checks.extend(check_chained(&stages, &rng, &scalars, &c, params, threads)?);
         }
     }
-    Ok(crate::validate::Report { reference: stages_dir.to_path_buf(), candidate: input.to_path_buf(), checks })
+    Ok(crate::validate::Report { reference: stages_dir.to_path_buf(), candidate: input.to_path_buf(), checks, mode: None, grading: Vec::new() })
 }

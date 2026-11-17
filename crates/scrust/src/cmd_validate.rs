@@ -77,6 +77,9 @@ pub fn main(argv: &[String]) -> Result<bool, String> {
     if tool == "cluster" {
         return cluster_report(&argv[1..]);
     }
+    if tool == "floor" {
+        return floor_report(&argv[1..]);
+    }
     let report = match tool.as_str() {
         "doubletfinder" => doubletfinder_report(&argv[1..])?,
         "sctransform" => sctransform_report(&argv[1..])?,
@@ -90,8 +93,15 @@ pub fn main(argv: &[String]) -> Result<bool, String> {
     if let Some(p) = args.get("markdown").map(PathBuf::from) {
         std::fs::write(&p, report.to_markdown()).map_err(|e| format!("{}: {e}", p.display()))?;
     }
-    for (stage, ok, bad, n, nd) in report.by_stage() {
-        eprintln!("{stage:>7}: {ok} checks identical, {bad} differing; {nd} of {n} elements differ");
+    if let Some((m, r)) = report.mode_text() {
+        eprintln!("grading: {m} mode: {r}");
+    }
+    for (stage, ok, within, bad, n, nd) in report.by_stage() {
+        if within > 0 {
+            eprintln!("{stage:>7}: {ok} checks identical, {within} within the floor, {bad} differing; {nd} of {n} elements differ");
+        } else {
+            eprintln!("{stage:>7}: {ok} checks identical, {bad} differing; {nd} of {n} elements differ");
+        }
     }
     use doubletfinder::validate::Status;
     for c in report.checks.iter().filter(|c| matches!(c.status, Status::Differ | Status::Missing)) {
@@ -101,7 +111,17 @@ pub fn main(argv: &[String]) -> Result<bool, String> {
     if na > 0 {
         eprintln!("  {na} checks not applicable (R's structural checks of its own containers; stage dumps of a direct run; the RNG digest under teacher forcing)");
     }
-    eprintln!("{}", if report.pass() { "pass: everything compared is identical" } else { "FAIL" });
+    let within = report.checks.iter().filter(|c| c.status == Status::WithinFloor).count();
+    eprintln!(
+        "{}",
+        if !report.pass() {
+            "FAIL".to_string()
+        } else if within > 0 {
+            format!("pass: {within} BLAS-dependent checks differ within the R-vs-R floor (tolerance mode), everything else is identical")
+        } else {
+            "pass: everything compared is identical".to_string()
+        }
+    );
     Ok(report.pass())
 }
 
@@ -126,7 +146,7 @@ fn neighbors_report(argv: &[String]) -> Result<bool, String> {
 
 fn cluster_report(argv: &[String]) -> Result<bool, String> {
     let args = Args::parse(argv)?;
-    args.only(&["reference", "candidate", "optimizer", "panel", "object", "json", "markdown"])?;
+    args.only(&["reference", "candidate", "optimizer", "panel", "object", "saved", "saved-kernel", "json", "markdown"])?;
     let reference = args.path("reference")?;
     let candidate = args.path("candidate")?;
     let panel = match (args.get("panel"), args.get("object")) {
@@ -134,7 +154,12 @@ fn cluster_report(argv: &[String]) -> Result<bool, String> {
         (None, None) => None,
         _ => return Err("--panel and --object go together".into()),
     };
-    let opts = cluster::validate::CompareOptions { optimizer: args.get("optimizer").map(PathBuf::from), panel };
+    let opts = cluster::validate::CompareOptions {
+        optimizer: args.get("optimizer").map(PathBuf::from),
+        panel,
+        saved: args.get("saved").map(PathBuf::from),
+        saved_kernel: args.get("saved-kernel").map(String::from),
+    };
     let report = cluster::validate::compare(&reference, &candidate, &opts)?;
     if let Some(p) = args.get("json").map(PathBuf::from) {
         std::fs::write(&p, scio::json::to_file_text(&report.to_json())).map_err(|e| format!("{}: {e}", p.display()))?;
@@ -142,11 +167,88 @@ fn cluster_report(argv: &[String]) -> Result<bool, String> {
     if let Some(p) = args.get("markdown").map(PathBuf::from) {
         std::fs::write(&p, report.to_markdown()).map_err(|e| format!("{}: {e}", p.display()))?;
     }
-    for c in &report.checks {
-        eprintln!("{:>6} {:<58} {:<9} {} of {} differ; {}", c.stage, c.name, c.status.as_str(), c.n_differ, c.n, c.detail);
+    eprintln!("grading: {} mode: {}", report.mode.name(), report.mode.reason());
+    if let Some(m) = &report.saved_mode {
+        eprintln!("against the saved object: {} mode: {}", m.name(), m.reason());
     }
-    eprintln!("{}", if report.pass() { "pass: everything compared is identical" } else { "FAIL" });
+    for c in &report.checks {
+        eprintln!("{:>11} {:<62} {:<14} {:<12} {} of {} differ; {}", c.stage, c.name, c.class.name(), c.status.as_str(), c.n_differ, c.n, c.detail);
+    }
+    use cluster::validate::Status as S;
+    let within = report.checks.iter().filter(|c| c.status == S::WithinFloor && c.stage != "saved").count();
+    let within_saved = report.checks.iter().filter(|c| c.status == S::WithinFloor && c.stage == "saved").count();
+    let mut verdict = if !report.pass() {
+        "FAIL".to_string()
+    } else if within > 0 {
+        format!("pass: {within} BLAS-dependent checks differ within the R-vs-R floor (tolerance mode), everything else compared with the R run is identical")
+    } else {
+        "pass: everything compared with the R run is identical".to_string()
+    };
+    if report.pass() && within_saved > 0 {
+        verdict.push_str(&format!("; against the saved object (made under another kernel), {within_saved} checks within the floor"));
+    }
+    eprintln!("{verdict}");
     Ok(report.pass())
+}
+
+/// `scrust validate floor`: the R-vs-R floor between pairs of runs that differ only in their
+/// OpenBLAS kernel, measured with the statistics tolerance mode grades with (scio::grade).
+fn floor_report(argv: &[String]) -> Result<bool, String> {
+    let args = Args::parse(argv)?;
+    args.only(&["pairs", "out", "summary"])?;
+    let pairs = scio::Table::read(&args.path("pairs")?).map_err(|e| format!("--pairs: {e}"))?;
+    let (lc, ac, bc) = (pairs.col("label").ok_or("--pairs: no label column")?, pairs.col("a").ok_or("--pairs: no a column")?, pairs.col("b").ok_or("--pairs: no b column")?);
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    // key -> (blocks, blocks differing, values differing, rows differing, max abs, max scaled, max rel, max fraction)
+    let mut agg: Vec<(String, [f64; 8])> = Vec::new();
+    for p in &pairs.rows {
+        let (label, a, b) = (&p[lc], PathBuf::from(&p[ac]), PathBuf::from(&p[bc]));
+        let m = scio::grade::measure_stages(&a, &b).map_err(|e| format!("{label}: {e}"))?;
+        for r in m {
+            let s = &r.stats;
+            rows.push(vec![
+                label.clone(),
+                r.key.clone(),
+                r.ctx.clone(),
+                s.n.to_string(),
+                s.n_differ.to_string(),
+                s.rows_differ.to_string(),
+                scio::fmt17(s.max_abs),
+                scio::fmt17(s.max_scaled),
+                scio::fmt17(s.max_rel),
+                s.flipped.to_string(),
+                s.incomparable.to_string(),
+            ]);
+            let i = match agg.iter().position(|x| x.0 == r.key) {
+                Some(i) => i,
+                None => {
+                    agg.push((r.key.clone(), [0.0; 8]));
+                    agg.len() - 1
+                }
+            };
+            let v = &mut agg[i].1;
+            v[0] += 1.0;
+            v[1] += (s.n_differ > 0) as usize as f64;
+            v[2] += s.n_differ as f64;
+            v[3] += s.rows_differ as f64;
+            v[4] = v[4].max(s.max_abs);
+            v[5] = v[5].max(s.max_scaled);
+            v[6] = v[6].max(s.max_rel);
+            v[7] = v[7].max(s.fraction());
+        }
+    }
+    let header = ["pair", "key", "ctx", "n", "n_differ", "rows_differ", "max_abs", "max_scaled", "max_rel", "flipped", "incomparable"];
+    scio::Table { header: header.iter().map(|s| s.to_string()).collect(), rows }.write(&args.path("out")?).map_err(|e| e.to_string())?;
+    let mut md = String::from("| key | blocks | blocks differing | values differing | rows differing | max abs | max scaled | max rel | max fraction differing |\n|---|---|---|---|---|---|---|---|---|\n");
+    agg.sort_by(|x, y| x.0.cmp(&y.0));
+    for (k, v) in &agg {
+        md.push_str(&format!("| {k} | {} | {} | {} | {} | {:.3e} | {:.3e} | {:.3e} | {:.4} |\n", v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]));
+    }
+    match args.get("summary") {
+        Some(p) => std::fs::write(p, &md).map_err(|e| format!("{p}: {e}"))?,
+        None => print!("{md}"),
+    }
+    Ok(true)
 }
 
 fn sctransform_report(argv: &[String]) -> Result<(doubletfinder::validate::Report, Args), String> {
@@ -205,6 +307,11 @@ fn doubletfinder_report(argv: &[String]) -> Result<(doubletfinder::validate::Rep
         let s = doubletfinder::validate::compare_saved(&saved, &candidate).map_err(|e| e.to_string())?;
         report = Some(match report {
             Some(mut r) => {
+                // the saved output's checks read the calls, which come after every BLAS product:
+                // exact (the floor found S4-S7 identical across kernels)
+                for _ in &s.checks {
+                    r.grading.push((scio::grade::Class::BlasDependent, "exact (the floor: identical across kernels)".into()));
+                }
                 r.checks.extend(s.checks);
                 r
             }

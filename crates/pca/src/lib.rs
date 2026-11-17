@@ -19,7 +19,9 @@
 //! Shared by DoubletFinder (7 calls per object, `npcs = 10`) and, later, the clustering crate.
 
 pub mod irlba;
+pub mod output;
 pub mod products;
+pub mod record;
 pub mod rowvar;
 
 pub use irlba::{irlba, Irlba, IrlbaParams};

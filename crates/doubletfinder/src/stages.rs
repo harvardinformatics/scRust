@@ -13,69 +13,10 @@ use crate::pann::Embeddings;
 use crate::run::{EmbeddingSource, Output};
 use crate::DfError;
 use rcompat::as_character;
-use scio::npy::{self, Dtype, Npy};
-use scio::Table;
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use scio::Npy;
+use std::path::Path;
 
-/// One block of an array: rows `row_start..row_start + nrow` of `file`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Block {
-    pub file: String,
-    pub ctx: String,
-    pub row_start: usize,
-    pub nrow: usize,
-    pub ncol: usize,
-    pub dtype: String,
-    pub stage: String,
-}
-
-/// A stage directory written by an instrumented R run (or by Rust).
-#[derive(Debug, Clone)]
-pub struct StageDir {
-    pub dir: PathBuf,
-    pub blocks: Vec<Block>,
-}
-
-impl StageDir {
-    pub fn open(dir: &Path) -> Result<StageDir, DfError> {
-        let t = Table::read(&dir.join("index.tsv")).map_err(DfError::Io)?;
-        let want = ["file", "ctx", "row_start", "nrow", "ncol", "dtype", "stage"];
-        if t.header != want {
-            return Err(DfError::Input(format!("{}: unexpected index.tsv header {:?}", dir.display(), t.header)));
-        }
-        let parse = |s: &str| s.parse::<usize>().map_err(|_| DfError::Input(format!("{}: bad index.tsv number {s}", dir.display())));
-        let mut blocks = Vec::with_capacity(t.rows.len());
-        for r in &t.rows {
-            blocks.push(Block {
-                file: r[0].clone(),
-                ctx: r[1].clone(),
-                row_start: parse(&r[2])?,
-                nrow: parse(&r[3])?,
-                ncol: parse(&r[4])?,
-                dtype: r[5].clone(),
-                stage: r[6].clone(),
-            });
-        }
-        Ok(StageDir { dir: dir.to_path_buf(), blocks })
-    }
-
-    /// The block of `file` for `ctx`.
-    pub fn block(&self, file: &str, ctx: &str) -> Option<&Block> {
-        self.blocks.iter().find(|b| b.file == file && b.ctx == ctx)
-    }
-
-    /// Every block of `file`, in row order.
-    pub fn blocks_of(&self, file: &str) -> Vec<&Block> {
-        let mut v: Vec<&Block> = self.blocks.iter().filter(|b| b.file == file).collect();
-        v.sort_by_key(|b| b.row_start);
-        v
-    }
-
-    pub fn read(&self, file: &str) -> Result<Npy, DfError> {
-        Npy::read(&self.dir.join(file)).map_err(|e| DfError::Input(e.to_string()))
-    }
-}
+pub use scio::stages::{Block, StageDir, StageWriter};
 
 /// Teacher forcing: R's own embeddings (stage S3) and sweep subsample (stage S1) from an
 /// instrumented run's stage directory.
@@ -126,106 +67,6 @@ impl EmbeddingSource for StageSource {
     fn final_embeddings(&mut self, _pn: f64, _n_doublets: usize) -> Result<Embeddings, DfError> {
         // the sweep's embeddings are not needed any more
         self.embeddings("final").inspect(|_| self.embeddings = None)
-    }
-}
-
-/// One context's block of an array: column-major values, its shape and its stage.
-struct ArrayBlock<T> {
-    ctx: String,
-    values: Vec<T>,
-    nrow: usize,
-    ncol: usize,
-    stage: String,
-}
-
-/// Collects stage arrays and writes them in R's layout.
-#[derive(Default)]
-pub struct StageWriter {
-    /// name -> blocks of a stacked array
-    f64s: BTreeMap<String, Vec<ArrayBlock<f64>>>,
-    i32s: BTreeMap<String, Vec<ArrayBlock<i32>>>,
-    /// one file per context: (file, block)
-    big: Vec<(String, ArrayBlock<i32>)>,
-    /// one file per context, already written: (file, ctx, nrow, ncol, dtype, stage)
-    written: Vec<(String, String, usize, usize, Dtype, String)>,
-}
-
-/// Stacks the blocks' rows, column by column (Fortran order): (values, total rows, columns).
-fn stack<T: Copy>(blocks: &[ArrayBlock<T>]) -> (Vec<T>, usize, usize) {
-    let (total, ncol) = (blocks.iter().map(|b| b.nrow).sum::<usize>(), blocks[0].ncol);
-    let mut data = Vec::with_capacity(total * ncol);
-    for c in 0..ncol {
-        for b in blocks {
-            data.extend_from_slice(&b.values[c * b.nrow..(c + 1) * b.nrow]);
-        }
-    }
-    (data, total, ncol)
-}
-
-impl StageWriter {
-    pub fn add_f64(&mut self, name: &str, ctx: &str, values: Vec<f64>, nrow: usize, ncol: usize, stage: &str) {
-        assert_eq!(values.len(), nrow * ncol);
-        self.f64s.entry(name.into()).or_default().push(ArrayBlock { ctx: ctx.into(), values, nrow, ncol, stage: stage.into() });
-    }
-
-    pub fn add_i32(&mut self, name: &str, ctx: &str, values: Vec<i32>, nrow: usize, ncol: usize, stage: &str) {
-        assert_eq!(values.len(), nrow * ncol);
-        self.i32s.entry(name.into()).or_default().push(ArrayBlock { ctx: ctx.into(), values, nrow, ncol, stage: stage.into() });
-    }
-
-    /// One matrix file per context (`<name>.<ctx>.npy`), as R writes `S4_positions`.
-    pub fn add_big_i32(&mut self, name: &str, ctx: &str, values: Vec<i32>, nrow: usize, ncol: usize, stage: &str) {
-        assert_eq!(values.len(), nrow * ncol);
-        self.big.push((format!("{name}.{ctx}.npy"), ArrayBlock { ctx: ctx.into(), values, nrow, ncol, stage: stage.into() }));
-    }
-
-    /// One matrix file per context (`<name>.<ctx>.npy`), written into `dir` right away, as R
-    /// writes `S2d_scale_data` and `S2d_y`: `rows` holds the matrix row-major (`nrow x ncol`),
-    /// the file is R's column-major layout. Nothing of it is kept.
-    pub fn write_big_f64_rows(&mut self, dir: &Path, name: &str, ctx: &str, rows: &[f64], nrow: usize, ncol: usize, stage: &str) -> std::io::Result<()> {
-        std::fs::create_dir_all(dir)?;
-        let file = format!("{name}.{ctx}.npy");
-        npy::write_f64_rows(&dir.join(&file), rows, nrow, ncol)?;
-        self.written.push((file, ctx.into(), nrow, ncol, Dtype::F8, stage.into()));
-        Ok(())
-    }
-
-    /// Writes every array and `index.tsv` into `dir`.
-    pub fn write(&self, dir: &Path) -> std::io::Result<()> {
-        std::fs::create_dir_all(dir)?;
-        let mut index: Vec<Vec<String>> = Vec::new();
-        let shape = |nrow: usize, ncol: usize| if ncol == 1 { vec![nrow] } else { vec![nrow, ncol] };
-        let mut push_index = |file: &str, blocks: &[(&str, usize, usize, &str)], dtype: Dtype| {
-            let mut start = 0;
-            for &(ctx, nrow, ncol, stage) in blocks {
-                index.push(vec![file.into(), ctx.into(), start.to_string(), nrow.to_string(), ncol.to_string(), dtype.descr().into(), stage.into()]);
-                start += nrow;
-            }
-        };
-        for (name, blocks) in &self.f64s {
-            let file = format!("{name}.npy");
-            let (data, total, ncol) = stack(blocks);
-            npy::write_f64(&dir.join(&file), &data, &shape(total, ncol))?;
-            let meta: Vec<(&str, usize, usize, &str)> = blocks.iter().map(|b| (b.ctx.as_str(), b.nrow, b.ncol, b.stage.as_str())).collect();
-            push_index(&file, &meta, Dtype::F8);
-        }
-        for (name, blocks) in &self.i32s {
-            let file = format!("{name}.npy");
-            let (data, total, ncol) = stack(blocks);
-            npy::write_i32(&dir.join(&file), &data, &shape(total, ncol))?;
-            let meta: Vec<(&str, usize, usize, &str)> = blocks.iter().map(|b| (b.ctx.as_str(), b.nrow, b.ncol, b.stage.as_str())).collect();
-            push_index(&file, &meta, Dtype::I4);
-        }
-        for (file, b) in &self.big {
-            npy::write_i32(&dir.join(file), &b.values, &[b.nrow, b.ncol])?;
-            push_index(file, &[(b.ctx.as_str(), b.nrow, b.ncol, b.stage.as_str())], Dtype::I4);
-        }
-        for (file, ctx, nrow, ncol, dtype, stage) in &self.written {
-            push_index(file, &[(ctx.as_str(), *nrow, *ncol, stage.as_str())], *dtype);
-        }
-        index.sort_by(|a, b| a[0].cmp(&b[0]).then(a[2].parse::<usize>().unwrap().cmp(&b[2].parse::<usize>().unwrap())));
-        Table { header: ["file", "ctx", "row_start", "nrow", "ncol", "dtype", "stage"].iter().map(|s| s.to_string()).collect(), rows: index }
-            .write(&dir.join("index.tsv"))
     }
 }
 

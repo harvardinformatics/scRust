@@ -14,17 +14,23 @@
 //! - [`json`]: `summary.json` in the R scripts' layout, and a small parser;
 //! - [`npy`]: `.npy` arrays, the format of the R scripts' dense intermediates and RNG
 //!   checkpoints;
-//! - [`sha256`]: SHA-256, the digest the R scripts record (`digest::digest`).
+//! - [`sha256`]: SHA-256, the digest the R scripts record (`digest::digest`);
+//! - [`grade`]: kernel-gated grading, exact or against the R-vs-R floor (M11);
+//! - [`stages`]: stage dumps in the instrumented R runs' layout, read and written (M6, M11);
+//! - [`toml`]: a small TOML reader, for parameter files and the repository's TOML files (M11).
 
 pub mod deflate;
+pub mod grade;
 pub mod gz;
 pub mod json;
 pub mod mtx;
 pub mod npy;
 pub mod sha256;
 pub mod sparse;
+pub mod stages;
 pub mod tenx;
 pub mod text;
+pub mod toml;
 pub mod tsv;
 
 pub use json::Json;

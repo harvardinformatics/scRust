@@ -1,6 +1,6 @@
 [package]
 name = "cluster"
-description = "Seurat 5.5.1's FindClusters without Seurat: the modularity optimizer (Louvain, multilevel refinement, SLM) with its Java-style generator, GroupSingletons and the result's columns and levels"
+description = "The workflow's clustering without Seurat: Seurat 5.5.1's FindClusters (the modularity optimizer with its Java-style generator, GroupSingletons, the result's columns and levels), bluster's approxSilhouette, and the chain from the counts (SCTransform, RunPCA, FindNeighbors, FindClusters, silhouette) with its comparison with R"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,5 +10,7 @@ publish.workspace = true
 
 [dependencies]
 neighbors.workspace = true
+pca.workspace = true
 rcompat.workspace = true
 scio.workspace = true
+sctransform.workspace = true

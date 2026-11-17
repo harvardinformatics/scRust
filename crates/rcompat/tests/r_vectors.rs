@@ -463,6 +463,8 @@ impl rcompat::port::Problem for Traced {
 
 #[test]
 fn nlminb_against_r() {
+    // PORT's dd7tpr and dv2nrm are BLAS ddot and dnrm2
+    rcompat::blas::require_fixture_kernel(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/rcompat/nlminb.tsv"), "nlminb against R");
     for row in fixture("nlminb.tsv") {
         let what = format!("nlminb {} from {}", row[0], row[1]);
         let spec: Vec<String> = row[0].split(':').map(String::from).collect();

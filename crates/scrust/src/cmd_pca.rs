@@ -3,8 +3,7 @@
 
 use crate::cli::{self, Args, Phases};
 use rcompat::RRng;
-use scio::{fmt17, Json, Table};
-use std::fmt::Write as _;
+use scio::{Json, Table};
 use std::path::Path;
 
 pub const USAGE: &str = "\
@@ -72,69 +71,21 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     phases.mark("pca");
 
     std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
-    let pcs: Vec<String> = (1..=p.npcs).map(|k| format!("PC_{k}")).collect();
-    let mut t = format!("barcode\t{}\n", pcs.join("\t"));
-    for (c, b) in barcodes.iter().enumerate() {
-        t.push_str(b);
-        for k in 0..p.npcs {
-            t.push('\t');
-            t.push_str(&fmt17(p.embeddings[c + k * nc]));
-        }
-        t.push('\n');
-    }
-    write(&out.join("embeddings.tsv"), &t)?;
-    let nk = p.features.len();
-    let mut t = format!("id\tname\t{}\n", pcs.join("\t"));
-    for (i, &f) in p.features.iter().enumerate() {
-        let _ = write!(t, "{}\t{}", feats.rows[f][0], feats.rows[f][1]);
-        for k in 0..p.npcs {
-            t.push('\t');
-            t.push_str(&fmt17(p.loadings[i + k * nk]));
-        }
-        t.push('\n');
-    }
-    write(&out.join("loadings.tsv"), &t)?;
-    let mut t = String::from("pc\tstdev\n");
-    for (k, s) in p.sdev.iter().enumerate() {
-        let _ = writeln!(t, "{}\t{}", pcs[k], fmt17(*s));
-    }
-    write(&out.join("stdev.tsv"), &t)?;
-    let seed: String = rng.random_seed().iter().map(|v| format!("{v}\n")).collect();
-    write(&out.join("random_seed.txt"), &seed)?;
+    let features: Vec<(String, String)> = feats.rows.iter().map(|r| (r[0].clone(), r.get(1).cloned().unwrap_or_default())).collect();
+    pca::output::write_outputs(&out, &barcodes, &features, &p, &rng.random_seed()).map_err(|e| e.to_string())?;
+    // the counts' per-cell metadata, carried forward for `scrust cluster` (M11)
+    cluster::metadata::carry(&sct, &out).map_err(|e| e.to_string())?;
     phases.mark("write");
 
     let fingerprint = Json::parse(&crate::fingerprint::json()).unwrap_or(Json::Null);
     let ir = &p.irlba;
+    let nk = p.features.len();
     let summary = Json::obj(vec![
         ("tool", Json::Str("scrust pca".into())),
         ("reference", Json::Str(pca::REFERENCE.into())),
         ("scrust_version", Json::Str(env!("CARGO_PKG_VERSION").into())),
-        (
-            "parameters",
-            Json::obj(vec![
-                ("npcs", Json::Int(params.npcs as i64)),
-                ("seed_use", Json::Int(params.seed_use.unwrap_or(0) as i64)),
-                ("weight_by_var", Json::Bool(params.weight_by_var)),
-                ("irlba_maxit", Json::Int(params.irlba.maxit as i64)),
-                ("irlba_tol", Json::Num(params.irlba.tol)),
-            ]),
-        ),
-        (
-            "result",
-            Json::obj(vec![
-                ("n_cells", Json::Int(nc as i64)),
-                ("n_features", Json::Int(nf as i64)),
-                ("n_pca_features", Json::Int(nk as i64)),
-                ("npcs", Json::Int(p.npcs as i64)),
-                ("irlba_d", Json::nums(&ir.d)),
-                ("irlba_iter", Json::Int(ir.iter as i64)),
-                ("irlba_mprod", Json::Int(ir.mprod as i64)),
-                ("irlba_converged", Json::Bool(ir.converged)),
-                ("irlba_work", Json::Int(ir.work as i64)),
-                ("irlba_invariant_draws", Json::Int(ir.invariant_draws as i64)),
-                ("total_variance", Json::Num(p.total_variance)),
-            ]),
-        ),
+        ("parameters", pca::output::params_json(&params)),
+        ("result", pca::output::result_json(&p, nf)),
         (
             "run",
             Json::obj(vec![

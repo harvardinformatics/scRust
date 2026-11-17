@@ -169,5 +169,5 @@ pub fn validate(input: &std::path::Path, stages_dir: &std::path::Path, which: Wh
             checks.extend(check_chained(&stages, &rng, &scalars, &c, &sct_params, threads)?);
         }
     }
-    Ok((Report { reference: stages_dir.to_path_buf(), candidate: input.to_path_buf(), checks }, sources))
+    Ok((Report { reference: stages_dir.to_path_buf(), candidate: input.to_path_buf(), checks, mode: None, grading: Vec::new() }, sources))
 }

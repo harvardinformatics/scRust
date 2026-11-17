@@ -4,7 +4,8 @@
 #   agreement  fraction identical, correlation
 # Exact checks run only when the BLAS-relevant fields of the environment fingerprint match the
 # reference's; otherwise the harness switches to tolerance mode (the R-vs-R floor, measured at
-# M2) and says so in its report (A5b).
+# M2) and says so in its report (A5b). From M11 both validators do this (kernel-gated grading,
+# [doubletfinder.kernel_gating] and [clustering.kernel_gating] below; scio::grade).
 #
 # The criteria are the plan's (B5) and the key names a proposal. Each stage is uncommented and
 # settled when its milestone lands (S0: M1; S1 and S4-S7: M3; S2a-S2d: M4; S3: M5; the end-to-end,
@@ -23,7 +24,8 @@ criterion = "exact"
 # R-vs-R floor (M2; docs/validation/doubletfinder_m2.md): how far R itself moves when only the
 # machine changes. Measured with instrumented runs (every stage array and .Random.seed
 # checkpoint, block by block) on the five tier-T objects and on soupx_tenx_SRR18256555,
-# soupx_tenx_10xmousebrain and soupx_emptydrops_4500871lane; the two large objects end to end.
+# soupx_tenx_10xmousebrain and soupx_emptydrops_4500871lane; the two large objects end to end
+# (M2), and per stage from M11, which made their production-profile instrumented runs.
 # Settled as measurements; the stage criteria below are settled at their milestones.
 #
 # Same kernel, different CPU types: OPENBLAS_CORETYPE=Haswell (the portable profile) on Sapphire
@@ -33,17 +35,66 @@ criterion = "exact"
 all_stages = "identical"
 
 # Different kernels, same CPU type: Haswell against SapphireRapids (the production profile, by
-# detection) on Sapphire Rapids. Maxima over objects and contexts; max_scaled is
-# max|a - b| / max|a| within one block; S3 embeddings and loadings after aligning each
-# component's sign (irlba's signs can flip between kernels). Everything not listed is identical:
-# S1, S2a, S2b, S2c, all RNG checkpoints (so irlba's draw count), S4, S5, S6, S7 and the final
-# cells.tsv, sweep_stats.tsv and bcmvn.tsv.
+# detection) on Sapphire Rapids, on all ten objects. Maxima over objects and contexts, rounded up
+# to two significant digits; max_scaled is max|a - b| / max|a| within one block; S3 embeddings and
+# loadings after aligning each component's sign (irlba's signs can flip between kernels); counts
+# (values_differing, cells_differing) are totals over the ten objects. Everything not listed is
+# identical: S1, S2a, S2b, S2c, all RNG checkpoints (so irlba's draw count), every scalar, S5, S6,
+# S7 and the final cells.tsv, sweep_stats.tsv and bcmvn.tsv.
+#
+# M11 measured it again with `scrust validate floor` (validation/slurm/m11_floor.sbatch): first on
+# M2's eight objects (data/doubletfinder/compare/floor_kernel_m11/, job 60798602), reproducing M2's
+# table, then on all ten (floor_kernel_m11_ten_objects/, job 61102448), with the two large objects'
+# instrumented production runs, which M11 made (jobs 61097286 and 61097287). The large objects
+# raise three bounds: S3's embeddings (max_abs 3.548e-11 -> 3.665e-11, scaled 2.407e-13 ->
+# 3.133e-13, was 3.6e-11 and 2.5e-13) and loadings (8.034e-14 -> 8.370e-14, was 8.1e-14), both at
+# soupx_emptydrops_sscovelli's sweep_pN0.1; and S4's digest (below). Everything else of theirs
+# stays within the eight objects' bounds.
 [doubletfinder.floor.kernel]
 S2d_residual_stats = { max_abs = 5.7e-14, max_scaled = 1.4e-16 }
 S2d_scale_data = { max_abs = 2.2e-14, max_scaled = 1.2e-15, max_fraction_differing = 0.008 }
 S3_sdev = { max_rel = 7.3e-15 }
-S3_embeddings = { max_abs = 3.6e-11, max_scaled = 2.5e-13 }
-S3_loadings = { max_abs = 8.1e-14, max_scaled = 3.0e-13 }
+S3_embeddings = { max_abs = 3.7e-11, max_scaled = 3.2e-13 }
+S3_loadings = { max_abs = 8.4e-14, max_scaled = 3.0e-13 }
+# irlba's d (M11), from M2's own measurement (docs/validation/doubletfinder_m2.md, R-vs-R floor);
+# the ten objects give the same maxima (7.503e-12, 3.799e-15).
+S3_irlba_d = { max_abs = 7.6e-12, max_scaled = 3.8e-15 }
+# S4's digest of each real cell's first ind (sweep) or k + 1 (final) order() positions (M11, the
+# ten objects). A digest has no magnitude to bound, so the entry bounds how many cells' digests
+# differ. Identical in every block of nine objects; in cellbender_fromraw_ghirsutum2's final run
+# (k = 2,373) R orders 3 of the 59,323 cells' neighbours differently under the two kernels: the
+# same k + 1 neighbours, with two or three of them, at distances equal to within 1.1e-15 (exact
+# ties under one kernel), in another order. pANN (S5) and the calls (S7) stay identical.
+S4_digest = { cells_differing = 3, values_differing = 6, objects = 1 }
+
+# Kernel-gated grading (M11; docs/PLAN.md A5b mechanism 3): `scrust validate doubletfinder` grades
+# every check exactly when the reference's and the candidate's recorded OpenBLAS kernels
+# (run.fingerprint.openblas_corename) are the same; otherwise, or when either run records none, in
+# tolerance mode: each BLAS-free check stays exact, each BLAS-dependent stage array and scalar is
+# graded against [doubletfinder.floor.kernel] (bounds: the keys starting with max_, and the counts
+# values_differing and cells_differing), and what the floor does not list stays exact, since the
+# floor found it identical across kernels. The report gives the mode, why, and each check's class
+# and criterion. A check is BLAS-dependent when any of its inputs passed through a BLAS product in
+# the candidate's run (crates/doubletfinder/src/validate.rs, Grading::class):
+#   - teacher-forced runs (on R's own embeddings, --from-stages): every check is BLAS-free;
+#   - runs from the counts: BLAS-free are S1 and S2a, and the RNG states of the sampling and of
+#     SCTransform's fits (whose draw counts are fixed), in the contexts whose doublets are drawn
+#     from a fresh set.seed(12345) (the first sweep iteration, sweep_pN0.05, and the final run), and
+#     the checks made from R's own states or arrays (S1 redrawn from R's checkpoints, S6 and S7
+#     recomputed from R's S5); BLAS-dependent is everything else: S2b (glmGamPoi's Cox-Reid term
+#     calls dgemv, nlminb calls ddot and dnrm2), S2c, S2d, S3 and every later stage, irlba's draw
+#     counts, the other sweep iterations (their doublets are drawn after the previous irlba), the
+#     final files and the result section.
+# With the same kernel every verdict is the one Step 1's validator gave before M11 (the kernel
+# check itself is identical, and nothing else changes): validation/slurm/m11_doubletfinder.sbatch
+# re-graded M6's and M7's Rust runs (docs/validation/clustering.md, "Kernel-gated grading").
+[doubletfinder.kernel_gating]
+exact_when = "the reference's and the candidate's recorded OpenBLAS kernels match"
+otherwise = "tolerance: BLAS-free checks exact; BLAS-dependent checks within [doubletfinder.floor.kernel], exact where it lists nothing"
+no_kernel_recorded = "tolerance (never exact)"
+blas_free = ["S1 and S2a in sweep_pN0.05 and final", "RNG states of the sampling and of SCTransform's fits in those contexts", "S1 redrawn from R's checkpoints", "S6 and S7 recomputed from R's S5", "every check of a teacher-forced run"]
+blas_dependent = ["S2b", "S2c", "S2d", "S3", "S4", "S5", "S6", "S7", "S1 and S2a of the other sweep iterations", "irlba's RNG states", "cells.tsv, sweep_stats.tsv, bcmvn.tsv", "the result section", "the saved output's checks"]
+floor = "doubletfinder.floor.kernel"
 
 # S1 sampling: subsample and doublet index pairs, RNG state after each step. Settled (M3):
 # exact. From R's own .Random.seed before each draw, rcompat redraws the sweep subsample
@@ -146,7 +197,10 @@ blas_dependent = true
 # S4 neighbours: the first `ind` (sweep) or k + 1 (final) order positions of every real cell.
 # Plan floor: identical for >= 99.99% of cells, each difference explained by a near-tie.
 # Floor (M2): identical across kernels and CPU types on every object (the S3 differences above
-# move no neighbour), so S5-S7 are identical too.
+# move no neighbour), so S5-S7 are identical too. M11, measuring the two large objects per stage:
+# across kernels R orders 3 of cellbender_fromraw_ghirsutum2's 59,323 cells' neighbours differently
+# in the final run, near-ties within the same k + 1 neighbours ([doubletfinder.floor.kernel]
+# S4_digest); S5-S7 stay identical.
 # Settled (M3): exact. On R's own S3 embeddings, every cell's S4 digest is identical in all 24
 # instrumented runs of the 10 objects, and on tier T the full order positions (15 runs,
 # 3.1 million positions), including the lower-index twins of cellbender_fromraw_ghirsutum2 that
@@ -340,18 +394,65 @@ all_stages = "identical"
 # sign; max_scaled is max|a - b| / max|a| within one array; S2d identical on tier T. scale.data
 # on tier P: the four objects whose runs dumped it, and the three light-level objects measured by
 # validation/R/floor_scale_data.R against their saved objects, which the production runs reproduce:
+#
+# M11 measured the floor again with the statistics kernel-gated grading uses (scio::grade,
+# `scrust validate floor`; validation/slurm/m11_floor.sbatch, job 60798602, the 34 objects'
+# instrumented runs in both profiles; data/clustering/floor_kernel_m11/: blocks.tsv, summary.md):
+# every entry M8 listed is reproduced, and the arrays and scalars M8 did not tabulate are added
+# (S3_irlba_d, S3_loadings, irlba_iter, irlba_mprod, K4_annoy_index, K8_centroids,
+# K8_cluster_var). Values are the maxima over the 34 objects, rounded up (two entries M8 rounded
+# down by less than their last digit are corrected: S2d_residual_stats max_scaled 3.2e-17 ->
+# 3.21e-17, measured 3.204e-17; K5_nn_dist max_abs 1.9e-6 -> 1.91e-6, measured 1.907e-6).
+# Identical across kernels in every object, and so not listed: everything else, including the
+# total variance and every scalar of SCTransform, Annoy and the optimizer.
+# How tolerance mode reads an entry (scio::grade): keys starting with max_ are bounds, and so are
+# values_differing and cells_differing (totals over the objects measured, so they bound one object
+# too); may_differ = true means the floor found the bytes differing in every object, without a
+# numeric measure; other keys (note, fraction_differing, objects, ...) are measurements only.
 [clustering.floor.kernel]
-S2d_residual_stats = { max_abs = 1.5e-14, max_scaled = 3.2e-17 }
+S2d_residual_stats = { max_abs = 1.5e-14, max_scaled = 3.21e-17 }
 S2d_scale_data = { max_abs = 4.3e-14, max_fraction_differing = 0.0072 }
 S3_sdev = { max_abs = 1.9e-13, max_scaled = 3.6e-14 }
+S3_irlba_d = { max_abs = 6.94e-12, max_scaled = 3.56e-14 }
 S3_embeddings_dims_1_30 = { max_abs = 1.6e-10, max_scaled = 2.4e-12 }
 S3_embeddings_dims_31_50 = { max_abs = 4.3e-6, note = "trailing components of the smallest tier-T objects" }
+S3_loadings = { max_abs = 1.2e-7, max_scaled = 4.5e-7, note = "component 50 of the smallest tier-T objects; 1.6e-12 on tier P" }
+irlba_iter = { max_abs = 2, objects_differing = 5, note = "five small post-hoc tier-T objects restart once or twice more or fewer; .Random.seed is identical (no extra draws)" }
+irlba_mprod = { max_abs = 12, objects_differing = 5 }
 K3_items = { values_differing = 121, cells_differing = 121, max_abs = 9.6e-7, float_ulps = "116 values 1, 3 values 2-4, 2 values near 0 more" }
-K5_nn_dist = { cells_differing = 10, max_abs = 1.9e-6 }
+K4_annoy_index = { may_differ = true, objects_differing = 34, note = "the stored split vectors carry the PCA's sign flips and last bits; the neighbour ids (K5) and both graphs (K6) are identical in all 34" }
+K5_nn_dist = { cells_differing = 10, values_differing = 11, max_abs = 1.91e-6 }
 K8_silhouette_width = { max_abs = 3.3e-13, fraction_differing = 0.99 }
+K8_centroids = { max_abs = 6.68e-11, max_scaled = 4.67e-13, note = "after aligning each dimension's sign" }
+K8_cluster_var = { max_abs = 1.75e-9, max_scaled = 1.67e-13 }
 K9_dist50 = { max_abs = 6.5e-11, max_scaled = 2.8e-13 }
 K9_neighbor_count = { cells_differing = 22, objects = 11 }
 K9_purity = { cells_differing = 19, objects = 10, max_abs = 0.019 }
+
+# Kernel-gated grading (M11; docs/PLAN.md A5b mechanism 3): `scrust validate cluster` grades every
+# check exactly when the reference's and the candidate's recorded OpenBLAS kernels match;
+# otherwise, or when either run records none, BLAS-free checks stay exact and BLAS-dependent ones
+# are graded against [clustering.floor.kernel] (bounds as described there; what it does not list
+# stays exact). The checks against the saved object are graded under the saved object's kernel
+# (SapphireRapids, the kernel of every workflow job, M8). The report gives the mode, why, and each
+# check's class and criterion. A check is BLAS-dependent when any of its inputs passed through a
+# BLAS product in the candidate's run (crates/cluster/src/validate.rs, Grader::class):
+#   - from the counts (--counts): BLAS-free are the settings, the barcodes, the counts' columns
+#     (nCount_RNA, nFeature_RNA), S2a, the RNG states of SCTransform and RunPCA's entry (fixed
+#     draw counts) and the teacher-forced silhouette; BLAS-dependent is everything from S2b on
+#     (glmGamPoi's Cox-Reid term and nlminb call BLAS): S2b-S2d, S3, irlba's exit state, K3-K8,
+#     the labels, the graphs, the files and the result section;
+#   - from SCTransform's output (--sct): RunPCA (S3) and everything after it;
+#   - from R's own embeddings or SNN graph (--pca, --snn): nothing (teacher forcing, as M9's and
+#     M10's runs).
+[clustering.kernel_gating]
+exact_when = "the reference's and the candidate's recorded OpenBLAS kernels match"
+otherwise = "tolerance: BLAS-free checks exact; BLAS-dependent checks within [clustering.floor.kernel], exact where it lists nothing"
+no_kernel_recorded = "tolerance (never exact)"
+saved_object_kernel = "SapphireRapids"
+blas_free = ["FindClusters' settings", "barcodes", "nCount_RNA", "nFeature_RNA", "S2a", "SCTransform's RNG states", "RunPCA's entry and irlba's entry states", "approxSilhouette teacher-forced on R's embeddings and labels", "every check of a run started from R's embeddings or SNN graph"]
+blas_dependent = ["S2b", "S2c", "S2d", "scale.data's digest", "S3", "irlba's exit state", "K3", "K4", "K5", "K6", "K7", "K8", "the result section's numbers", "the saved object's labels and silhouette widths"]
+floor = "clustering.floor.kernel"
 
 # K0, Kiss64Random (M9): RcppAnnoy 0.0.23's kissrandom.h, compiled with the R env's compiler and
 # flags (tests/fixtures/clustering/k0/, M8), against crates/neighbors (tests/k0_kiss64.rs):
@@ -391,6 +492,72 @@ note = "scrust validate neighbors reads the distances as text, where every NaN r
 criterion = "exact"
 compare = ["SCT_nn", "SCT_snn"]
 detail = "dimensions, every stored entry in stored order, values bitwise"
+
+# K1, K2, K8 and the chain's thread criterion (M11; docs/validation/clustering.md): `scrust cluster
+# --counts --preset workflow` from each object's exported counts, with the stage dumps of M8's
+# instrumented runs, against every R run of M8 in the same OpenBLAS profile (the portable runs on
+# Sapphire Rapids and Cascade Lake with OPENBLAS_CORETYPE=Haswell, the production runs on Sapphire
+# Rapids with the kernel detected; validation/slurm/m11_cluster.sbatch, label m11-eedf376, binary
+# data/clustering/bin/scrust-m11-eedf376; jobs 60803803, 60803842, 60803843, 60803844), graded by
+# kernel (exact: the kernels match). Settled (M11): exact, in all 222 comparisons of the 27 tier-T
+# and 7 tier-P objects (portable 118, production 104), 20,383 checks and 1.11 billion values; the
+# only checks not identical are the portable runs' silhouette widths against the saved objects
+# (118), which are graded under the saved objects' kernel and stay within the floor, as M8 found.
+#
+# K1 SCTransform at seed 12345 (v5 and v3 assays: the emptyDrops objects' instrumented runs are v3,
+# and their v5 runs were compared too): every S2a-S2d array R dumped (scale.data and the residual
+# matrix wherever R kept them; R's digest of scale.data in its layout for the three light-level
+# objects), the RNG checkpoints of SCTransform, every SCTransform scalar both runs recorded, and R's
+# digest of .Random.seed after SCTransform.
+[clustering.K1]
+criterion = "exact"
+blas_dependent = true
+compare = ["S2a", "S2b", "S2c", "S2d", "scale_data (array, or its digest at level light)", "rng_vst_entry", "rng_after_cell_sampling", "rng_fits_entry", "rng_bin_entry", "rng_fits_exit", "rng_vst_exit", "rng_sctransform_exit", "rng_after_SCTransform_sha256", "stage_scalars"]
+otherwise = { criterion = "floor", floor = "clustering.floor.kernel" }
+
+# K2 RunPCA with 50 PCs at seed 12345 (work 66, capped for small objects): S3's embeddings,
+# loadings, standard deviations and irlba's d, the PCA features, irlba's iterations and products,
+# the total variance, the RNG checkpoints at RunPCA's and irlba's entry and exit, R's digest of
+# .Random.seed after RunPCA, and the files: pca/ (embeddings, loadings and their features in order,
+# standard deviations) against R's pca/.
+[clustering.K2]
+criterion = "exact"
+blas_dependent = true
+compare = ["S3_embeddings", "S3_loadings", "S3_sdev", "S3_irlba_d", "S2d_pca_features", "irlba_iter", "irlba_mprod", "total_variance", "rng_pca_entry", "rng_irlba_entry", "rng_irlba_exit", "rng_pca_exit", "rng_after_RunPCA_sha256", "pca/"]
+otherwise = { criterion = "floor", floor = "clustering.floor.kernel" }
+rng_state = "exact"
+
+# K8 end to end, from the counts: K3-K7 from the Rust run's own PCA (K3_items, annoy.ann, K5's ids
+# and distances, both graphs, K7's ids, labels, levels, printed numbers, singletons and
+# .Random.seed after GroupSingletons, the workflow's files and logged numbers), the silhouette
+# widths and closest clusters (K8_*, metadata.tsv), against the instrumented runs; the files
+# against the direct runs (the runs without RunUMAP included): metadata.tsv's columns, the levels,
+# cluster_ids.txt, nclusters.txt, pca/, the graphs, the result section's numbers; the labels and
+# levels against the saved objects, and the silhouette widths against them in the production
+# profile (graded under the saved objects' kernel, SapphireRapids). Not compared: the columns of
+# later milestones (neighborhood_purity: M12; nCount_SCT, nFeature_SCT: M13), R's K9 and K10
+# arrays, R's .Random.seed after RunUMAP (not ported; nothing later reads it). Silhouette is also
+# teacher-forced on R's own embeddings and labels (the K8_* arrays), BLAS-free, exact on any machine:
+# 98 comparisons with instrumented references, 490 checks identical.
+[clustering.K8]
+criterion = "exact"
+blas_dependent = true
+compare = ["K3", "K4", "K5", "K6", "K7", "K8_silhouette_width", "K8_silhouette_other", "K8_centroids", "K8_cluster_var", "metadata.tsv", "levels", "cluster_ids.txt", "nclusters.txt", "pca/", "graphs", "result", "saved labels and levels", "saved silhouette widths (production profile)"]
+otherwise = { criterion = "floor", floor = "clustering.floor.kernel" }
+teacher_forced_silhouette = "exact on any machine"
+not_compared = ["neighborhood_purity (M12)", "nCount_SCT, nFeature_SCT (M13)", "K9, K10 arrays", ".Random.seed after RunUMAP"]
+
+# Kernel-gated grading shown on deliberately mismatched pairs (M11): each Rust run against the
+# other profile's instrumented R run on Sapphire Rapids, 68 pairs of the 34 objects in both
+# directions: all in tolerance mode, every BLAS-free check identical, 1,028 BLAS-dependent checks
+# within [clustering.floor.kernel], none beyond it. DoubletFinder: 20 pairs of M6's runs (10 objects,
+# both directions), all within [doubletfinder.floor.kernel] as measured on all ten objects (674
+# BLAS-dependent checks within it; job 61104652). With M2's floor, which had the two large objects
+# end to end only, 16 of the first 18 pairs passed (job 60804010; docs/validation/clustering.md).
+[clustering.kernel_gating_shown]
+pairs = 68
+passed = 68
+checks_within_floor = 1028
 
 # Threads (M9, scrust neighbors): 1 and 32 threads on both 79,409-cell objects give byte-identical
 # knn_index.tsv, knn_distance.tsv, nn.mtx.gz, snn.mtx.gz and annoy.ann (job 60383132,
@@ -483,4 +650,71 @@ measured_m10 = [
   { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", resolutions = 1, threads = 1, clustering_s = 14.8, process_wall_s = 15.8, peak_rss_gib = 0.15 },
   { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", resolutions = 5, threads = 1, clustering_s = 70.3, process_wall_s = 71.3, peak_rss_gib = 0.15 },
   { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", resolutions = 5, threads = 32, clustering_s = 15.4, process_wall_s = 16.4, peak_rss_gib = 0.41 },
+]
+
+# Threads (M11), the chain: scrust cluster --counts --preset workflow at one thread and at many,
+# every file compared byte for byte, and summary.json's result section. Tier T, both profiles:
+# 8 and 1 threads on all 27 objects (m11_cluster.sbatch's second run; 62 files each: the outputs,
+# sct/, every start's partition, the stage dumps). Tier P, portable: 8 and 1 threads on all 7
+# (labels m11-eedf376 and m11-eedf376-t1, job 60805276, validation/slurm/m11_threads.sh; 55-56
+# files, the stage dumps included), and the 1-thread runs' 17 validation reports identical to the
+# 8-thread runs' check by check. Tier P, production: 1 and 32 threads (the benchmark, job
+# 60804011) and 8 (the validation run): the 17 output files. cargo test compares 1, 2 and 5
+# threads on tier T, and the staged starts with the one-process run. Settled (M11): byte-identical
+# in every comparison.
+[clustering.threads]
+criterion = "byte-identical"
+compared = [
+  { tier = "T", profile = "portable", objects = 27, threads = [8, 1], files = 62, differing = 0 },
+  { tier = "T", profile = "production", objects = 27, threads = [8, 1], files = 62, differing = 0 },
+  { tier = "P", profile = "portable", objects = 7, threads = [8, 1], files = "55-56", differing = 0 },
+  { tier = "P", profile = "production", objects = 7, threads = [1, 32, 8], files = 17, differing = 0 },
+]
+
+# Performance (M11), the chain: scrust cluster --counts --preset workflow on the seven tier-P
+# objects, without stage dumps, at 1 and 32 threads, one Sapphire Rapids node (Xeon Platinum 8480CL,
+# test partition, 32 CPUs reserved; job 60804011, validation/slurm/m11_benchmark.sbatch, binary
+# scrust-m11-eedf376), against M8's direct production R runs of the chain on the same inputs (R with
+# OpenBLAS at one thread, the same CPU type), without RunUMAP and, for context, with it. wall_s and
+# peak_rss_gib: the whole process (/usr/bin/time -v); R's to_silhouette_s: from the timer's start,
+# after loading the packages, to the end of the silhouette (reading the input included), R's
+# like-for-like with Rust's run, which computes no purity yet (M12) and writes no export (M13);
+# purity_s and write_s: R's shares that Rust does not have yet. Rust's stage times include writing
+# each stage's files (run.phases; the validation binary's chain times carried an offset of at most
+# 0.12 s, counted in SCTransform, fixed after the runs). Settled (M11): met. Rust at one thread takes
+# 2.7-5.7 times less time than R's whole run and 2.0-2.6 times less than R's chain alone, at 32
+# threads 8.6-17.4 times less than R's whole run, and peaks at 0.15-3.19 GiB against R's
+# 2.50-104.13 GiB; 3.15 GiB (1 thread) and 3.19 GiB (32) on the 79,409-cell objects.
+[clustering.performance]
+criterion = "peak RSS and wall time below R's direct run of the chain without RunUMAP, on the same input and CPU type; at most 10 GiB on the 79,409-cell objects"
+peak_rss_gib_max_79409_cells = 10
+measured_m11 = [
+  { object = "soupx_tenx_SRR18256555", side = "R", threads = 1, umap = false, wall_s = 47.1, to_silhouette_s = 30.3, purity_s = 0.2, write_s = 8.1, peak_rss_gib = 2.50 },
+  { object = "soupx_tenx_SRR18256555", side = "R", threads = 1, umap = true, wall_s = 71.4, runumap_s = 9.5, peak_rss_gib = 2.50 },
+  { object = "soupx_tenx_SRR18256555", side = "Rust", threads = 1, wall_s = 11.7, sctransform_s = 6.9, pca_s = 3.6, neighbors_s = 0.6, cluster_s = 0.2, silhouette_s = 0.04, peak_rss_gib = 0.15 },
+  { object = "soupx_tenx_SRR18256555", side = "Rust", threads = 32, wall_s = 3.0, sctransform_s = 1.4, pca_s = 0.7, neighbors_s = 0.3, cluster_s = 0.2, silhouette_s = 0.04, peak_rss_gib = 0.18 },
+  { object = "soupx_tenx_10xmousebrain", side = "R", threads = 1, umap = false, wall_s = 215.0, to_silhouette_s = 91.9, purity_s = 1.0, write_s = 113.6, peak_rss_gib = 12.02 },
+  { object = "soupx_tenx_10xmousebrain", side = "R", threads = 1, umap = true, wall_s = 295.0, runumap_s = 15.7, peak_rss_gib = 12.01 },
+  { object = "soupx_tenx_10xmousebrain", side = "Rust", threads = 1, wall_s = 38.0, sctransform_s = 21.2, pca_s = 7.7, neighbors_s = 2.6, cluster_s = 1.0, silhouette_s = 0.21, peak_rss_gib = 1.44 },
+  { object = "soupx_tenx_10xmousebrain", side = "Rust", threads = 32, wall_s = 14.7, sctransform_s = 5.6, pca_s = 1.7, neighbors_s = 1.0, cluster_s = 1.0, silhouette_s = 0.21, peak_rss_gib = 1.44 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "R", threads = 1, umap = false, wall_s = 211.5, to_silhouette_s = 87.3, purity_s = 0.9, write_s = 115.3, peak_rss_gib = 12.08 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "R", threads = 1, umap = true, wall_s = 226.4, runumap_s = 12.7, peak_rss_gib = 11.88 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "Rust", threads = 1, wall_s = 37.2, sctransform_s = 21.4, pca_s = 6.9, neighbors_s = 2.4, cluster_s = 1.1, silhouette_s = 0.21, peak_rss_gib = 1.44 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "Rust", threads = 32, wall_s = 14.9, sctransform_s = 5.6, pca_s = 1.7, neighbors_s = 1.1, cluster_s = 1.1, silhouette_s = 0.21, peak_rss_gib = 1.44 },
+  { object = "soupx_emptydrops_4500871lane", side = "R", threads = 1, umap = false, wall_s = 204.8, to_silhouette_s = 153.5, purity_s = 9.7, write_s = 33.5, peak_rss_gib = 23.36 },
+  { object = "soupx_emptydrops_4500871lane", side = "R", threads = 1, umap = true, wall_s = 240.8, runumap_s = 32.1, peak_rss_gib = 23.36 },
+  { object = "soupx_emptydrops_4500871lane", side = "Rust", threads = 1, wall_s = 75.2, sctransform_s = 42.6, pca_s = 16.0, neighbors_s = 6.4, cluster_s = 4.0, silhouette_s = 0.67, peak_rss_gib = 1.48 },
+  { object = "soupx_emptydrops_4500871lane", side = "Rust", threads = 32, wall_s = 23.9, sctransform_s = 8.3, pca_s = 3.1, neighbors_s = 2.5, cluster_s = 3.9, silhouette_s = 0.67, peak_rss_gib = 1.48 },
+  { object = "soupx_emptydrops_sscovelli", side = "R", threads = 1, umap = false, wall_s = 808.4, to_silhouette_s = 474.6, purity_s = 192.6, write_s = 131.9, peak_rss_gib = 62.13 },
+  { object = "soupx_emptydrops_sscovelli", side = "R", threads = 1, umap = true, wall_s = 883.2, runumap_s = 107.7, peak_rss_gib = 62.13 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 1, wall_s = 205.2, sctransform_s = 109.6, pca_s = 49.2, neighbors_s = 20.5, cluster_s = 15.0, silhouette_s = 2.38, peak_rss_gib = 3.15 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 32, wall_s = 59.8, sctransform_s = 19.5, pca_s = 8.4, neighbors_s = 6.2, cluster_s = 15.1, silhouette_s = 2.35, peak_rss_gib = 3.19 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "R", threads = 1, umap = false, wall_s = 778.0, to_silhouette_s = 456.8, purity_s = 180.3, write_s = 130.7, peak_rss_gib = 57.52 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "R", threads = 1, umap = true, wall_s = 1010.8, runumap_s = 117.1, peak_rss_gib = 57.53 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 1, wall_s = 203.0, sctransform_s = 108.7, pca_s = 47.8, neighbors_s = 20.2, cluster_s = 15.6, silhouette_s = 2.42, peak_rss_gib = 3.15 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 32, wall_s = 61.0, sctransform_s = 19.8, pca_s = 8.8, neighbors_s = 6.3, cluster_s = 15.4, silhouette_s = 2.44, peak_rss_gib = 3.19 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "R", threads = 1, umap = false, wall_s = 905.9, to_silhouette_s = 604.8, purity_s = 74.4, write_s = 202.8, peak_rss_gib = 104.13 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "R", threads = 1, umap = true, wall_s = 1144.7, runumap_s = 82.9, peak_rss_gib = 104.13 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, wall_s = 255.5, sctransform_s = 181.3, pca_s = 39.8, neighbors_s = 14.3, cluster_s = 9.6, silhouette_s = 1.10, peak_rss_gib = 2.65 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, wall_s = 52.1, sctransform_s = 20.8, pca_s = 7.2, neighbors_s = 4.5, cluster_s = 9.2, silhouette_s = 1.10, peak_rss_gib = 2.69 },
 ]

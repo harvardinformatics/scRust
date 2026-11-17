@@ -1,39 +1,74 @@
-//! Comparison of a `scrust cluster` run with an R run of FindClusters on the same SNN graph
-//! (docs/PLAN.md C5, stage K7), on plain files. M11 extends it to the whole chain.
+//! Comparison of a `scrust cluster` run with an R run of the workflow's chain (docs/PLAN.md C5:
+//! K1-K8; milestones M10 and M11), on plain files, with kernel-gated grading (A5b mechanism 3,
+//! [`scio::grade`]).
 //!
-//! The R side is an instrumented clustering run (`validation/R/instrumented_clustering.R`, M8),
-//! a direct run (labels and printed numbers only), or a FindClusters reference run in the same
-//! layout (`validation/R/cluster_references.R`, M10), optionally with the instrumented
-//! optimizer's per-start results (`--optimizer`). For each resolution, in call order:
+//! The R side is an instrumented clustering run (`validation/R/instrumented_clustering.R`, M8,
+//! with its stage dumps), a direct run (its final files), or a FindClusters reference run in the
+//! same layout (`validation/R/cluster_references.R`, M10). What is compared depends on what both
+//! sides hold:
 //!
-//! - **the optimizer's ids** (`stages/K7_optimizer_ids.npy`, before GroupSingletons, numbered
-//!   by size) against the candidate's `optimizer_ids.tsv`;
-//! - **the final labels** (`stages/K7_final_ids.npy`, and the column in `metadata.tsv`) and the
-//!   column's levels (`<column>_levels.txt`, byte for byte);
-//! - **the printed numbers**: every line the optimizer printed but the elapsed time (nodes,
-//!   edges, the maximum modularity as `%.4f`, communities), and GroupSingletons' message
-//!   (singletons and final clusters); the singletons in order (`stages.json`);
-//! - **every start** against the instrumented optimizer (`starts.tsv`: iterations, and the
-//!   modularity as a double, bitwise; `ids.txt`; and each start's partition,
-//!   `partitions.npy`, when the candidate kept them with `--keep-stages`);
-//! - **R's `.Random.seed` after GroupSingletons** (`stages/rng.npy`, label
-//!   `groupsingletons_exit`) where GroupSingletons drew; where it did not, that it did not;
+//! - **K1, K2, K3, K5, K7, K8: the stage dumps**, when both runs have `stages/`: every block of
+//!   every array R dumped (S2a-S2d: SCTransform; S3: RunPCA; K3: Annoy's items; K5: the
+//!   neighbours; K7: the optimizer's and the final ids; K8: approxSilhouette's widths, closest
+//!   clusters, centroids and within-cluster variances), every `.Random.seed` checkpoint both
+//!   recorded, and every scalar both recorded. For runs that kept `scale.data` only as a digest
+//!   (level light), its digest (`result.scale_data_sha256`). Arrays of later milestones (K9:
+//!   purity, M12; K10: the corrected counts, M13) are listed as not compared;
+//! - **K4: Annoy's index** (`stages/annoy.ann`), byte for byte;
+//! - **K6: the graphs**, R's `graphs/` against the candidate's `neighbors/`: dimensions, every
+//!   stored entry in order, every value;
+//! - **K7: FindClusters**, resolution by resolution (M10): the settings, the optimizer's ids
+//!   (`stages/K7_optimizer_ids.npy` against `optimizer_ids.tsv`), the final ids, the labels and
+//!   levels, what FindClusters printed, GroupSingletons' singletons, messages and R's
+//!   `.Random.seed` after it, every start against the instrumented optimizer (`--optimizer`),
+//!   `seurat_clusters` and the workflow's files, the workflow job's logged numbers (`--panel`);
+//! - **K8: the files**, against R's final files: `metadata.tsv`'s columns (`nCount_RNA`,
+//!   `nFeature_RNA`, the labels, `silhouette_width`, and the candidate's `silhouette_other`
+//!   against R's `K8_silhouette_other`); `pca/` (embeddings, loadings and their features,
+//!   standard deviations, total variance); the `result` section's numbers (cells, clusters and
+//!   their sizes, `scale.data`'s shape and digest, the variable features, the optimizer's
+//!   numbers, the digests of `.Random.seed` after SCTransform and RunPCA). Columns of later
+//!   milestones (`neighborhood_purity`: M12; `nCount_SCT`, `nFeature_SCT`: M13) are left out;
+//! - **the saved object** (`--saved`): the labels and levels, and the silhouette widths, graded
+//!   under the saved object's kernel (`--saved-kernel`, SapphireRapids: M8 found it on every
+//!   production job);
+//! - **silhouette, teacher-forced**: approxSilhouette on R's own embeddings and labels, against
+//!   R's `K8_*` arrays and `silhouette_width` column. BLAS-free, so exact on any machine.
 //!
-//! then `seurat_clusters` (the column, its levels, `idents_levels.txt`, `cluster_ids.txt`,
-//! `nclusters.txt`) and, with `--panel`, the numbers the workflow job logged. Every criterion
-//! is exact (`validation/tolerances.toml`, K7): no BLAS is involved.
+//! **Grading.** Each check is BLAS-free or BLAS-dependent ([`Class`]): BLAS-dependent when any of
+//! its inputs passed through a BLAS product in the candidate's run. From the counts, that is
+//! every check from SCTransform's fits on (S2b's Cox-Reid term and nlminb call BLAS), except
+//! SCTransform's random-number states and the counts' own columns; from R's own embeddings or
+//! SNN graph, none. When both runs recorded the same OpenBLAS kernel, every check is exact.
+//! Otherwise ([`Mode::Tolerance`]) BLAS-dependent checks are graded against
+//! `[clustering.floor.kernel]` (`validation/tolerances.toml`, embedded at build time), and the
+//! report says so.
 
+use crate::find_clusters::Factor;
+use crate::silhouette::approx_silhouette;
+use scio::grade::{self, Class, Floor, Mode, Outcome, Stats};
+use scio::stages::{RngCheckpoints, StageDir};
 use scio::{Json, Npy, Table};
 use std::path::{Path, PathBuf};
+
+/// `validation/tolerances.toml`, as built: the floors tolerance mode grades against.
+pub const TOLERANCES: &str = include_str!("../../../validation/tolerances.toml");
+
+/// The floor of the clustering chain's checks.
+pub fn floor() -> Floor {
+    Floor::from_toml(TOLERANCES, "clustering.floor.kernel").expect("validation/tolerances.toml has [clustering.floor.kernel]")
+}
 
 /// The outcome of one check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
     Identical,
+    /// It differs, within the R-vs-R floor (tolerance mode, BLAS-dependent checks only).
+    WithinFloor,
     Differ,
-    /// The reference or the candidate lacks the file.
+    /// The reference or the candidate lacks what the check needs.
     Missing,
-    /// The reference does not hold what the check needs (a direct run has no stage dumps).
+    /// The check does not apply (a direct run has no stage dumps; a later milestone's output).
     NotApplicable,
 }
 
@@ -41,6 +76,7 @@ impl Status {
     pub fn as_str(self) -> &'static str {
         match self {
             Status::Identical => "identical",
+            Status::WithinFloor => "within floor",
             Status::Differ => "differ",
             Status::Missing => "missing",
             Status::NotApplicable => "n/a",
@@ -53,6 +89,9 @@ impl Status {
 pub struct Check {
     pub stage: &'static str,
     pub name: String,
+    pub class: Class,
+    /// `exact`, or the floor entry it was graded against.
+    pub criterion: String,
     pub status: Status,
     /// Elements compared and elements that differ.
     pub n: usize,
@@ -65,20 +104,68 @@ pub struct Check {
 pub struct Report {
     pub reference: PathBuf,
     pub candidate: PathBuf,
+    pub mode: Mode,
+    /// The mode of the checks against the saved object, under its own kernel.
+    pub saved_mode: Option<Mode>,
     pub checks: Vec<Check>,
 }
 
 impl Report {
-    /// True when every applicable check is identical (a missing file fails).
+    /// True when every check is identical, within the floor, or not applicable (a missing file
+    /// fails).
     pub fn pass(&self) -> bool {
-        self.checks.iter().all(|c| matches!(c.status, Status::Identical | Status::NotApplicable))
+        self.checks.iter().all(|c| matches!(c.status, Status::Identical | Status::WithinFloor | Status::NotApplicable))
+    }
+
+    /// Checks per stage: (stage, identical, within floor, differing, missing, n/a).
+    pub fn by_stage(&self) -> Vec<(&'static str, [usize; 5])> {
+        let mut out: Vec<(&'static str, [usize; 5])> = Vec::new();
+        for c in &self.checks {
+            let i = match out.iter().position(|o| o.0 == c.stage) {
+                Some(i) => i,
+                None => {
+                    out.push((c.stage, [0; 5]));
+                    out.len() - 1
+                }
+            };
+            let k = match c.status {
+                Status::Identical => 0,
+                Status::WithinFloor => 1,
+                Status::Differ => 2,
+                Status::Missing => 3,
+                Status::NotApplicable => 4,
+            };
+            out[i].1[k] += 1;
+        }
+        out
     }
 
     pub fn to_json(&self) -> Json {
+        let mode = |m: &Mode| Json::obj(vec![("mode", Json::Str(m.name().into())), ("reason", Json::Str(m.reason()))]);
         Json::obj(vec![
             ("reference", Json::Str(self.reference.display().to_string())),
             ("candidate", Json::Str(self.candidate.display().to_string())),
             ("pass", Json::Bool(self.pass())),
+            ("grading", mode(&self.mode)),
+            ("saved_grading", self.saved_mode.as_ref().map(mode).unwrap_or(Json::Null)),
+            (
+                "by_stage",
+                Json::List(
+                    self.by_stage()
+                        .into_iter()
+                        .map(|(s, k)| {
+                            Json::obj(vec![
+                                ("stage", Json::Str(s.into())),
+                                ("identical", Json::Int(k[0] as i64)),
+                                ("within_floor", Json::Int(k[1] as i64)),
+                                ("differing", Json::Int(k[2] as i64)),
+                                ("missing", Json::Int(k[3] as i64)),
+                                ("not_applicable", Json::Int(k[4] as i64)),
+                            ])
+                        })
+                        .collect(),
+                ),
+            ),
             (
                 "checks",
                 Json::List(
@@ -88,6 +175,8 @@ impl Report {
                             Json::obj(vec![
                                 ("stage", Json::Str(c.stage.into())),
                                 ("name", Json::Str(c.name.clone())),
+                                ("class", Json::Str(c.class.name().into())),
+                                ("criterion", Json::Str(c.criterion.clone())),
                                 ("status", Json::Str(c.status.as_str().into())),
                                 ("n", Json::Int(c.n as i64)),
                                 ("n_differ", Json::Int(c.n_differ as i64)),
@@ -102,36 +191,43 @@ impl Report {
 
     pub fn to_markdown(&self) -> String {
         let mut s = format!(
-            "# scrust validate cluster\n\nreference: `{}`\ncandidate: `{}`\n\n**{}**\n\n| stage | check | status | compared | differing | detail |\n|---|---|---|---|---|---|\n",
+            "# scrust validate cluster\n\nreference: `{}`\ncandidate: `{}`\n\n**{}**\n\nGrading: **{} mode**: {}.\n",
             self.reference.display(),
             self.candidate.display(),
-            if self.pass() { "pass: everything compared is identical" } else { "FAIL" }
+            if self.pass() { "pass" } else { "FAIL" },
+            self.mode.name(),
+            self.mode.reason()
         );
+        if let Some(m) = &self.saved_mode {
+            s.push_str(&format!("Against the saved object: **{} mode**: {}.\n", m.name(), m.reason()));
+        }
+        s.push_str("\n| stage | identical | within floor | differing | missing | n/a |\n|---|---|---|---|---|---|\n");
+        for (st, k) in self.by_stage() {
+            s.push_str(&format!("| {st} | {} | {} | {} | {} | {} |\n", k[0], k[1], k[2], k[3], k[4]));
+        }
+        s.push_str("\n| stage | check | class | criterion | status | compared | differing | detail |\n|---|---|---|---|---|---|---|---|\n");
         for c in &self.checks {
-            s.push_str(&format!("| {} | {} | {} | {} | {} | {} |\n", c.stage, c.name, c.status.as_str(), c.n, c.n_differ, c.detail.replace('|', "\\|")));
+            s.push_str(&format!(
+                "| {} | {} | {} | {} | {} | {} | {} | {} |\n",
+                c.stage,
+                c.name,
+                c.class.name(),
+                c.criterion.replace('|', "\\|"),
+                c.status.as_str(),
+                c.n,
+                c.n_differ,
+                c.detail.replace('|', "\\|")
+            ));
         }
         s
     }
-}
-
-fn check(stage: &'static str, name: &str, n: usize, n_differ: usize, detail: String) -> Check {
-    let status = if n_differ == 0 { Status::Identical } else { Status::Differ };
-    Check { stage, name: name.into(), status, n, n_differ, detail }
-}
-
-fn missing(stage: &'static str, name: &str, detail: String) -> Check {
-    Check { stage, name: name.into(), status: Status::Missing, n: 0, n_differ: 0, detail }
-}
-
-fn not_applicable(stage: &'static str, name: &str, detail: String) -> Check {
-    Check { stage, name: name.into(), status: Status::NotApplicable, n: 0, n_differ: 0, detail }
 }
 
 /// A file's bytes, from `path` or `path.gz` (the committed fixtures are gzipped), decompressed.
 fn read_any(path: &Path) -> Result<Vec<u8>, String> {
     let gz = PathBuf::from(format!("{}.gz", path.display()));
     let p = if path.exists() || !gz.exists() { path } else { gz.as_path() };
-    scio::tenx::read_maybe_gz(p).map_err(|e| e.to_string())
+    scio::tenx::read_maybe_gz(p).map_err(|e| format!("{}: {e}", p.display()))
 }
 
 fn exists_any(path: &Path) -> bool {
@@ -172,6 +268,80 @@ fn num_list(j: Option<&Json>) -> Vec<f64> {
 
 fn jnum(j: &Json, key: &str) -> Option<f64> {
     j.get(key).and_then(Json::as_f64)
+}
+
+/// Builds checks, classified and graded for the comparison's mode.
+struct Grader {
+    mode: Mode,
+    floor: Floor,
+    /// Where the candidate's chain started: counts, sct, pca or snn.
+    start: String,
+    checks: Vec<Check>,
+}
+
+/// The stage a check is attached to, for its class: SCTransform's setup and random-number states
+/// (no BLAS), SCTransform's fits on, RunPCA, or what follows the PCA.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Inputs {
+    /// The counts alone, or R's own data (settings, barcodes, the counts' columns, S2a, the
+    /// RNG states SCTransform draws).
+    Free,
+    /// SCTransform's fits and residuals (S2b-S2d).
+    Sct,
+    /// RunPCA (S3) and everything after it.
+    Pca,
+}
+
+impl Grader {
+    fn class(&self, inputs: Inputs) -> Class {
+        let blas = match (inputs, self.start.as_str()) {
+            (Inputs::Free, _) => false,
+            (Inputs::Sct, "counts") => true,
+            (Inputs::Pca, "counts" | "sct") => true,
+            _ => false,
+        };
+        if blas {
+            Class::BlasDependent
+        } else {
+            Class::BlasFree
+        }
+    }
+
+    fn push(&mut self, stage: &'static str, name: &str, class: Class, criterion: String, status: Status, n: usize, n_differ: usize, detail: String) {
+        self.checks.push(Check { stage, name: name.into(), class, criterion, status, n, n_differ, detail });
+    }
+
+    /// An exact check (labels, ids, text): identical or not, in any mode.
+    fn exact(&mut self, stage: &'static str, name: &str, inputs: Inputs, n: usize, n_differ: usize, detail: String) {
+        let class = self.class(inputs);
+        let status = if n_differ == 0 { Status::Identical } else { Status::Differ };
+        let criterion = if class == Class::BlasDependent && !self.mode.is_exact() { "exact (the floor: identical across kernels)".into() } else { "exact".into() };
+        self.push(stage, name, class, criterion, status, n, n_differ, detail);
+    }
+
+    /// A numeric check, graded on its statistics against the floor entry `key`.
+    fn numeric(&mut self, stage: &'static str, name: &str, inputs: Inputs, key: &str, s: &Stats, detail: &str) {
+        let class = self.class(inputs);
+        let outcome = grade::grade(s, class, &self.mode, &self.floor, key);
+        let criterion = if class == Class::BlasDependent && !self.mode.is_exact() { self.floor.describe(key) } else { "exact".into() };
+        let (status, why) = match outcome {
+            Outcome::Identical => (Status::Identical, String::new()),
+            Outcome::WithinFloor => (Status::WithinFloor, String::new()),
+            Outcome::Differ(m) => (Status::Differ, format!("; {m}")),
+        };
+        let d = if detail.is_empty() { format!("{}{why}", s.describe()) } else { format!("{detail}: {}{why}", s.describe()) };
+        self.push(stage, name, class, criterion, status, s.n, s.n_differ, d);
+    }
+
+    fn missing(&mut self, stage: &'static str, name: &str, inputs: Inputs, detail: String) {
+        let class = self.class(inputs);
+        self.push(stage, name, class, "exact".into(), Status::Missing, 0, 0, detail);
+    }
+
+    fn not_applicable(&mut self, stage: &'static str, name: &str, inputs: Inputs, detail: String) {
+        let class = self.class(inputs);
+        self.push(stage, name, class, "-".into(), Status::NotApplicable, 0, 0, detail);
+    }
 }
 
 /// FindClusters' settings as an R run records them.
@@ -221,7 +391,7 @@ impl Settings {
 /// The R run's settings: `summary.json`'s `parameters` (M10's reference runs), else the
 /// optimizer settings an instrumented run's hooks recorded, else the workflow's (a direct run of
 /// the workflow's chain).
-fn reference_settings(reference: &Path, summary: Option<&Json>, scalars: Option<&Json>) -> Settings {
+fn reference_settings(summary: Option<&Json>, scalars: Option<&Json>) -> Settings {
     if let Some(p) = summary.and_then(|s| s.get("parameters")) {
         if let Some(s) = Settings::from_params(p, "summary.json parameters") {
             return s;
@@ -247,7 +417,6 @@ fn reference_settings(reference: &Path, summary: Option<&Json>, scalars: Option<
             };
         }
     }
-    let _ = reference;
     Settings::workflow("the workflow's call (a direct run records no settings)")
 }
 
@@ -265,7 +434,7 @@ fn printed_blocks(lines: &[String]) -> Vec<Vec<String>> {
     out
 }
 
-/// The `n`-th row of R's RNG checkpoints labelled `label` (stages/rng.npy and rng.tsv).
+/// The rows of R's RNG checkpoints labelled `label` (stages/rng.npy and rng.tsv).
 fn rng_rows(reference: &Path, label: &str) -> Result<Vec<Vec<i32>>, String> {
     let tsv = read_table(&reference.join("stages/rng.tsv"))?;
     let a = read_npy(&reference.join("stages/rng.npy"))?;
@@ -290,29 +459,48 @@ pub struct CompareOptions {
     /// The panel table (`validation/clustering_panel.tsv`) and the object's name: the numbers
     /// the workflow job logged.
     pub panel: Option<(PathBuf, String)>,
+    /// The saved object's export (`data/clustering/<object>/saved`): its labels, levels and
+    /// silhouette widths.
+    pub saved: Option<PathBuf>,
+    /// The OpenBLAS kernel the saved objects were made with (default SapphireRapids, M8).
+    pub saved_kernel: Option<String>,
 }
+
+/// The kernel the saved objects were made with: every production job ran on Sapphire Rapids,
+/// where OpenBLAS detected SapphireRapids (M8).
+pub const SAVED_KERNEL: &str = "SapphireRapids";
 
 /// Compares the candidate directory (`scrust cluster --out`) with the R run directory
 /// `reference`.
 pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Result<Report, String> {
-    let mut checks = Vec::new();
     let r_summary = if exists_any(&reference.join("summary.json")) { Some(read_json(&reference.join("summary.json"))?) } else { None };
-    let has_stages = exists_any(&reference.join("stages/stages.json"));
-    let r_scalars = if has_stages {
-        read_json(&reference.join("stages/stages.json"))?.get("scalars").and_then(|s| s.get("chain")).cloned()
-    } else {
-        None
-    };
+    // R's stage dumps (an instrumented run), and its scalars (also in the committed fixtures, which
+    // keep stages.json without the index)
+    let has_stages = exists_any(&reference.join("stages/index.tsv"));
+    let r_scalars = if exists_any(&reference.join("stages/stages.json")) { read_json(&reference.join("stages/stages.json"))?.get("scalars").and_then(|s| s.get("chain")).cloned() } else { None };
     let c_summary = read_json(&candidate.join("summary.json"))?;
     let c_result = c_summary.get("result").cloned().ok_or("candidate summary.json: no result section")?;
-    let c_params = c_summary.get("run").and_then(|r| r.get("parameters")).cloned().ok_or("candidate summary.json: no run.parameters")?;
+    let c_run = c_summary.get("run").cloned().ok_or("candidate summary.json: no run section")?;
+    let c_params_all = c_run.get("parameters").cloned().ok_or("candidate summary.json: no run.parameters")?;
+    let c_params = c_params_all.get("cluster").cloned().unwrap_or(c_params_all.clone());
+    let start = c_run.get("start").and_then(Json::as_str).unwrap_or("snn").to_string();
+    let mode = grade::mode(grade::recorded_kernel(r_summary.as_ref()).as_deref(), grade::recorded_kernel(Some(&c_summary)).as_deref());
+    let mut g = Grader { mode, floor: floor(), start, checks: Vec::new() };
+
+    // the environment: which mode, and why
+    {
+        let rk = grade::recorded_kernel(r_summary.as_ref()).unwrap_or_else(|| "none recorded".into());
+        let ck = grade::recorded_kernel(Some(&c_summary)).unwrap_or_else(|| "none recorded".into());
+        let detail = format!("R {rk}, Rust {ck}; {} mode: {}", g.mode.name(), g.mode.reason());
+        g.push("environment", "OpenBLAS kernel", Class::BlasFree, "-".into(), Status::NotApplicable, 1, 0, detail);
+    }
 
     // settings
-    let rs = reference_settings(reference, r_summary.as_ref(), r_scalars.as_ref());
-    let cs = Settings::from_params(&c_params, "candidate").ok_or("candidate summary.json: incomplete parameters")?;
+    let rs = reference_settings(r_summary.as_ref(), r_scalars.as_ref());
+    let cs = Settings::from_params(&c_params, "candidate").ok_or("candidate summary.json: incomplete FindClusters parameters")?;
     let (ra, ca) = (rs.describe(), cs.describe());
     let bad: Vec<String> = ra.iter().zip(&ca).filter(|(a, b)| a.1 != b.1).map(|(a, b)| format!("{}: R {}, Rust {}", a.0, a.1, b.1)).collect();
-    checks.push(check("params", "FindClusters' settings", ra.len(), bad.len(), format!("R's from {}{}", rs.source, if bad.is_empty() { String::new() } else { format!("; {}", bad.join("; ")) })));
+    g.exact("params", "FindClusters' settings", Inputs::Free, ra.len(), bad.len(), format!("R's from {}{}", rs.source, if bad.is_empty() { String::new() } else { format!("; {}", bad.join("; ")) }));
 
     // the cells
     let r_meta = read_table(&reference.join("metadata.tsv"))?;
@@ -320,9 +508,30 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
     let rb = r_meta.col("barcode").ok_or("R's metadata.tsv: no barcode column")?;
     let cb = c_meta.col("barcode").ok_or("candidate metadata.tsv: no barcode column")?;
     let n = r_meta.rows.len();
-    let bc_differ = if c_meta.rows.len() != n { n.max(c_meta.rows.len()) } else { (0..n).filter(|&i| r_meta.rows[i].get(rb) != c_meta.rows[i].get(cb)).count() };
-    checks.push(check("cells", "barcodes", n, bc_differ, format!("{n} cells in R's metadata.tsv, {} in Rust's", c_meta.rows.len())));
+    let same_n = c_meta.rows.len() == n;
+    let bc_differ = if !same_n { n.max(c_meta.rows.len()) } else { (0..n).filter(|&i| r_meta.rows[i].get(rb) != c_meta.rows[i].get(cb)).count() };
+    g.exact("cells", "barcodes", Inputs::Free, n, bc_differ, format!("{n} cells in R's metadata.tsv, {} in Rust's", c_meta.rows.len()));
 
+    compare_k7(&mut g, reference, candidate, opts, &r_summary, &r_scalars, has_stages, &c_result, &r_meta, &c_meta)?;
+    if has_stages {
+        compare_stages(&mut g, reference, candidate, &r_summary, &c_result)?;
+    } else {
+        g.not_applicable("K1-K8", "stage dumps", Inputs::Free, "the reference has none (a direct run): its final files are compared".into());
+    }
+    compare_files(&mut g, reference, candidate, &r_summary, &c_result, &c_run, &r_meta, &c_meta)?;
+    let saved_mode = match &opts.saved {
+        Some(s) => Some(compare_saved(&mut g, s, opts.saved_kernel.as_deref().unwrap_or(SAVED_KERNEL), &c_summary, &c_meta, candidate)?),
+        None => None,
+    };
+    teacher_forced_silhouette(&mut g, reference, &r_meta, r_scalars.as_ref())?;
+    Ok(Report { reference: reference.to_path_buf(), candidate: candidate.to_path_buf(), mode: g.mode, saved_mode, checks: g.checks })
+}
+
+/// K7 (M10): FindClusters, resolution by resolution, and the workflow's files.
+#[allow(clippy::too_many_arguments)]
+fn compare_k7(g: &mut Grader, reference: &Path, candidate: &Path, opts: &CompareOptions, r_summary: &Option<Json>, r_scalars: &Option<Json>, has_stages: bool, c_result: &Json, r_meta: &Table, c_meta: &Table) -> Result<(), String> {
+    let n = r_meta.rows.len();
+    let cb = c_meta.col("barcode").unwrap_or(0);
     let columns = str_list(c_result.get("columns"));
     let c_res = match c_result.get("resolutions") {
         Some(Json::List(v) | Json::Vector(v)) => v.clone(),
@@ -330,17 +539,19 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
     };
     let r_blocks = printed_blocks(&str_list(r_summary.as_ref().and_then(|s| s.get("run")).and_then(|r| r.get("printed"))));
     let r_messages: Vec<String> = str_list(r_summary.as_ref().and_then(|s| s.get("run")).and_then(|r| r.get("messages"))).iter().map(|m| m.trim().to_string()).filter(|m| m.contains("singletons identified")).collect();
-    let r_opt_ids = if has_stages && exists_any(&reference.join("stages/K7_optimizer_ids.npy")) { Some(read_npy(&reference.join("stages/K7_optimizer_ids.npy"))?) } else { None };
-    let r_final_ids = if has_stages && exists_any(&reference.join("stages/K7_final_ids.npy")) { Some(read_npy(&reference.join("stages/K7_final_ids.npy"))?) } else { None };
+    let _ = has_stages;
+    let r_opt_ids = if exists_any(&reference.join("stages/K7_optimizer_ids.npy")) { Some(read_npy(&reference.join("stages/K7_optimizer_ids.npy"))?) } else { None };
+    let r_final_ids = if exists_any(&reference.join("stages/K7_final_ids.npy")) { Some(read_npy(&reference.join("stages/K7_final_ids.npy"))?) } else { None };
     let c_opt = read_table(&candidate.join("optimizer_ids.tsv"))?;
-    let gs_entry = if has_stages { rng_rows(reference, "groupsingletons_entry").ok() } else { None };
-    let gs_exit = if has_stages { rng_rows(reference, "groupsingletons_exit").ok() } else { None };
+    let gs_entry = if exists_any(&reference.join("stages/rng.tsv")) { rng_rows(reference, "groupsingletons_entry").ok() } else { None };
+    let gs_exit = if exists_any(&reference.join("stages/rng.tsv")) { rng_rows(reference, "groupsingletons_exit").ok() } else { None };
+    let k7 = Inputs::Pca;
 
     for (k, col) in columns.iter().enumerate() {
         let cr = c_res.get(k).cloned().unwrap_or(Json::Null);
         let res_name = cr.get("name").and_then(Json::as_str).unwrap_or("").to_string();
 
-        // K7: the optimizer's ids
+        // the optimizer's ids
         let c_ids: Vec<Option<i64>> = match c_opt.col(col) {
             Some(j) => c_opt.rows.iter().map(|r| r.get(j).and_then(|v| v.parse().ok())).collect(),
             None => Vec::new(),
@@ -348,13 +559,13 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
         match &r_opt_ids {
             Some(a) if a.ncol() > k => {
                 let differ = if c_ids.len() != a.nrow() { a.nrow().max(c_ids.len()) } else { (0..a.nrow()).filter(|&i| c_ids[i] != Some(a.get_i32(i, k) as i64)).count() };
-                checks.push(check("K7", &format!("{col}: optimizer ids"), a.nrow(), differ, format!("K7_optimizer_ids.npy column {} against optimizer_ids.tsv", k + 1)));
+                g.exact("K7", &format!("{col}: optimizer ids"), k7, a.nrow(), differ, format!("K7_optimizer_ids.npy column {} against optimizer_ids.tsv", k + 1));
             }
-            Some(_) => checks.push(missing("K7", &format!("{col}: optimizer ids"), format!("K7_optimizer_ids.npy has no column {}", k + 1))),
-            None => checks.push(not_applicable("K7", &format!("{col}: optimizer ids"), "no stage dumps in the reference".into())),
+            Some(_) => g.missing("K7", &format!("{col}: optimizer ids"), k7, format!("K7_optimizer_ids.npy has no column {}", k + 1)),
+            None => g.not_applicable("K7", &format!("{col}: optimizer ids"), k7, "no stage dumps in the reference".into()),
         }
 
-        // K7: the final labels
+        // the final labels
         let rc = r_meta.col(col);
         let cc = c_meta.col(col);
         match (rc, cc) {
@@ -369,13 +580,12 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
                         }
                     }
                 }
-                checks.push(check("K7", &format!("{col}: labels"), n, differ, first.unwrap_or_else(|| "metadata.tsv".into())));
+                g.exact("K7", &format!("{col}: labels"), k7, n, differ, first.unwrap_or_else(|| "metadata.tsv".into()));
             }
-            _ => checks.push(missing("K7", &format!("{col}: labels"), format!("column {col} missing from R's or Rust's metadata.tsv"))),
+            _ => g.missing("K7", &format!("{col}: labels"), k7, format!("column {col} missing from R's or Rust's metadata.tsv")),
         }
-        if let Some(a) = &r_final_ids {
-            if a.ncol() > k && cc.is_some() && c_meta.rows.len() == n {
-                let cc = cc.unwrap();
+        if let (Some(a), Some(cc)) = (&r_final_ids, cc) {
+            if a.ncol() > k && c_meta.rows.len() == n {
                 let differ = (0..n)
                     .filter(|&i| {
                         let want = a.get_i32(i, k);
@@ -384,7 +594,7 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
                         got != Some(want_s.as_str())
                     })
                     .count();
-                checks.push(check("K7", &format!("{col}: final ids"), n, differ, format!("K7_final_ids.npy column {}", k + 1)));
+                g.exact("K7", &format!("{col}: final ids"), k7, n, differ, format!("K7_final_ids.npy column {}", k + 1));
             }
         }
         // the column's levels
@@ -392,9 +602,10 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
         match (read_any(&reference.join(&lv)), read_any(&candidate.join(&lv))) {
             (Ok(a), Ok(b)) => {
                 let (la, lb) = (String::from_utf8_lossy(&a).lines().count(), String::from_utf8_lossy(&b).lines().count());
-                checks.push(check("K7", &format!("{col}: levels"), la.max(lb), (a != b) as usize, format!("{la} levels in R's, {lb} in Rust's{}", if a == b { String::new() } else { format!(": R {:?}, Rust {:?}", String::from_utf8_lossy(&a), String::from_utf8_lossy(&b)) })));
+                let detail = format!("{la} levels in R's, {lb} in Rust's{}", if a == b { String::new() } else { format!(": R {:?}, Rust {:?}", String::from_utf8_lossy(&a), String::from_utf8_lossy(&b)) });
+                g.exact("K7", &format!("{col}: levels"), k7, la.max(lb), (a != b) as usize, detail);
             }
-            (Err(e), _) | (_, Err(e)) => checks.push(missing("K7", &format!("{col}: levels"), e)),
+            (Err(e), _) | (_, Err(e)) => g.missing("K7", &format!("{col}: levels"), k7, e),
         }
 
         // the printed numbers
@@ -409,15 +620,14 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
                 if differ > 0 {
                     detail = format!("R {:?}; Rust {:?}", ra, ca);
                 }
-                checks.push(check("K7", &format!("{col}: printed numbers"), m, differ, detail));
+                g.exact("K7", &format!("{col}: printed numbers"), k7, m, differ, detail);
             }
-            None => checks.push(not_applicable("K7", &format!("{col}: printed numbers"), "R's printed output not recorded (no summary.json)".into())),
+            None => g.not_applicable("K7", &format!("{col}: printed numbers"), k7, "R's printed output not recorded (no summary.json)".into()),
         }
 
         // the singletons
         let c_sing = str_list(cr.get("singletons"));
-        if let Some(sc) = &r_scalars {
-            // M10's references record each call's singletons; M8's one call's
+        if let Some(sc) = r_scalars {
             let r_sing = match sc.get("singletons_by_call") {
                 Some(Json::List(v) | Json::Vector(v)) => v.get(k).map(|x| str_list(Some(x))),
                 _ if columns.len() == 1 && sc.get("singletons").is_some() => Some(str_list(sc.get("singletons"))),
@@ -426,15 +636,15 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
             if let Some(r_sing) = r_sing {
                 let differ = if r_sing == c_sing { 0 } else { r_sing.len().max(c_sing.len()).max(1) };
                 let shown = |v: &Vec<String>| if v.len() > 12 { format!("{:?} ... ({} in all)", &v[..12], v.len()) } else { format!("{v:?}") };
-                checks.push(check("K7", &format!("{col}: singletons in order"), r_sing.len().max(c_sing.len()), differ, format!("R {}, Rust {}", shown(&r_sing), shown(&c_sing))));
+                g.exact("K7", &format!("{col}: singletons in order"), k7, r_sing.len().max(c_sing.len()), differ, format!("R {}, Rust {}", shown(&r_sing), shown(&c_sing)));
             }
         }
         // per-start results, against the instrumented optimizer
         if let Some(dir) = &opts.optimizer {
             let d = [dir.join(col), dir.join(&res_name), dir.clone()].into_iter().find(|d| d.join("starts.tsv").exists() && (d != dir || columns.len() == 1));
             match d {
-                Some(d) => checks.extend(compare_starts(&d, col, &cr, &c_ids, candidate)?),
-                None => checks.push(missing("K7", &format!("{col}: every start"), format!("{}: no starts.tsv for {col}", dir.display()))),
+                Some(d) => compare_starts(g, &d, col, &cr, &c_ids, candidate)?,
+                None => g.missing("K7", &format!("{col}: every start"), k7, format!("{}: no starts.tsv for {col}", dir.display())),
             }
         }
         // R's .Random.seed after GroupSingletons. Whether R drew cannot be read from its entry
@@ -451,28 +661,28 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
                 match c_rng {
                     Some(v) => {
                         let differ = if v.len() != ex[k].len() { ex[k].len() } else { v.iter().zip(&ex[k]).filter(|(a, b)| **a != **b as i64).count() };
-                        checks.push(check("K7", &name, ex[k].len(), differ, format!("Rust drew; R's state after the call (position {} after set.seed(1))", ex[k][1])));
+                        g.exact("K7", &name, k7, ex[k].len(), differ, format!("Rust drew; R's state after the call (position {} after set.seed(1))", ex[k][1]));
                     }
-                    None => checks.push(check("K7", &name, 1, (en[k] != ex[k]) as usize, "Rust drew nothing (no singletons, or group.singletons = FALSE); R's state unchanged by the call".into())),
+                    None => g.exact("K7", &name, k7, 1, (en[k] != ex[k]) as usize, "Rust drew nothing (no singletons, or group.singletons = FALSE); R's state unchanged by the call".into()),
                 }
             }
-            _ => checks.push(not_applicable("K7", &format!("{col}: .Random.seed after GroupSingletons"), "no RNG checkpoints in the reference".into())),
+            _ => g.not_applicable("K7", &format!("{col}: .Random.seed after GroupSingletons"), k7, "no RNG checkpoints in the reference".into()),
         }
     }
     // GroupSingletons' messages, all resolutions together
     if r_summary.is_some() {
         let c_msgs: Vec<String> = c_res.iter().filter_map(|r| r.get("message").and_then(Json::as_str).map(String::from)).collect();
         let differ = if c_msgs == r_messages { 0 } else { r_messages.len().max(c_msgs.len()).max(1) };
-        checks.push(check("K7", "GroupSingletons' messages", r_messages.len().max(c_msgs.len()), differ, format!("R {:?}, Rust {:?}", r_messages, c_msgs)));
+        g.exact("K7", "GroupSingletons' messages", k7, r_messages.len().max(c_msgs.len()), differ, format!("R {:?}, Rust {:?}", r_messages, c_msgs));
     }
 
     // seurat_clusters and the workflow's files
     match (r_meta.col("seurat_clusters"), c_meta.col("seurat_clusters")) {
         (Some(a), Some(b)) if c_meta.rows.len() == n => {
             let differ = (0..n).filter(|&i| r_meta.rows[i].get(a) != c_meta.rows[i].get(b)).count();
-            checks.push(check("K7", "seurat_clusters: labels", n, differ, "metadata.tsv".into()));
+            g.exact("K7", "seurat_clusters: labels", k7, n, differ, "metadata.tsv".into());
         }
-        _ => checks.push(missing("K7", "seurat_clusters: labels", "seurat_clusters missing from a metadata.tsv".into())),
+        _ => g.missing("K7", "seurat_clusters: labels", k7, "seurat_clusters missing from a metadata.tsv".into()),
     }
     for (rname, cname) in [
         ("seurat_clusters_levels.txt", "seurat_clusters_levels.txt"),
@@ -482,31 +692,32 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
     ] {
         let label = if rname == cname { rname.to_string() } else { format!("{rname} (R) = {cname} (Rust)") };
         match (read_any(&reference.join(rname)), read_any(&candidate.join(cname))) {
-            (Ok(a), Ok(b)) => checks.push(check("K7", &label, 1, (a != b) as usize, if a == b { format!("{} lines", String::from_utf8_lossy(&a).lines().count()) } else { format!("R {:?}, Rust {:?}", String::from_utf8_lossy(&a), String::from_utf8_lossy(&b)) })),
+            (Ok(a), Ok(b)) => {
+                let detail = if a == b { format!("{} lines", String::from_utf8_lossy(&a).lines().count()) } else { format!("R {:?}, Rust {:?}", String::from_utf8_lossy(&a), String::from_utf8_lossy(&b)) };
+                g.exact("K7", &label, k7, 1, (a != b) as usize, detail);
+            }
             (Err(_), _) if rname == "idents_levels.txt" => {}
-            (Err(e), _) | (_, Err(e)) => checks.push(missing("K7", &label, e)),
+            (Err(e), _) | (_, Err(e)) => g.missing("K7", &label, k7, e),
         }
     }
     // the seurat_clusters.tsv that scrust doubletfinder reads
     match (read_table(&candidate.join("seurat_clusters.tsv")), c_meta.col("seurat_clusters")) {
         (Ok(t), Some(b)) => {
             let differ = if t.rows.len() != c_meta.rows.len() { n } else { (0..t.rows.len()).filter(|&i| t.rows[i].get(1) != c_meta.rows[i].get(b) || t.rows[i].first() != c_meta.rows[i].get(cb)).count() };
-            checks.push(check("K7", "seurat_clusters.tsv = metadata.tsv", t.rows.len(), differ, format!("header {:?}", t.header)));
+            g.exact("K7", "seurat_clusters.tsv = metadata.tsv", k7, t.rows.len(), differ, format!("header {:?}", t.header));
         }
-        (Err(e), _) => checks.push(missing("K7", "seurat_clusters.tsv", e)),
+        (Err(e), _) => g.missing("K7", "seurat_clusters.tsv", k7, e),
         _ => {}
     }
-
-    // the workflow job's log
     if let Some((panel, object)) = &opts.panel {
-        checks.push(compare_panel(panel, object, &c_res)?);
+        compare_panel(g, panel, object, &c_res)?;
     }
-    Ok(Report { reference: reference.to_path_buf(), candidate: candidate.to_path_buf(), checks })
+    Ok(())
 }
 
 /// The candidate's starts against the instrumented optimizer's output in `dir`.
-fn compare_starts(dir: &Path, col: &str, cr: &Json, c_ids: &[Option<i64>], candidate: &Path) -> Result<Vec<Check>, String> {
-    let mut out = Vec::new();
+fn compare_starts(g: &mut Grader, dir: &Path, col: &str, cr: &Json, c_ids: &[Option<i64>], candidate: &Path) -> Result<(), String> {
+    let k7 = Inputs::Pca;
     let t = read_table(&dir.join("starts.tsv"))?;
     let (ci, cm) = (t.col("iterations").ok_or("starts.tsv: no iterations")?, t.col("modularity").ok_or("starts.tsv: no modularity")?);
     let want_it: Vec<i64> = t.rows.iter().map(|r| r[ci].parse().unwrap_or(-1)).collect();
@@ -536,15 +747,13 @@ fn compare_starts(dir: &Path, col: &str, cr: &Json, c_ids: &[Option<i64>], candi
     let c_best = jnum(cr, "best_start").map(|v| v as usize);
     let best_ok = c_best == Some(best.0 + 1);
     let detail = first.unwrap_or_else(|| format!("{m} starts, {distinct} distinct modularities; best start {} ({})", best.0 + 1, scio::fmt17(best.1)));
-    out.push(check("K7", &format!("{col}: every start (iterations, modularity)"), m, differ, detail));
-    out.push(check("K7", &format!("{col}: best start"), 1, (!best_ok) as usize, format!("the first start at the maximum: optimizer {}, Rust {:?}", best.0 + 1, c_best)));
-    // the optimizer's final ids
+    g.exact("K7", &format!("{col}: every start (iterations, modularity)"), k7, m, differ, detail);
+    g.exact("K7", &format!("{col}: best start"), k7, 1, (!best_ok) as usize, format!("the first start at the maximum: optimizer {}, Rust {:?}", best.0 + 1, c_best));
     if let Ok(text) = read_text(&dir.join("ids.txt")) {
         let want: Vec<Option<i64>> = text.lines().map(|l| l.trim().parse().ok()).collect();
         let differ = if want.len() != c_ids.len() { want.len().max(c_ids.len()) } else { want.iter().zip(c_ids).filter(|(a, b)| a != b).count() };
-        out.push(check("K7", &format!("{col}: optimizer ids = instrumented optimizer's ids.txt"), want.len(), differ, String::new()));
+        g.exact("K7", &format!("{col}: optimizer ids = instrumented optimizer's ids.txt"), k7, want.len(), differ, String::new());
     }
-    // each start's partition, when the candidate kept them
     let cp = candidate.join("stages").join(format!("{col}_partitions.npy"));
     if cp.exists() && exists_any(&dir.join("partitions.npy")) {
         let a = read_npy(&dir.join("partitions.npy"))?;
@@ -560,22 +769,22 @@ fn compare_starts(dir: &Path, col: &str, cr: &Json, c_ids: &[Option<i64>], candi
             }
             d
         };
-        out.push(check("K7", &format!("{col}: every start's partition"), a.nrow() * a.ncol(), differ, format!("{} starts x {} cells", a.nrow(), a.ncol())));
+        g.exact("K7", &format!("{col}: every start's partition"), k7, a.nrow() * a.ncol(), differ, format!("{} starts x {} cells", a.nrow(), a.ncol()));
     }
-    Ok(out)
+    Ok(())
 }
 
 /// The candidate's numbers against the workflow job's log (`clustering_panel.tsv`).
-fn compare_panel(panel: &Path, object: &str, c_res: &[Json]) -> Result<Check, String> {
+fn compare_panel(g: &mut Grader, panel: &Path, object: &str, c_res: &[Json]) -> Result<(), String> {
     let t = read_table(panel)?;
     let oc = t.col("object").ok_or("panel: no object column")?;
     let row = t.rows.iter().find(|r| r.get(oc).map(String::as_str) == Some(object)).ok_or_else(|| format!("{}: no row for {object}", panel.display()))?;
     let get = |name: &str| t.col(name).and_then(|c| row.get(c)).cloned().unwrap_or_default();
     let Some(cr) = c_res.first() else {
-        return Ok(missing("log", "workflow log", "no resolution in the candidate".into()));
+        g.missing("log", "workflow log", Inputs::Pca, "no resolution in the candidate".into());
+        return Ok(());
     };
     let int_of = |key: &str| jnum(cr, key).map(|v| (v as i64).to_string()).unwrap_or_default();
-    // nodes and edges as the candidate printed them
     let printed = str_list(cr.get("printed"));
     let pnum = |prefix: &str| printed.iter().find_map(|l| l.strip_prefix(prefix)).unwrap_or("").to_string();
     let all: Vec<(&str, String, String)> = vec![
@@ -588,5 +797,556 @@ fn compare_panel(panel: &Path, object: &str, c_res: &[Json]) -> Result<Check, St
     ];
     let bad: Vec<String> = all.iter().filter(|(_, a, b)| a != b).map(|(n, a, b)| format!("{n}: log {a}, Rust {b}")).collect();
     let detail = if bad.is_empty() { all.iter().map(|(n, a, _)| format!("{n} {a}")).collect::<Vec<_>>().join(", ") } else { bad.join("; ") };
-    Ok(check("log", "the workflow job's logged numbers", all.len(), bad.len(), detail))
+    g.exact("log", "the workflow job's logged numbers", Inputs::Pca, all.len(), bad.len(), detail);
+    Ok(())
+}
+
+/// The stage, inputs, floor key and sign alignment of a stage array R dumps.
+fn array_kind(array: &str) -> Option<(&'static str, Inputs, String, bool)> {
+    let stage = match array.split('_').next().unwrap_or("") {
+        "S2a" => "K1",
+        "S2b" | "S2c" => "K1",
+        "S2d" if array == "S2d_pca_features" => "K2",
+        "S2d" => "K1",
+        "S3" => "K2",
+        "K3" => "K3",
+        "K5" => "K5",
+        "K7" => "K7",
+        "K8" => "K8",
+        _ => return None,
+    };
+    let inputs = if array.starts_with("S2a") { Inputs::Free } else if stage == "K1" { Inputs::Sct } else { Inputs::Pca };
+    let key = array.to_string();
+    let align = matches!(array, "S3_embeddings" | "S3_loadings" | "K3_items" | "K8_centroids");
+    Some((stage, inputs, key, align))
+}
+
+/// The later milestones' arrays, and what supplies them.
+fn later_milestone(array: &str) -> Option<&'static str> {
+    if array.starts_with("K9") {
+        Some("neighbourhood purity, milestone M12")
+    } else if array.starts_with("K10") {
+        Some("the corrected counts, milestone M13")
+    } else {
+        None
+    }
+}
+
+/// K1-K8 from the stage dumps: every block of every array R dumped against the candidate's,
+/// every RNG checkpoint and scalar both recorded, Annoy's index, and (light references) the
+/// digest of scale.data.
+fn compare_stages(g: &mut Grader, reference: &Path, candidate: &Path, r_summary: &Option<Json>, c_result: &Json) -> Result<(), String> {
+    let rs = StageDir::open(&reference.join("stages")).map_err(|e| e.to_string())?;
+    let csd = candidate.join("stages");
+    if !csd.join("index.tsv").exists() {
+        g.missing("K1-K8", "stage dumps", Inputs::Free, "the candidate has none (run scrust cluster --counts with --dump-stages)".into());
+        return Ok(());
+    }
+    let cs = StageDir::open(&csd).map_err(|e| e.to_string())?;
+    let mut files: Vec<String> = rs.blocks.iter().map(|b| b.file.clone()).collect();
+    files.sort();
+    files.dedup();
+    let mut later: Vec<String> = Vec::new();
+    for file in &files {
+        for rb in rs.blocks_of(file) {
+            let array = file.trim_end_matches(".npy").trim_end_matches(&format!(".{}", rb.ctx)).to_string();
+            if let Some(m) = later_milestone(&array) {
+                later.push(format!("{array} ({m})"));
+                continue;
+            }
+            let Some((stage, inputs, key, align)) = array_kind(&array) else {
+                g.not_applicable("stages", &array, Inputs::Free, "not an array of the chain's stages".into());
+                continue;
+            };
+            let name = format!("{}: {array}", rb.ctx);
+            if !rs.has(file, &rb.ctx) {
+                g.not_applicable(stage, &name, inputs, "listed in R's index, not held (committed fixtures leave large arrays out)".into());
+                continue;
+            }
+            let Some(cb) = cs.block(file, &rb.ctx).cloned() else {
+                g.missing(stage, &name, inputs, "not in the candidate's dumps".into());
+                continue;
+            };
+            if cb.dtype != rb.dtype || (cb.nrow, cb.ncol) != (rb.nrow, rb.ncol) {
+                g.exact(stage, &name, inputs, rb.nrow * rb.ncol, rb.nrow * rb.ncol, format!("dtype {} and shape {}x{} against R's {} and {}x{}", cb.dtype, cb.nrow, cb.ncol, rb.dtype, rb.nrow, rb.ncol));
+                continue;
+            }
+            let ra = rs.read(file).map_err(|e| e.to_string())?;
+            let ca = cs.read(file).map_err(|e| e.to_string())?;
+            if rb.dtype.contains('i') {
+                let mut nd = 0usize;
+                for c in 0..rb.ncol {
+                    for r in 0..rb.nrow {
+                        nd += (ra.get_i32(rb.row_start + r, c) != ca.get_i32(cb.row_start + r, c)) as usize;
+                    }
+                }
+                g.exact(stage, &name, inputs, rb.nrow * rb.ncol, nd, format!("{} x {}", rb.nrow, rb.ncol));
+                continue;
+            }
+            let a: Vec<f64> = (0..rb.ncol).flat_map(|c| ra.col_f64(c, rb.row_start, rb.nrow)).collect();
+            let b: Vec<f64> = (0..cb.ncol).flat_map(|c| ca.col_f64(c, cb.row_start, cb.nrow)).collect();
+            if array == "S3_embeddings" && rb.ncol > 30 {
+                // the floor separates the 30 dimensions the later stages read from the rest
+                let split = 30 * rb.nrow;
+                let s1 = grade::stats(&a[..split], &b[..split], rb.nrow, 30, true);
+                let s2 = grade::stats(&a[split..], &b[split..], rb.nrow, rb.ncol - 30, true);
+                g.numeric(stage, &format!("{name}, dims 1:30"), inputs, "S3_embeddings_dims_1_30", &s1, "");
+                g.numeric(stage, &format!("{name}, dims 31:{}", rb.ncol), inputs, "S3_embeddings_dims_31_50", &s2, "");
+                continue;
+            }
+            let fkey = if array == "S3_embeddings" { "S3_embeddings_dims_1_30".to_string() } else { key };
+            let s = grade::stats(&a, &b, rb.nrow, rb.ncol, align);
+            g.numeric(stage, &name, inputs, &fkey, &s, &format!("{} x {}", rb.nrow, rb.ncol));
+        }
+    }
+    if !later.is_empty() {
+        later.dedup();
+        g.not_applicable("later", "arrays of later milestones", Inputs::Free, format!("not compared: {}", later.join(", ")));
+    }
+    // scale.data as a digest where R kept no copy (level light)
+    if !rs.has("S2d_scale_data.chain.npy", "chain") {
+        let rd = r_summary.as_ref().and_then(|s| s.get("result")).and_then(|r| r.get("scale_data_sha256")).and_then(Json::as_str);
+        let cd = c_result.get("scale_data_sha256").and_then(Json::as_str);
+        match (rd, cd) {
+            (Some(a), Some(b)) => {
+                let class = g.class(Inputs::Sct);
+                if a == b {
+                    g.exact("K1", "scale.data (digest; R kept no copy)", Inputs::Sct, 1, 0, format!("sha256 {a}"));
+                } else if class == Class::BlasDependent && !g.mode.is_exact() {
+                    g.push("K1", "scale.data (digest; R kept no copy)", class, g.floor.describe("S2d_scale_data"), Status::NotApplicable, 1, 1, "the digests differ; a digest cannot be graded against the floor's bounds (compare a run that kept scale.data)".into());
+                } else {
+                    g.exact("K1", "scale.data (digest; R kept no copy)", Inputs::Sct, 1, 1, format!("R {a}, Rust {b}"));
+                }
+            }
+            _ => g.missing("K1", "scale.data (digest; R kept no copy)", Inputs::Sct, "no scale_data_sha256 in one of the summaries".into()),
+        }
+    }
+    // the RNG checkpoints
+    let rr = RngCheckpoints::open(&rs).map_err(|e| e.to_string())?;
+    let cr = RngCheckpoints::open(&cs).map_err(|e| e.to_string())?;
+    let mut na: Vec<String> = Vec::new();
+    for (ctx, stage, label, state) in rr.all() {
+        let (st, inputs, why_na): (&'static str, Inputs, Option<&str>) = match label.as_str() {
+            "vst_entry" | "after_cell_sampling" | "fits_entry" | "fits_exit" | "vst_exit" | "sctransform_exit" => ("K1", Inputs::Free, None),
+            l if l.starts_with("bin") => ("K1", Inputs::Free, None),
+            "pca_entry" | "irlba_entry" => ("K2", Inputs::Free, None),
+            "irlba_exit" | "pca_exit" => ("K2", Inputs::Pca, None),
+            "groupsingletons_exit" => ("K7", Inputs::Pca, Some("compared under K7")),
+            "correct_entry" => ("later", Inputs::Free, Some("correct(): milestone M13")),
+            "chain_exit" => ("later", Inputs::Free, Some("after neighborPurity: milestone M12")),
+            _ => ("K2", Inputs::Free, Some("after RunUMAP, which draws from R's stream and is not ported; nothing later reads these states (GroupSingletons reseeds)")),
+        };
+        if let Some(w) = why_na {
+            na.push(format!("{label} ({w})"));
+            continue;
+        }
+        let _ = stage;
+        match cr.state(&ctx, &label) {
+            Some(c) => g.exact(st, &format!("{ctx}: RNG {label}"), inputs, 1, (c != state) as usize, String::new()),
+            None => g.missing(st, &format!("{ctx}: RNG {label}"), inputs, "not among the candidate's checkpoints".into()),
+        }
+    }
+    if !na.is_empty() {
+        g.not_applicable("RNG", "checkpoints not compared here", Inputs::Free, na.join("; "));
+    }
+    // the scalars both recorded
+    let read_sc = |d: &StageDir| -> Option<Json> { Json::parse(&String::from_utf8(read_any(&d.dir.join("stages.json")).ok()?).ok()?).ok()?.get("scalars")?.get("chain").cloned() };
+    if let (Some(Json::Object(r)), Some(c)) = (read_sc(&rs), read_sc(&cs)) {
+        let mut r_only: Vec<String> = Vec::new();
+        for (key, rv) in &r {
+            let Some(cv) = c.get(key) else {
+                r_only.push(key.clone());
+                continue;
+            };
+            let inputs = match key.as_str() {
+                "vst_n_cells" | "n_genes" | "n_genes_step1" | "n_cells_step1" | "n_genes_step1_pool" | "gene_sampling" | "n_cells" | "density_bw" | "density_n" | "min_variance" | "res_clip_range" | "clip_range" | "n_bins_fit" => Inputs::Free,
+                "n_theta_below_1e7" | "n_theta_inf" | "reg_bw" | "mean_cell_sum" | "n_outliers" | "n_all_poisson_genes" | "n_smoothing_genes" => Inputs::Sct,
+                _ => Inputs::Pca,
+            };
+            let st: &'static str = match inputs {
+                Inputs::Free | Inputs::Sct => "K1",
+                Inputs::Pca if key.starts_with("pca") || key.starts_with("irlba") || key == "total_variance" => "K2",
+                Inputs::Pca if key.starts_with("annoy") => "K4",
+                Inputs::Pca if key.starts_with("knn") => "K5",
+                Inputs::Pca if key.starts_with("optimizer") || key.contains("singleton") => "K7",
+                _ => "K8",
+            };
+            // numbers, graded (the floor lists irlba's iterations and products); the rest as text
+            if let (Some(x), Some(y)) = (atoms_num(rv), atoms_num(cv)) {
+                if x.len() == y.len() {
+                    let s = grade::stats(&x, &y, x.len(), 1, false);
+                    g.numeric(st, &format!("chain: {key}"), inputs, key, &s, &atoms_text(rv));
+                    continue;
+                }
+            }
+            // as atoms: R writes a vector of length one as a scalar
+            let (a, b) = (atoms_text(rv), atoms_text(cv));
+            g.exact(st, &format!("chain: {key}"), inputs, 1, (a != b) as usize, if a == b { a } else { format!("R {a}, Rust {b}") });
+        }
+        if !r_only.is_empty() {
+            g.not_applicable("scalars", "R's own scalars", Inputs::Free, format!("recorded by R only (its structural checks of its own containers, RunUMAP's, later milestones'): {}", r_only.join(", ")));
+        }
+    }
+    // K4: Annoy's index, byte for byte
+    match (read_any(&reference.join("stages/annoy.ann")), read_any(&candidate.join("stages/annoy.ann"))) {
+        (Ok(a), Ok(b)) => {
+            let nd = if a.len() != b.len() { a.len().max(b.len()) } else { a.iter().zip(&b).filter(|(x, y)| x != y).count() };
+            let s = Stats { n: a.len(), n_differ: nd, rows_differ: nd.min(1), ..Stats::default() };
+            g.numeric("K4", "annoy.ann", Inputs::Pca, "K4_annoy_index", &s, &format!("{} bytes in R's, {} in Rust's", a.len(), b.len()));
+        }
+        (Err(e), _) | (_, Err(e)) => g.missing("K4", "annoy.ann", Inputs::Pca, e),
+    }
+    Ok(())
+}
+
+/// A JSON value's scalars as text, in order (a vector of length one reads as its scalar; numbers
+/// with 17 significant digits, so equal text is equal bits).
+fn atoms_text(v: &Json) -> String {
+    fn walk(v: &Json, out: &mut Vec<String>) {
+        match v {
+            Json::Vector(items) | Json::List(items) => items.iter().for_each(|x| walk(x, out)),
+            Json::Int(_) | Json::Num(_) => out.push(scio::fmt17(v.as_f64().unwrap())),
+            other => out.push(other.to_text(0)),
+        }
+    }
+    let mut out = Vec::new();
+    walk(v, &mut out);
+    out.join(", ")
+}
+
+/// A JSON value's numbers, in order (`None` if any atom is not a number).
+fn atoms_num(v: &Json) -> Option<Vec<f64>> {
+    match v {
+        Json::Int(_) | Json::Num(_) => Some(vec![v.as_f64()?]),
+        Json::Vector(items) | Json::List(items) => {
+            let mut out = Vec::new();
+            for x in items {
+                out.extend(atoms_num(x)?);
+            }
+            Some(out)
+        }
+        _ => None,
+    }
+}
+
+/// The rows of the candidate's TSV of numbers (`pca/embeddings.tsv`: barcode then values), as a
+/// column-major matrix.
+fn tsv_matrix(t: &Table, skip: usize) -> Result<(Vec<f64>, usize, usize), String> {
+    let nrow = t.rows.len();
+    let ncol = t.header.len().saturating_sub(skip);
+    let mut m = vec![0.0; nrow * ncol];
+    for (i, r) in t.rows.iter().enumerate() {
+        for c in 0..ncol {
+            m[c * nrow + i] = r.get(c + skip).and_then(|v| scio::parse17(v)).ok_or_else(|| format!("row {}: bad value", i + 1))?;
+        }
+    }
+    Ok((m, nrow, ncol))
+}
+
+/// One column of numbers from two metadata tables, by name.
+fn meta_numbers(t: &Table, col: usize) -> Vec<f64> {
+    t.rows.iter().map(|r| r.get(col).and_then(|v| scio::parse17(v)).unwrap_or(f64::NAN)).collect()
+}
+
+/// K8: the candidate's final files against R's.
+#[allow(clippy::too_many_arguments)]
+fn compare_files(g: &mut Grader, reference: &Path, candidate: &Path, r_summary: &Option<Json>, c_result: &Json, c_run: &Json, r_meta: &Table, c_meta: &Table) -> Result<(), String> {
+    let n = r_meta.rows.len();
+    let same_n = c_meta.rows.len() == n;
+    let stats_computed = str_list(c_run.get("stats").and_then(|s| s.get("computed")));
+    // metadata.tsv: the counts' columns and the silhouette widths (the labels are K7's)
+    for (col, inputs) in [("nCount_RNA", Inputs::Free), ("nFeature_RNA", Inputs::Free)] {
+        match (r_meta.col(col), c_meta.col(col)) {
+            (Some(a), Some(b)) if same_n => {
+                let nd = (0..n).filter(|&i| r_meta.rows[i].get(a) != c_meta.rows[i].get(b)).count();
+                g.exact("files", &format!("metadata.tsv: {col}"), inputs, n, nd, "as text".into());
+            }
+            (Some(_), None) => g.not_applicable("files", &format!("metadata.tsv: {col}"), inputs, "not in the candidate's metadata.tsv (a staged start without the counts' columns)".into()),
+            _ => {}
+        }
+    }
+    match (r_meta.col("silhouette_width"), c_meta.col("silhouette_width")) {
+        (Some(a), Some(b)) if same_n => {
+            let s = grade::stats(&meta_numbers(r_meta, a), &meta_numbers(c_meta, b), n, 1, false);
+            g.numeric("K8", "metadata.tsv: silhouette_width", Inputs::Pca, "K8_silhouette_width", &s, "");
+        }
+        (Some(_), _) if !stats_computed.iter().any(|s| s == "silhouette") => {
+            g.not_applicable("K8", "metadata.tsv: silhouette_width", Inputs::Pca, "the candidate did not compute silhouette widths".into())
+        }
+        (Some(_), _) => g.missing("K8", "metadata.tsv: silhouette_width", Inputs::Pca, "not in the candidate's metadata.tsv".into()),
+        _ => {}
+    }
+    // silhouette_other against R's K8_silhouette_other and the levels approxSilhouette saw
+    if let (Ok(o), Some(cc)) = (read_npy(&reference.join("stages/K8_silhouette_other.npy")), c_meta.col("silhouette_other")) {
+        let levels: Vec<String> = read_json(&reference.join("stages/stages.json"))
+            .ok()
+            .and_then(|j| j.get("scalars").and_then(|s| s.get("chain")).map(|c| str_list(c.get("silhouette_levels"))))
+            .unwrap_or_default();
+        if same_n && o.nrow() == n && !levels.is_empty() {
+            let nd = (0..n).filter(|&i| c_meta.rows[i].get(cc).map(String::as_str) != levels.get(o.get_i32(i, 0) as usize).map(String::as_str)).count();
+            g.exact("K8", "metadata.tsv: silhouette_other = K8_silhouette_other", Inputs::Pca, n, nd, format!("{} levels", levels.len()));
+        }
+    }
+    let later: Vec<&str> = ["neighborhood_purity", "nCount_SCT", "nFeature_SCT"].into_iter().filter(|c| r_meta.col(c).is_some()).collect();
+    if !later.is_empty() {
+        g.not_applicable("later", "metadata.tsv: columns of later milestones", Inputs::Free, format!("not compared: {} (neighborhood_purity: M12; nCount_SCT, nFeature_SCT: M13)", later.join(", ")));
+    }
+
+    // pca/: R's embeddings.npy, loadings.npy, loadings_features.tsv, stdev.npy, pca.json against
+    // the candidate's scrust pca layout
+    let rp = reference.join("pca");
+    let cp = candidate.join("pca");
+    if exists_any(&rp.join("embeddings.npy")) && cp.join("embeddings.tsv").exists() {
+        let a = read_npy(&rp.join("embeddings.npy"))?;
+        let (b, bn, bc) = tsv_matrix(&read_table(&cp.join("embeddings.tsv"))?, 1).map_err(|e| format!("{}: {e}", cp.join("embeddings.tsv").display()))?;
+        let (an, ac) = (a.nrow(), a.ncol());
+        if (an, ac) != (bn, bc) {
+            g.exact("K2", "pca/ embeddings", Inputs::Pca, an * ac, an * ac, format!("{an} x {ac} in R's, {bn} x {bc} in Rust's"));
+        } else {
+            let av = a.block_f64(0, an);
+            let k = ac.min(30);
+            let s1 = grade::stats(&av[..k * an], &b[..k * an], an, k, true);
+            g.numeric("K2", "pca/ embeddings, dims 1:30", Inputs::Pca, "S3_embeddings_dims_1_30", &s1, "");
+            if ac > 30 {
+                let s2 = grade::stats(&av[k * an..], &b[k * an..], an, ac - k, true);
+                g.numeric("K2", &format!("pca/ embeddings, dims 31:{ac}"), Inputs::Pca, "S3_embeddings_dims_31_50", &s2, "");
+            }
+        }
+        if let (Ok(la), Ok(lt)) = (read_npy(&rp.join("loadings.npy")), read_table(&cp.join("loadings.tsv"))) {
+            let rf: Vec<String> = read_text(&rp.join("loadings_features.tsv")).unwrap_or_default().lines().map(String::from).collect();
+            let nc = lt.col("name").unwrap_or(1);
+            let cf: Vec<String> = lt.rows.iter().map(|r| r.get(nc).cloned().unwrap_or_default()).collect();
+            let nd = if rf.len() != cf.len() { rf.len().max(cf.len()) } else { rf.iter().zip(&cf).filter(|(x, y)| x != y).count() };
+            g.exact("K2", "pca/ loadings' features, in order", Inputs::Pca, rf.len(), nd, String::new());
+            if let Ok((lb, ln, lc)) = tsv_matrix(&lt, 2) {
+                if (la.nrow(), la.ncol()) == (ln, lc) {
+                    let s = grade::stats(&la.block_f64(0, ln), &lb, ln, lc, true);
+                    g.numeric("K2", "pca/ loadings", Inputs::Pca, "S3_loadings", &s, "");
+                } else {
+                    g.exact("K2", "pca/ loadings", Inputs::Pca, la.nrow() * la.ncol(), la.nrow() * la.ncol(), format!("{} x {} in R's, {ln} x {lc} in Rust's", la.nrow(), la.ncol()));
+                }
+            }
+        }
+        if let (Ok(sa), Ok(st)) = (read_npy(&rp.join("stdev.npy")), read_table(&cp.join("stdev.tsv"))) {
+            let a = sa.f64s();
+            let b: Vec<f64> = st.rows.iter().map(|r| r.get(1).and_then(|v| scio::parse17(v)).unwrap_or(f64::NAN)).collect();
+            let s = grade::stats(&a, &b, a.len(), 1, false);
+            g.numeric("K2", "pca/ stdev", Inputs::Pca, "S3_sdev", &s, "");
+        }
+        if let (Ok(pj), Some(tv)) = (read_json(&rp.join("pca.json")), c_result.get("pca").and_then(|p| p.get("total_variance")).and_then(Json::as_f64)) {
+            if let Some(rv) = pj.get("total_variance").and_then(Json::as_f64) {
+                let s = grade::stats(&[rv], &[tv], 1, 1, false);
+                g.numeric("K2", "total variance", Inputs::Pca, "total_variance", &s, "");
+            }
+        }
+    } else if exists_any(&rp.join("embeddings.npy")) {
+        g.not_applicable("K2", "pca/", Inputs::Pca, "the candidate has no pca/embeddings.tsv (a run started from the SNN graph without --pca)".into());
+    }
+
+    // K6: the graphs
+    for (name, file) in [("SCT_nn", "nn.mtx.gz"), ("SCT_snn", "snn.mtx.gz")] {
+        let rpth = reference.join("graphs").join(file);
+        let cpth = candidate.join("neighbors").join(file);
+        if !exists_any(&rpth) {
+            continue;
+        }
+        let (a, b) = match (scio::mtx::read_entries(&rpth), scio::mtx::read_entries(&cpth)) {
+            (Ok(a), Ok(b)) => (a, b),
+            (Err(e), _) | (_, Err(e)) => {
+                g.missing("K6", name, Inputs::Pca, e.to_string());
+                continue;
+            }
+        };
+        let m = a.vals.len().min(b.vals.len());
+        let mut differ = 0usize;
+        let mut first = None;
+        for t in 0..m {
+            if a.rows[t] != b.rows[t] || a.cols[t] != b.cols[t] || a.vals[t].to_bits() != b.vals[t].to_bits() {
+                differ += 1;
+                if first.is_none() {
+                    first = Some(format!("first at entry {}: R ({}, {}) {}, Rust ({}, {}) {}", t + 1, a.rows[t] + 1, a.cols[t] + 1, scio::fmt17(a.vals[t]), b.rows[t] + 1, b.cols[t] + 1, scio::fmt17(b.vals[t])));
+                }
+            }
+        }
+        differ += a.vals.len().max(b.vals.len()) - m;
+        if (a.nrow, a.ncol) != (b.nrow, b.ncol) {
+            differ = differ.max(1);
+        }
+        let mut detail = format!("{} x {}, {} entries in R's, {} x {}, {} in Rust's", a.nrow, a.ncol, a.vals.len(), b.nrow, b.ncol, b.vals.len());
+        if let Some(x) = first {
+            detail.push_str("; ");
+            detail.push_str(&x);
+        }
+        g.exact("K6", name, Inputs::Pca, a.vals.len().max(b.vals.len()), differ, detail);
+    }
+
+    // the result section's numbers
+    if let Some(rr) = r_summary.as_ref().and_then(|s| s.get("result")) {
+        let sizes = {
+            let col = c_meta.col("seurat_clusters");
+            let levels: Vec<String> = read_text(&candidate.join("seurat_clusters_levels.txt")).unwrap_or_default().lines().map(String::from).collect();
+            col.map(|c| levels.iter().map(|l| c_meta.rows.iter().filter(|r| r.get(c) == Some(l)).count() as f64).collect::<Vec<f64>>())
+        };
+        let c_sct = c_result.get("sctransform");
+        let int_text = |v: Option<f64>| v.map(|x| (x as i64).to_string()).unwrap_or_else(|| "-".into());
+        let mut pairs: Vec<(&str, Inputs, String, String)> = vec![
+            ("n_cells", Inputs::Free, int_text(jnum(rr, "n_cells")), int_text(jnum(c_result, "n_cells"))),
+            ("n_clusters", Inputs::Pca, int_text(jnum(rr, "n_clusters")), int_text(jnum(c_result, "n_clusters"))),
+            (
+                "cluster_sizes",
+                Inputs::Pca,
+                num_list(rr.get("cluster_sizes")).iter().map(|v| (*v as i64).to_string()).collect::<Vec<_>>().join(","),
+                sizes.unwrap_or_default().iter().map(|v| (*v as i64).to_string()).collect::<Vec<_>>().join(","),
+            ),
+        ];
+        if let Some(cs) = c_sct.filter(|s| !matches!(s, Json::Null)) {
+            pairs.push(("n_variable_features", Inputs::Sct, int_text(jnum(rr, "n_variable_features")), int_text(jnum(cs, "n_variable_features"))));
+            pairs.push((
+                "scale_data_dim",
+                Inputs::Sct,
+                num_list(rr.get("scale_data_dim")).iter().map(|v| (*v as i64).to_string()).collect::<Vec<_>>().join(","),
+                format!("{},{}", int_text(jnum(cs, "n_variable_features")), int_text(jnum(cs, "n_cells"))),
+            ));
+        }
+        if let Some(o) = rr.get("optimizer") {
+            let cr0 = match c_result.get("resolutions") {
+                Some(Json::List(v) | Json::Vector(v)) => v.first().cloned(),
+                _ => None,
+            };
+            if let Some(cr0) = cr0 {
+                let printed = str_list(cr0.get("printed"));
+                let pnum = |p: &str| printed.iter().find_map(|l| l.strip_prefix(p)).unwrap_or("-").to_string();
+                pairs.push(("optimizer: nodes", Inputs::Pca, int_text(jnum(o, "nodes")), pnum("Number of nodes: ")));
+                pairs.push(("optimizer: edges", Inputs::Pca, int_text(jnum(o, "edges")), pnum("Number of edges: ")));
+                pairs.push(("optimizer: max_modularity", Inputs::Pca, o.get("max_modularity").and_then(Json::as_str).unwrap_or("-").to_string(), cr0.get("max_modularity_printed").and_then(Json::as_str).unwrap_or("-").to_string()));
+                pairs.push(("optimizer: communities", Inputs::Pca, int_text(jnum(o, "communities")), int_text(jnum(&cr0, "communities"))));
+                pairs.push(("optimizer: singletons", Inputs::Pca, int_text(jnum(o, "singletons")), int_text(jnum(&cr0, "n_singletons"))));
+                pairs.push(("optimizer: final_clusters", Inputs::Pca, int_text(jnum(o, "final_clusters")), int_text(jnum(&cr0, "final_clusters"))));
+            }
+        }
+        for (key, inputs, a, b) in pairs {
+            g.exact("files", &format!("result: {key}"), inputs, 1, (a != b) as usize, if a == b { a } else { format!("R {a}, Rust {b}") });
+        }
+        // R's digests: scale.data, and .Random.seed after SCTransform and RunPCA
+        if let Some(rd) = rr.get("scale_data_sha256").and_then(Json::as_str) {
+            match c_result.get("scale_data_sha256").and_then(Json::as_str) {
+                Some(cd) if cd == rd => g.exact("K1", "result: scale_data_sha256", Inputs::Sct, 1, 0, rd.to_string()),
+                Some(cd) if g.class(Inputs::Sct) == Class::BlasDependent && !g.mode.is_exact() => {
+                    let crit = g.floor.describe("S2d_scale_data");
+                    g.push("K1", "result: scale_data_sha256", Class::BlasDependent, crit, Status::NotApplicable, 1, 1, format!("the digests differ (R {rd}, Rust {cd}); a digest cannot be graded against the floor's bounds"))
+                }
+                Some(cd) => g.exact("K1", "result: scale_data_sha256", Inputs::Sct, 1, 1, format!("R {rd}, Rust {cd}")),
+                None => g.not_applicable("K1", "result: scale_data_sha256", Inputs::Sct, "the candidate did not run SCTransform".into()),
+            }
+        }
+        let rng_after = rr.get("rng_after");
+        for (key, label, inputs) in [("SCTransform", "K1", Inputs::Free), ("RunPCA", "K2", Inputs::Pca)] {
+            let a = rng_after.and_then(|x| x.get(key)).and_then(Json::as_str);
+            let b = c_result.get("rng_after_sha256").and_then(|x| x.get(key)).and_then(Json::as_str);
+            match (a, b) {
+                (Some(a), Some(b)) => g.exact(if label == "K1" { "K1" } else { "K2" }, &format!("result: .Random.seed after {key} (digest)"), inputs, 1, (a != b) as usize, if a == b { a.to_string() } else { format!("R {a}, Rust {b}") }),
+                (Some(_), None) => g.not_applicable(if label == "K1" { "K1" } else { "K2" }, &format!("result: .Random.seed after {key} (digest)"), inputs, format!("the candidate did not run {key}")),
+                _ => {}
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The labels, levels and silhouette widths against the saved object's export; graded under the
+/// saved object's kernel.
+fn compare_saved(g: &mut Grader, saved: &Path, saved_kernel: &str, c_summary: &Json, c_meta: &Table, candidate: &Path) -> Result<Mode, String> {
+    let s_meta = read_table(&saved.join("metadata.tsv"))?;
+    let n = s_meta.rows.len();
+    let mode = grade::mode(Some(saved_kernel), grade::recorded_kernel(Some(c_summary)).as_deref());
+    let same_n = c_meta.rows.len() == n;
+    let sb = s_meta.col("barcode").unwrap_or(0);
+    let cb = c_meta.col("barcode").unwrap_or(0);
+    let nd = if same_n { (0..n).filter(|&i| s_meta.rows[i].get(sb) != c_meta.rows[i].get(cb)).count() } else { n };
+    g.exact("saved", "barcodes", Inputs::Free, n, nd, String::new());
+    for col in ["SCT_snn_res.0.8", "seurat_clusters"] {
+        match (s_meta.col(col), c_meta.col(col)) {
+            (Some(a), Some(b)) if same_n => {
+                let nd = (0..n).filter(|&i| s_meta.rows[i].get(a) != c_meta.rows[i].get(b)).count();
+                g.exact("saved", &format!("{col}: labels"), Inputs::Pca, n, nd, "metadata.tsv".into());
+            }
+            _ => g.missing("saved", &format!("{col}: labels"), Inputs::Pca, format!("{col} missing")),
+        }
+        let f = format!("{col}_levels.txt");
+        match (read_any(&saved.join(&f)), read_any(&candidate.join(&f))) {
+            (Ok(a), Ok(b)) => g.exact("saved", &format!("{col}: levels"), Inputs::Pca, 1, (a != b) as usize, format!("{} levels", String::from_utf8_lossy(&a).lines().count())),
+            (Err(e), _) | (_, Err(e)) => g.missing("saved", &format!("{col}: levels"), Inputs::Pca, e),
+        }
+    }
+    match (s_meta.col("silhouette_width"), c_meta.col("silhouette_width")) {
+        (Some(a), Some(b)) if same_n => {
+            let s = grade::stats(&meta_numbers(&s_meta, a), &meta_numbers(c_meta, b), n, 1, false);
+            // graded under the saved object's kernel
+            let keep = std::mem::replace(&mut g.mode, mode.clone());
+            g.numeric("saved", "silhouette_width", Inputs::Pca, "K8_silhouette_width", &s, &format!("saved under {saved_kernel}"));
+            g.mode = keep;
+        }
+        (Some(_), _) => g.not_applicable("saved", "silhouette_width", Inputs::Pca, "the candidate did not compute silhouette widths".into()),
+        _ => {}
+    }
+    let later: Vec<&str> = ["neighborhood_purity", "nCount_SCT", "nFeature_SCT"].into_iter().filter(|c| s_meta.col(c).is_some()).collect();
+    if !later.is_empty() {
+        g.not_applicable("later", "saved: columns of later milestones", Inputs::Free, format!("not compared: {} (M12, M13)", later.join(", ")));
+    }
+    Ok(mode)
+}
+
+/// approxSilhouette on R's own embeddings and labels (teacher forcing): exact on any machine.
+fn teacher_forced_silhouette(g: &mut Grader, reference: &Path, r_meta: &Table, r_scalars: Option<&Json>) -> Result<(), String> {
+    let emb_path = reference.join("pca/embeddings.npy");
+    let w_path = reference.join("stages/K8_silhouette_width.npy");
+    if !exists_any(&emb_path) || !exists_any(&w_path) {
+        return Ok(());
+    }
+    let emb = read_npy(&emb_path)?;
+    let (n, ncol) = (emb.nrow(), emb.ncol());
+    let e = emb.block_f64(0, n);
+    let col = r_meta.col("seurat_clusters").ok_or("R's metadata.tsv: no seurat_clusters")?;
+    let levels: Vec<String> = read_text(&reference.join("seurat_clusters_levels.txt"))?.lines().map(String::from).collect();
+    let mut codes = Vec::with_capacity(n);
+    for r in &r_meta.rows {
+        let l = r.get(col).ok_or("seurat_clusters: short row")?;
+        codes.push(levels.iter().position(|v| v == l).ok_or_else(|| format!("label {l} is not a level"))? as u32);
+    }
+    let f = Factor { name: "seurat_clusters".into(), levels, codes };
+    let nd = r_scalars.and_then(|s| jnum(s, "silhouette_dims")).map(|v| v as usize).unwrap_or(30);
+    let dims: Vec<usize> = (1..=nd).collect();
+    let s = approx_silhouette(&e, n, ncol, &dims, &f)?;
+    let free = Inputs::Free;
+    let want = read_npy(&w_path)?.f64s();
+    let st = grade::stats(&want, &s.width, n, 1, false);
+    g.numeric("teacher", "approxSilhouette width (R's embeddings and labels)", free, "K8_silhouette_width", &st, "");
+    if let Ok(o) = read_npy(&reference.join("stages/K8_silhouette_other.npy")) {
+        let want: Vec<i64> = (0..o.nrow()).map(|i| o.get_i32(i, 0) as i64).collect();
+        let got: Vec<i64> = s.other.iter().map(|x| x.map_or(-1, |v| v as i64)).collect();
+        let nd = if want.len() != got.len() { want.len().max(got.len()) } else { want.iter().zip(&got).filter(|(a, b)| a != b).count() };
+        g.exact("teacher", "approxSilhouette other (R's embeddings and labels)", free, want.len(), nd, String::new());
+    }
+    if let Ok(c) = read_npy(&reference.join("stages/K8_centroids.npy")) {
+        let (k, d) = (c.nrow(), c.ncol());
+        let mut got = vec![0.0; k * d];
+        if s.centroids.len() == k * d {
+            for a in 0..k {
+                for b in 0..d {
+                    got[a + b * k] = s.centroids[a * d + b];
+                }
+            }
+        }
+        let st = grade::stats(&c.block_f64(0, k), &got, k, d, false);
+        g.numeric("teacher", "approxSilhouette centroids (R's embeddings and labels)", free, "K8_centroids", &st, "");
+    }
+    if let Ok(v) = read_npy(&reference.join("stages/K8_cluster_var.npy")) {
+        let st = grade::stats(&v.f64s(), &s.cluster_var, v.nrow(), 1, false);
+        g.numeric("teacher", "approxSilhouette cluster_var (R's embeddings and labels)", free, "K8_cluster_var", &st, "");
+    }
+    if let Some(c) = r_meta.col("silhouette_width") {
+        let st = grade::stats(&meta_numbers(r_meta, c), &s.width, n, 1, false);
+        g.numeric("teacher", "approxSilhouette width = R's metadata.tsv silhouette_width", free, "K8_silhouette_width", &st, "");
+    }
+    Ok(())
 }

@@ -22,6 +22,7 @@
 pub mod annoy;
 pub mod graph;
 pub mod kiss;
+pub mod output;
 pub mod params;
 pub mod stl;
 pub mod validate;

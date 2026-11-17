@@ -3,8 +3,7 @@
 
 use crate::cli::{self, Args, Phases};
 use rcompat::RRng;
-use scio::{fmt17, tenx, Json};
-use std::fmt::Write as _;
+use scio::{tenx, Json};
 use std::path::Path;
 
 pub const USAGE: &str = "\
@@ -91,98 +90,24 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     phases.mark("sctransform");
 
     std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
-    let s = &sct.setup;
-    let res = &sct.residuals;
-    let mut t = String::from("barcode\tumi\tlog_umi\n");
-    for (c, b) in barcodes.iter().enumerate() {
-        let _ = writeln!(t, "{b}\t{}\t{}", fmt17(s.cell_attr.umi[c]), fmt17(s.cell_attr.log_umi[c]));
+    let genes: Vec<sctransform::output::Gene> = features.iter().map(|f| sctransform::output::Gene { id: f.id.clone(), name: f.name.clone() }).collect();
+    sctransform::output::write_outputs(&out, &barcodes, &genes, &sct).map_err(|e| e.to_string())?;
+    // the counts' per-cell metadata (CreateSeuratObject's nCount_RNA and nFeature_RNA), which
+    // `scrust pca` and `scrust neighbors` carry forward for `scrust cluster` (M11)
+    if context.is_none() {
+        cluster::metadata::RnaMetadata::of(&counts).write(&out.join(cluster::metadata::FILE), &barcodes).map_err(|e| e.to_string())?;
     }
-    write(&out.join("cell_attr.tsv"), &t)?;
-    let gene = |k: usize| &features[s.genes[k]];
-    let (detection, gmean) = (s.detection_rate(), s.gmean());
-    let mut t = String::from("id\tname\tdetection_rate\tgmean\tamean\tvariance\tresidual_mean\tresidual_variance\n");
-    for k in 0..s.genes.len() {
-        let f = gene(k);
-        let _ = writeln!(
-            t,
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-            f.id,
-            f.name,
-            fmt17(detection[k]),
-            fmt17(gmean[k]),
-            fmt17(s.amean[k]),
-            fmt17(s.var[k]),
-            fmt17(res.residual_mean[k]),
-            fmt17(res.residual_variance[k])
-        );
-    }
-    write(&out.join("gene_attr.tsv"), &t)?;
-    let pars = |rows: &mut dyn Iterator<Item = (usize, [f64; 3])>| {
-        let mut t = String::from("id\tname\ttheta\t(Intercept)\tlog_umi\n");
-        for (k, p) in rows {
-            let f = gene(k);
-            let _ = writeln!(t, "{}\t{}\t{}\t{}\t{}", f.id, f.name, fmt17(p[0]), fmt17(p[1]), fmt17(p[2]));
-        }
-        t
-    };
-    write(&out.join("model_pars.tsv"), &pars(&mut s.genes_step1.iter().copied().zip(sct.fits.model_pars.iter().copied())))?;
-    write(&out.join("model_pars_fit.tsv"), &pars(&mut sct.reg.model_pars_fit.iter().copied().enumerate()))?;
-    let mut t = String::from("id\tname\n");
-    for &k in &res.top_features {
-        let _ = writeln!(t, "{}\t{}", gene(k).id, gene(k).name);
-    }
-    write(&out.join("variable_features.tsv"), &t)?;
-    // scale.data, column-major as R stores it
-    let (nr, nc) = (res.top_features.len(), res.ncells);
-    let mut cm = vec![0.0f64; nr * nc];
-    for r in 0..nr {
-        for (c, &v) in res.scale_row(r).iter().enumerate() {
-            cm[r + c * nr] = v;
-        }
-    }
-    scio::npy::write_f64(&out.join("scale_data.npy"), &cm, &[nr, nc]).map_err(|e| e.to_string())?;
-    drop(cm);
     phases.mark("write");
 
     let fingerprint = Json::parse(&crate::fingerprint::json()).unwrap_or(Json::Null);
-    let n_out = sct.reg.outliers.iter().filter(|&&o| o).count();
+    let s = &sct.setup;
+    let nr = sct.residuals.top_features.len();
     let summary = Json::obj(vec![
         ("tool", Json::Str("scrust sctransform".into())),
         ("reference", Json::Str(sctransform::REFERENCE.into())),
         ("scrust_version", Json::Str(env!("CARGO_PKG_VERSION").into())),
-        (
-            "parameters",
-            Json::obj(vec![
-                ("seed_use", Json::Int(params.seed_use.unwrap_or(0) as i64)),
-                ("ncells", Json::Int(params.ncells as i64)),
-                ("variable_features_n", Json::Int(params.variable_features_n.unwrap_or(0) as i64)),
-                ("n_genes", Json::Int(params.n_genes.map_or(0, |v| v as i64))),
-                ("bin_size", Json::Int(params.bin_size as i64)),
-                ("min_cells", Json::Int(params.min_cells as i64)),
-                ("bw_adjust", Json::Num(params.bw_adjust)),
-            ]),
-        ),
-        (
-            "result",
-            Json::obj(vec![
-                ("n_cells", Json::Int(counts.ncol as i64)),
-                ("n_features", Json::Int(counts.nrow as i64)),
-                ("n_genes_kept", Json::Int(s.genes.len() as i64)),
-                ("n_cells_step1", Json::Int(s.cells_step1.len() as i64)),
-                ("n_genes_step1", Json::Int(s.genes_step1.len() as i64)),
-                ("gene_sampling", Json::Bool(s.sampling.is_some())),
-                ("n_theta_inf", Json::Int(sct.fits.model_pars_raw.iter().filter(|p| !p[0].is_finite()).count() as i64)),
-                ("mean_cell_sum", Json::Num(sct.mean_cell_sum)),
-                ("reg_bw", Json::Num(sct.reg.bw)),
-                ("n_outliers", Json::Int(n_out as i64)),
-                ("n_poisson_genes", Json::Int(sct.reg.poisson_genes.len() as i64)),
-                ("n_smoothing_genes", Json::Int(sct.reg.smoothing_genes.len() as i64)),
-                ("min_variance", Json::Num(res.min_var)),
-                ("res_clip_range", Json::nums(&[res.res_clip.0, res.res_clip.1])),
-                ("clip_range", Json::nums(&[res.clip.0, res.clip.1])),
-                ("n_variable_features", Json::Int(nr as i64)),
-            ]),
-        ),
+        ("parameters", sctransform::output::params_json(&params)),
+        ("result", sctransform::output::result_json(&sct, counts.nrow)),
         (
             "run",
             Json::obj(vec![

@@ -122,6 +122,11 @@ impl Phases {
         self.start.elapsed().as_secs_f64()
     }
 
+    /// When the timing started.
+    pub fn started(&self) -> Instant {
+        self.start
+    }
+
     pub fn to_json(&self) -> scio::Json {
         scio::Json::Object(
             self.marks
