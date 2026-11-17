@@ -7,6 +7,10 @@
 #   bash validation/slurm/doubletfinder_panel.sh <snakemake log> [<snakemake log> ...] > validation/doubletfinder_panel.tsv
 # For M7, the two runs of the workflow's rerun #2:
 #   .snakemake/log/2026-11-08T214133.605174.snakemake.log .snakemake/log/2026-11-09T220250.045638.snakemake.log
+# Since 17 November 2026, zmaysGSM5552419's five rows come from that sample's rerun: this script on
+# .snakemake/log/2026-11-17T092949.576075.snakemake.log alone, its rows put in place of the
+# sample's rows (docs/validation/doubletfinder_m7.md, "Update, 17 November 2026"). With all three
+# logs it stops, since those objects have a job in two of them.
 #
 # - The jobs: each log's "Job <n> has been submitted with SLURM jobid <id> (log: .../rule_doubletfinder
 #   [_cellbender]/<wildcards>/<id>.log)". An object submitted more than once (a retry, or a later

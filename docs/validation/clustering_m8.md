@@ -99,6 +99,12 @@ entries: stored entries of the RNA counts; explicit zeros: stored entries equal 
 - **CPU types.** All 840 jobs ran on Sapphire Rapids nodes (`sapphirerapids`).
 - **Singletons.** 36 logs report singletons, up to 40 (`cellbender_fromraw_ghirsutum2`), as plan C1 says. Every log holds exactly one optimizer block.
 
+**Update, 17 November 2026.** zmaysGSM5552419's 28 rows were regenerated after that sample's rerun: `clustering_panel.R` on the two logs above plus the rerun's, `2026-11-17T092949.576075`.
+- The 28 rows name the rerun's jobs, all on Sapphire Rapids nodes, and list the jobs of 8 November as superseded. So the table now holds 871 jobs for the 840 objects, and 31 objects have superseded jobs.
+- The logged optimizer numbers are unchanged. The other 812 rows are byte-identical.
+- The rerun's saved objects were last written 14 s to 11.0 minutes after their jobs' end (median 4.0 minutes), within the script's 30-minute bound.
+- Details: [doubletfinder_m7.md, "Update, 17 November 2026"](doubletfinder_m7.md#update-17-november-2026-zmaysgsm5552419s-rerun).
+
 ## Where the test references were made
 
 The tier-T references were made by the test-workflow run that started at 14:36 on 2026-11-06 (M2). Its 27 clustering jobs (the 2 base objects, the 5 DoubletFinder inputs, the 5 DoubletFinder and 5 scDblFinder outputs, the 10 post-hoc objects) ran on `sapphire` nodes (holy8a32608, 32607, 32606, 32601, 32505, 32503, 30606, 30604; all `sapphirerapids`), 45 s to 1:53 min and at most 1.1 GiB each (sacct). Their job logs were overwritten by the second test run at 15:01, so for tier T the optimizer's numbers come from the reference runs, which reproduce the saved objects. The test run's conda env differs from the production env only in xgboost (M2), which the chain does not use.
