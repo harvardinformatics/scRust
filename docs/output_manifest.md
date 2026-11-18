@@ -168,8 +168,12 @@ The normalised matrices also say what they are: right after the Matrix Market ba
 
 ## For loaders (M14)
 
+The loaders, `loaders/R/scrustio` (Seurat, SingleCellExperiment) and `loaders/python/scrustio` (AnnData), are written against this document (milestone M14; docs/PLAN.md C3g):
+
 - Find files by `role`, never by name; refuse a manifest whose `schema` or `version` is not this one.
-- Put a matrix only into a slot meant for its `scale`: `raw_counts` into counts slots (Seurat's RNA `counts`, SingleCellExperiment's `counts`, AnnData's `layers["counts"]`); `corrected_counts` and `log1p_corrected_counts` only into the SCT assay's `counts` and `data` (or `altExp(sce, "SCT")`, AnnData's `layers["sct_corrected_counts"]` and `X`); `residuals` only into `scale.data` (or its equivalents).
+- Put a matrix only into a slot meant for its `scale`: `raw_counts` into counts slots (Seurat's RNA `counts`, SingleCellExperiment's `counts`, AnnData's `layers["counts"]`); `corrected_counts` and `log1p_corrected_counts` only into the SCT assay's `counts` and `data` (or `altExp(sce, "SCT")`, AnnData's `layers["sct_corrected_counts"]` and `X`); `residuals` only into `scale.data` (or its equivalents). Each slot takes exactly one role, one scale and one format; the loaders refuse any other, a Matrix Market file whose comment lines say "NOT raw counts" for a raw-count slot, and a file not so marked for a slot of SCTransform's layers.
 - Take row and column names from `rows` and `columns`, and check their counts against `shape`.
 - `sct_scale_data`'s rows are in `VariableFeatures()` order; Seurat keeps `scale.data`'s rows in the SCT assay's gene order (C3g), which `sct_features` gives.
 - Check `sha256` before reading, when the user asks for it (a file can be large).
+- A file of role `cluster_levels` holds the levels of the column it is named after (`<column>_levels.txt`). Version 1 has no field that links a levels file to its column, so this is the one place the loaders read a file's name: to know which column a file found by its role belongs to, not to find it. Fields may be added within the version: a field naming the column (`levels_of`, say) would let a loader do without the name.
+- Seurat's SCT `data` layer holds the C library's `log1p` of the corrected counts (R's). The loaders read it from the `sct_data` file and check it against `log1p` of `sct_counts`; Python must use `math.log1p` for that check, since numpy's `np.log1p` can differ in the last bit (M14).

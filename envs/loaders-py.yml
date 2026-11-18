@@ -1,7 +1,9 @@
 # Python env for the export's guard test (docs/PLAN.md C3f, milestone M13): scanpy's
 # read_10x_mtx must fail on an export's sct/ and top directory, with and without prefix=, and
 # read its counts/ (validation/python/guard_read10x.py). Milestone M14 extends it for the Python
-# loader (C3g: numpy, scipy, pandas, anndata), as plan A1 and A2 name it.
+# loader (C3g; loaders/python/scrustio: numpy, scipy, pandas, anndata, all here already) and its
+# tests (pytest). The loader is not installed into the env: its tests and validation scripts put
+# loaders/python/scrustio on the path themselves (pyproject.toml's pytest pythonpath; sys.path).
 #
 # Create it as a project-local env inside the repo (gitignored), never under the home directory,
 # with conda's package cache off the home directory (conda config --show pkgs_dirs) and without
@@ -22,3 +24,4 @@ dependencies:
   - numpy=2.5.5
   - scipy=1.18.1
   - pandas=3.1.1
+  - pytest=9.2.0

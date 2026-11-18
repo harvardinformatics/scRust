@@ -44,7 +44,8 @@ BIOC=https://bioconductor.org/packages/3.22/bioc
 # Step 2, the clustering crate (milestone M8): RcppAnnoy 0.0.23 (Annoy 1.17.3) and RcppEigen
 # 0.3.4.0.2 (Eigen 3.4.0), the versions Seurat 5.5.1's conda build was compiled against; bluster
 # 1.20.0 (approxSilhouette, neighborPurity), BiocNeighbors 2.4.0 and assorthead 1.4.0 (knncolle's
-# headers, which BiocNeighbors and bluster were compiled against).
+# headers, which BiocNeighbors and bluster were compiled against). Milestone M14 (the loaders):
+# SingleCellExperiment 1.32.0, whose classes the R loader builds (altExps, reducedDims, colPairs).
 SOURCES='
 R              4.5.3       R-4.5.3.tar.gz                  https://cran.r-project.org/src/base/R-4/R-4.5.3.tar.gz
 sctransform    0.4.3       sctransform_0.4.3.tar.gz        cran
@@ -70,6 +71,7 @@ RcppEigen      0.3.4.0.2   RcppEigen_0.3.4.0.2.tar.gz      cran
 bluster        1.20.0      bluster_1.20.0.tar.gz           bioc
 BiocNeighbors  2.4.0       BiocNeighbors_2.4.0.tar.gz      bioc
 assorthead     1.4.0       assorthead_1.4.0.tar.gz         bioc
+SingleCellExperiment 1.32.0  SingleCellExperiment_1.32.0.tar.gz  bioc
 '
 
 die() { echo "fetch_sources.sh: $*" >&2; exit 1; }
