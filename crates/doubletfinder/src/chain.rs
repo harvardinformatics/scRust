@@ -127,7 +127,7 @@ impl<'a> RustSource<'a> {
         drop(input);
         let keep_y = self.recorder.as_ref().is_some_and(|r| r.level() == DumpLevel::Full);
         let sct = sctransform::finish(started, &self.sct, &mut self.rng, keep_y, self.threads).map_err(|e| DfError::Input(format!("{ctx}: SCTransform: {e}")))?;
-        let Sct { setup, rows, fits, mean_cell_sum, reg, residuals, rng_entry, rng_exit } = sct;
+        let Sct { setup, rows, fits, mean_cell_sum, reg, residuals, rng_entry, rng_exit, .. } = sct;
         drop(rows);
         (self.mark)(&format!("{ctx}: SCTransform"));
         if let Some(r) = self.recorder.as_mut() {

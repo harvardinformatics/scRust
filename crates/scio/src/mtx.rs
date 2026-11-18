@@ -24,14 +24,41 @@ pub fn write_gz(path: &Path, m: &CscMatrix, comments: &[String], threads: usize)
     if m.p.len() != m.ncol + 1 || m.i.len() != m.x.len() || m.p[m.ncol] != m.x.len() {
         return Err(invalid(format!("{}: inconsistent matrix", path.display())));
     }
+    write_gz_with(path, m.nrow, m.ncol, &m.p, &m.i, &|k| m.x[k], comments, threads)
+}
+
+/// [`write_gz`] for a matrix given by its compressed columns (`p`, `i`: rows within each column,
+/// as stored) and `value(k)`, the value of stored entry `k`: the layout of matrices whose values
+/// are computed as they are written (the corrected counts' integers and their `log1p`, M13).
+#[allow(clippy::too_many_arguments)]
+pub fn write_gz_with(path: &Path, nrow: usize, ncol: usize, p: &[usize], i: &[u32], value: &(dyn Fn(usize) -> f64 + Sync), comments: &[String], threads: usize) -> io::Result<&'static str> {
+    if p.len() != ncol + 1 || p[ncol] != i.len() {
+        return Err(invalid(format!("{}: inconsistent matrix", path.display())));
+    }
+    let nnz = i.len();
     let mut integer = true;
-    for &v in &m.x {
+    for k in 0..nnz {
+        let v = value(k);
         if !v.is_finite() {
             return Err(invalid(format!("{}: a non-finite value cannot be written", path.display())));
         }
         integer &= v == v.trunc();
     }
     let field = if integer { "integer" } else { "real" };
+    write_gz_formatted(path, nrow, ncol, p, i, field, &|k, out| push_value(out, value(k)), comments, threads)?;
+    Ok(field)
+}
+
+/// [`write_gz_with`] with each value's text given by `format(k, out)`, which appends stored entry
+/// `k`'s value to `out` exactly as `%.17g` writes it (a caller that knows its values' text, such
+/// as the `log1p` of small counts, formats each distinct value once), under the given `field`
+/// (`integer` or `real`).
+#[allow(clippy::too_many_arguments)]
+pub fn write_gz_formatted(path: &Path, nrow: usize, ncol: usize, p: &[usize], i: &[u32], field: &str, format_value: &(dyn Fn(usize, &mut Vec<u8>) + Sync), comments: &[String], threads: usize) -> io::Result<()> {
+    if p.len() != ncol + 1 || p[ncol] != i.len() {
+        return Err(invalid(format!("{}: inconsistent matrix", path.display())));
+    }
+    let nnz = i.len();
     let file = fs::File::create(path).map_err(|e| io::Error::new(e.kind(), format!("{}: {e}", path.display())))?;
     let mut gz = GzWriter::new(io::BufWriter::with_capacity(1 << 20, file))?;
     let mut header = format!("%%MatrixMarket matrix coordinate {field} general\n");
@@ -40,15 +67,15 @@ pub fn write_gz(path: &Path, m: &CscMatrix, comments: &[String], threads: usize)
         header.push_str(c);
         header.push('\n');
     }
-    header.push_str(&format!("{} {} {}\n", m.nrow, m.ncol, m.nnz()));
+    header.push_str(&format!("{nrow} {ncol} {nnz}\n"));
     gz.write_chunk(&Chunk::compress(header.as_bytes()))?;
     // pieces of whole columns, about PIECE entries each, formatted and compressed in parallel
     const PIECE: usize = 1 << 17;
     let mut bounds = vec![0usize];
     let mut j = 0;
-    while j < m.ncol {
-        let start = m.p[j];
-        while j < m.ncol && m.p[j + 1] - start <= PIECE {
+    while j < ncol {
+        let start = p[j];
+        while j < ncol && p[j + 1] - start <= PIECE {
             j += 1;
         }
         if j == bounds[bounds.len() - 1] {
@@ -58,14 +85,14 @@ pub fn write_gz(path: &Path, m: &CscMatrix, comments: &[String], threads: usize)
     }
     let pieces: Vec<(usize, usize)> = bounds.windows(2).map(|w| (w[0], w[1])).collect();
     let format = |&(a, b): &(usize, usize)| {
-        let mut out = Vec::with_capacity((m.p[b] - m.p[a]) * 24);
+        let mut out = Vec::with_capacity((p[b] - p[a]) * 24);
         for col in a..b {
-            for idx in m.p[col]..m.p[col + 1] {
-                push_uint(&mut out, m.i[idx] as u64 + 1);
+            for idx in p[col]..p[col + 1] {
+                push_uint(&mut out, i[idx] as u64 + 1);
                 out.push(b' ');
                 push_uint(&mut out, col as u64 + 1);
                 out.push(b' ');
-                push_value(&mut out, m.x[idx]);
+                format_value(idx, &mut out);
                 out.push(b'\n');
             }
         }
@@ -86,7 +113,66 @@ pub fn write_gz(path: &Path, m: &CscMatrix, comments: &[String], threads: usize)
         }
     }
     gz.finish()?.flush()?;
-    Ok(field)
+    Ok(())
+}
+
+/// How two Matrix Market files compare on their data lines: the banner, the size line and the
+/// entries, in order; comment lines are skipped (an R reference's name R's script, a Rust run's
+/// scrust's command).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataLines {
+    /// The banners (`%%MatrixMarket ...`), the size lines.
+    pub banner: (String, String),
+    pub size: (String, String),
+    /// Entry lines in each file, and the positions where the two differ (or where one has an
+    /// entry the other lacks).
+    pub entries: (usize, usize),
+    pub differing: usize,
+    /// The first differing entry, as `(position, line in a, line in b)`.
+    pub first: Option<(usize, String, String)>,
+}
+
+impl DataLines {
+    pub fn identical(&self) -> bool {
+        self.banner.0 == self.banner.1 && self.size.0 == self.size.1 && self.entries.0 == self.entries.1 && self.differing == 0
+    }
+}
+
+/// The banner, the size line and the entry lines of a Matrix Market file's text.
+fn split_data_lines(text: &[u8]) -> (String, String, Vec<&[u8]>) {
+    let mut lines = text.split(|&b| b == b'\n');
+    let banner = String::from_utf8_lossy(lines.next().unwrap_or(b"")).into_owned();
+    let mut size = String::new();
+    for l in lines.by_ref() {
+        if l.first() == Some(&b'%') {
+            continue;
+        }
+        size = String::from_utf8_lossy(l).into_owned();
+        break;
+    }
+    let entries: Vec<&[u8]> = lines.filter(|l| !l.is_empty() && l.first() != Some(&b'%')).collect();
+    (banner, size, entries)
+}
+
+/// Compares two Matrix Market files (gzipped or not) on their data lines, byte for byte.
+pub fn compare_data_lines(a: &Path, b: &Path) -> io::Result<DataLines> {
+    let ta = read_maybe_gz(a)?;
+    let tb = read_maybe_gz(b)?;
+    let (ba, sa, ea) = split_data_lines(&ta);
+    let (bb, sb, eb) = split_data_lines(&tb);
+    let m = ea.len().min(eb.len());
+    let mut differing = 0usize;
+    let mut first = None;
+    for k in 0..m {
+        if ea[k] != eb[k] {
+            differing += 1;
+            if first.is_none() {
+                first = Some((k + 1, String::from_utf8_lossy(ea[k]).into_owned(), String::from_utf8_lossy(eb[k]).into_owned()));
+            }
+        }
+    }
+    differing += ea.len().max(eb.len()) - m;
+    Ok(DataLines { banner: (ba, bb), size: (sa, sb), entries: (ea.len(), eb.len()), differing, first })
 }
 
 /// A coordinate Matrix Market file's entries in file order, 0-based.
@@ -193,6 +279,33 @@ mod tests {
         write_gz(&a, &big, &[], 1).unwrap();
         write_gz(&b, &big, &[], 6).unwrap();
         assert_eq!(fs::read(&a).unwrap(), fs::read(&b).unwrap());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn computed_values_and_data_lines() {
+        let dir = crate::test_dir("mtx_with");
+        // integer values computed from u32 storage, then their log1p from the same structure
+        let (p, i, x) = (vec![0usize, 2, 2, 4], vec![0u32, 2, 1, 2], vec![1u32, 3, 2, 7]);
+        let a = dir.join("a.mtx.gz");
+        let field = write_gz_with(&a, 3, 3, &p, &i, &|k| x[k] as f64, &[" counts".into()], 2).unwrap();
+        assert_eq!(field, "integer");
+        let text = String::from_utf8(crate::gz::gunzip(&fs::read(&a).unwrap()).unwrap()).unwrap();
+        assert_eq!(text, "%%MatrixMarket matrix coordinate integer general\n% counts\n3 3 4\n1 1 1\n3 1 3\n2 3 2\n3 3 7\n");
+        let m = CscMatrix { nrow: 3, ncol: 3, p: p.clone(), i: i.clone(), x: x.iter().map(|&v| v as f64).collect() };
+        let b = dir.join("b.mtx.gz");
+        write_gz(&b, &m, &[" another comment".into(), " and another".into()], 1).unwrap();
+        let d = compare_data_lines(&a, &b).unwrap();
+        assert!(d.identical(), "{d:?}");
+        assert_eq!(d.entries, (4, 4));
+        let l = dir.join("l.mtx.gz");
+        assert_eq!(write_gz_with(&l, 3, 3, &p, &i, &|k| (x[k] as f64).ln_1p(), &[], 1).unwrap(), "real");
+        let d = compare_data_lines(&a, &l).unwrap();
+        assert!(!d.identical());
+        assert_eq!((d.differing, d.first.as_ref().map(|f| f.0)), (4, Some(1)));
+        assert_ne!(d.banner.0, d.banner.1);
+        // an empty matrix: every value integer-valued, as R's all(logical(0)) says
+        assert_eq!(write_gz_with(&dir.join("e.mtx.gz"), 2, 2, &[0, 0, 0], &[], &|_| 0.5, &[], 1).unwrap(), "integer");
         fs::remove_dir_all(&dir).unwrap();
     }
 }

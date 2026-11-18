@@ -440,6 +440,21 @@ K9_totals = { cells_differing = 22, objects = 11, max_abs = 1.8e-2, max_scaled =
 K9_neighbors = { cells_differing = 12, objects = 6, note = "the 28 objects with lists; each differing list gains or loses one cell" }
 purity_radius = { max_abs = 1.2e-12, max_scaled = 6.3e-14 }
 purity_mean_neighbors = { max_abs = 2.3e-2, max_scaled = 5.2e-4, objects = 11 }
+# M13 records K10, the corrected counts, from M8's measurement: identical across the Haswell and
+# SapphireRapids kernels in all 34 objects (docs/validation/clustering_m8.md, "Different kernels,
+# same CPU type": the corrected counts, their log1p, nCount_SCT and nFeature_SCT, and K10_genes;
+# M11's measurement with the grader's statistics, job 60798602: K10_genes and correct()'s scalars,
+# the median log_umi and the residuals beyond the clip range among them, 0 of 34 objects
+# differing). The residuals correct() reads differ in their last bits on tier P (S2d), but no
+# corrected value crosses a rounding boundary. The bounds are zero, so in tolerance mode these
+# checks stay exact.
+K10_corrected_counts = { values_differing = 0, cells_differing = 0, objects = 34, note = "every entry of the SCT counts layer, and its digest" }
+K10_log1p_data = { values_differing = 0, cells_differing = 0, objects = 34, note = "the SCT data layer, in full on tier T, as R's digest on tier P" }
+K10_nCount_SCT = { values_differing = 0, cells_differing = 0, objects = 34 }
+K10_nFeature_SCT = { values_differing = 0, cells_differing = 0, objects = 34 }
+K10_genes = { values_differing = 0, objects = 34 }
+correct_residuals_beyond_clip = { values_differing = 0, objects = 34 }
+vst_umi_corrected_nnz = { values_differing = 0, objects = 34 }
 
 # Kernel-gated grading (M11; docs/PLAN.md A5b mechanism 3): `scrust validate cluster` grades every
 # check exactly when the reference's and the candidate's recorded OpenBLAS kernels match;
@@ -462,8 +477,8 @@ exact_when = "the reference's and the candidate's recorded OpenBLAS kernels matc
 otherwise = "tolerance: BLAS-free checks exact; BLAS-dependent checks within [clustering.floor.kernel], exact where it lists nothing"
 no_kernel_recorded = "tolerance (never exact)"
 saved_object_kernel = "SapphireRapids"
-blas_free = ["FindClusters' settings", "barcodes", "nCount_RNA", "nFeature_RNA", "S2a", "SCTransform's RNG states", "RunPCA's entry and irlba's entry states", "approxSilhouette teacher-forced on R's embeddings and labels", "neighborPurity teacher-forced on R's embeddings and labels (M12)", "the purity certificate (a property of the search)", "every check of a run started from R's embeddings or SNN graph"]
-blas_dependent = ["S2b", "S2c", "S2d", "scale.data's digest", "S3", "irlba's exit state", "K3", "K4", "K5", "K6", "K7", "K8", "K9 (M12)", "the result section's numbers", "the saved object's labels, silhouette widths and purities"]
+blas_free = ["FindClusters' settings", "barcodes", "nCount_RNA", "nFeature_RNA", "S2a", "SCTransform's RNG states", "RunPCA's entry and irlba's entry states", "approxSilhouette teacher-forced on R's embeddings and labels", "neighborPurity teacher-forced on R's embeddings and labels (M12)", "the purity certificate (a property of the search)", "every check of a run started from R's embeddings or SNN graph", "K10_genes, correct()'s settings, its median log_umi and RNG state at its entry, sct_features and sct_cells (M13)", "the output manifest (M13)"]
+blas_dependent = ["S2b", "S2c", "S2d", "scale.data's digest", "S3", "irlba's exit state", "K3", "K4", "K5", "K6", "K7", "K8", "K9 (M12)", "K10: the corrected counts, their log1p, nCount_SCT, nFeature_SCT, the residuals beyond the clip range (M13)", "K10 teacher-forced (correct()'s mu is a dgemm; graded under the validator's own kernel against R's)", "the result section's numbers", "the saved object's labels, silhouette widths, purities, nCount_SCT, nFeature_SCT and SCT layers"]
 floor = "clustering.floor.kernel"
 
 # K0, Kiss64Random (M9): RcppAnnoy 0.0.23's kissrandom.h, compiled with the R env's compiler and
@@ -557,8 +572,10 @@ blas_dependent = true
 compare = ["K3", "K4", "K5", "K6", "K7", "K8_silhouette_width", "K8_silhouette_other", "K8_centroids", "K8_cluster_var", "metadata.tsv", "levels", "cluster_ids.txt", "nclusters.txt", "pca/", "graphs", "result", "saved labels and levels", "saved silhouette widths (production profile)"]
 otherwise = { criterion = "floor", floor = "clustering.floor.kernel" }
 teacher_forced_silhouette = "exact on any machine"
-not_compared = ["nCount_SCT, nFeature_SCT (M13)", "K10 arrays", ".Random.seed after RunUMAP"]
-# (M11 also left out neighborhood_purity and the K9 arrays; M12 compares them, under [clustering.K9].)
+not_compared = [".Random.seed after RunUMAP"]
+# (M11 also left out neighborhood_purity and the K9 arrays, which M12 compares under
+# [clustering.K9], and nCount_SCT, nFeature_SCT and the K10 arrays, which M13 compares under
+# [clustering.K10].)
 
 # K9, neighbourhood purity (M12; docs/PLAN.md C3e, C5): bluster 1.20.0's neighborPurity as the
 # workflow calls it (k = 50, weighted, BiocNeighbors 2.4.0's default index, KMKNN), searched
@@ -615,6 +632,37 @@ certificate_decision = "2026-11-17: keep the exhaustive result; report the flagg
 # runs on R's embeddings), and nothing else; 102 certificates reported in the 222 comparisons.
 # Every check M11's 290 reports held keeps its status and counts (31,269).
 settled = { comparisons = 222, k9_identical = 1831, teacher_forced_identical = 1033, certificates_reported = 102, saved_within_floor_portable = 28, m11_checks_unchanged = 31269 }
+
+# K10, the corrected counts (M13; docs/PLAN.md C3f, C5): sctransform 0.4.3's correct(), which vst()
+# calls on its own residuals before clipping them (return_corrected_umi = TRUE, Seurat's
+# do.correct.umi): the residuals floored at min_variance and not clipped; the regressors
+# [1, median(log_umi)] (R's median); per bin of 500 genes, mu = exp(tcrossprod(model_pars_fit[, -1],
+# regressors)) through R's dgemm call and shapes; the variance mu + mu^2 / theta, not floored; the
+# value mu + residual * sqrt(variance); round(x, 0) (nearbyint: half to even), negatives to 0,
+# zeros dropped (make.sparse); the SCT data layer log1p of it (glibc's); nCount_SCT and
+# nFeature_SCT its column sums and nonzero counts (crates/sctransform/src/correct.rs). Made in
+# S2d's pass, one bin's products at a time (the product at the median depth in the free product
+# buffer, kept as its runs of equal values), never as a dense genes x cells matrix.
+# Compared, with scrust cluster --export (scrust validate cluster): from the stage dumps,
+# K10_genes, correct()'s scalars (the median log_umi, the residuals beyond the clip range, the
+# number of entries, its settings) and .Random.seed at its entry; the files against every R run
+# of the profile on their data lines (R's comment lines name R's script): sct/corrected_counts.mtx.gz
+# always, sct/log1p_corrected_counts.mtx.gz where R kept it (level full: tier T), else R's digest of
+# the log1p data's values (raw_sha256(data@x), standard and light levels: tier P); R's digest of the
+# counts' values; sct_features.tsv.gz and sct_cells.tsv.gz; the counts' summary (features, entries,
+# minimum, explicit zeros); metadata.tsv's nCount_SCT and nFeature_SCT; the same against the saved
+# object (under its kernel, SapphireRapids). Teacher-forced: correct() on R's model_pars_fit, cell
+# attributes (stages/vst/), K10_genes and the counts, against R's layers, digests, columns and
+# scalars. mu is a BLAS product, so every K10 check but K10_genes, the settings and the median is
+# BLAS-dependent, teacher-forced too (graded under the validator's own kernel against R's): exact
+# under the reference's kernel; otherwise against [clustering.floor.kernel], whose K10 entries are
+# zero (M8: identical across kernels).
+[clustering.K10]
+criterion = "exact"
+blas_dependent = "from the counts and teacher-forced (correct()'s mu is a dgemm); K10_genes, correct()'s settings and median log_umi are BLAS-free"
+compare = ["K10_genes", "correct_median_log_umi", "correct_residuals_beyond_clip", "vst_umi_corrected_nnz", "correct()'s settings", "RNG correct_entry", "sct/corrected_counts.mtx.gz (data lines)", "sct/log1p_corrected_counts.mtx.gz (data lines, or R's digest of the values)", "sct_counts_x_sha256", "sct_features.tsv.gz", "sct_cells.tsv.gz", "metadata.tsv nCount_SCT", "metadata.tsv nFeature_SCT", "saved nCount_SCT, nFeature_SCT, SCT counts and data layers"]
+otherwise = { criterion = "floor", floor = "clustering.floor.kernel" }
+teacher_forced = "exact under the validator's own kernel when it is R's; otherwise the floor (identical)"
 
 # Kernel-gated grading shown on deliberately mismatched pairs (M11): each Rust run against the
 # other profile's instrumented R run on Sapphire Rapids, 68 pairs of the 34 objects in both

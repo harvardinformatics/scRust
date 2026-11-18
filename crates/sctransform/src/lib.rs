@@ -15,10 +15,13 @@
 //! - [`reg`] (S2c): the Poisson genes, outlier removal and `ksmooth` against the genes'
 //!   geometric means;
 //! - [`residuals`] (S2d): clipped Pearson residuals, residual variance, the variable features and
-//!   `scale.data`.
+//!   `scale.data`;
+//! - [`correct`] (K10, milestone M13): `correct()`'s corrected counts, made in S2d's pass when
+//!   asked for, their `log1p`, `nCount_SCT` and `nFeature_SCT`.
 //!
-//! Shared by DoubletFinder (7 calls per object) and, later, the clustering crate.
+//! Shared by DoubletFinder (7 calls per object) and the clustering crate (M11).
 
+pub mod correct;
 pub mod fit;
 pub mod glm;
 pub mod matrix;
@@ -34,9 +37,10 @@ pub use fit::{fit, FitInput, Fits};
 pub use matrix::GeneRows;
 pub use params::{MinVariance, SctParams};
 pub use reg::{regularize, Reg, RegInput};
-pub use residuals::{residuals, ResidualInput, Residuals};
+pub use correct::Corrected;
+pub use residuals::{residuals, residuals_corrected, ResidualInput, Residuals};
 pub use setup::{setup, CellAttr, Setup};
-pub use vst::{finish, sctransform, start, Sct, Started};
+pub use vst::{finish, finish_with, sctransform, start, Sct, Started};
 
 use std::fmt;
 

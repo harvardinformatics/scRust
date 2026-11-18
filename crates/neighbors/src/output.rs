@@ -119,3 +119,46 @@ pub fn result_json(r: &Neighbors, n_components: usize) -> Json {
         ("snn_distinct_values", int(distinct.len())),
     ])
 }
+
+/// The manifest's entries for this layout (docs/PLAN.md C3f, M13), in the directory `dir`
+/// relative to the output directory (`""` or `"neighbors"`): `n` cells, the graphs' stored
+/// entries when known (else read from the files), `annoy.ann` when written. The graphs' rows and
+/// columns are the cells of `cells` (a path relative to the output directory and its barcode
+/// column), else of this layout's `knn_index.tsv`.
+pub fn manifest_entries(dir: &str, n: usize, nnz: Option<(usize, usize)>, annoy: bool, cells: Option<scio::manifest::Ids>) -> Vec<scio::manifest::Entry> {
+    use scio::manifest::{Entry, Ids};
+    let own = Ids::named("cells", "knn_index.tsv", "barcode");
+    let graph_cells = cells.unwrap_or_else(|| Ids::named("cells", &format!("{}knn_index.tsv", if dir.is_empty() { String::new() } else { format!("{}/", dir.trim_end_matches('/')) }), "barcode"));
+    let cells = own;
+    let graph = |file: &str, role: &str, what: &str, k: Option<usize>| {
+        let mut e = Entry::new(file, role, role, "matrix_market", what);
+        e.rows = Some(graph_cells.clone());
+        e.columns = Some(graph_cells.clone());
+        if let Some(k) = k {
+            e = e.shape(&[n, n]).nnz(k);
+        }
+        e
+    };
+    let mut v = vec![
+        Entry::new("knn_index.tsv", "knn_index", "neighbour_indices", "tsv", "each cell's k nearest neighbours by Annoy (FindNeighbors), 1-based cell numbers as in R: barcode, nn_1, ..., nn_k").header(true).rows(cells.clone()),
+        Entry::new("knn_distance.tsv", "knn_distance", "neighbour_distances", "tsv", "their distances, Annoy's floats: barcode, nn_1, ..., nn_k").header(true).rows(cells.clone()),
+        graph("nn.mtx.gz", "graph_nn", "Seurat's SCT_nn graph: 1 at (cell, neighbour); cells x cells, entries in stored order", nnz.map(|x| x.0)),
+        graph("snn.mtx.gz", "graph_snn", "Seurat's SCT_snn graph (ComputeSNN): s / (k + (k - s)) for s shared neighbours, pruned below prune.SNN; cells x cells, entries in stored order", nnz.map(|x| x.1)),
+    ];
+    if annoy {
+        v.push(Entry::new("annoy.ann", "annoy_index", "none", "annoy", "Annoy's index (RcppAnnoy 0.0.23's file format), as save() writes it"));
+    }
+    // `under` moves the identifier files too: the graphs' are given relative to the output
+    // directory already, so they are put back after it
+    v.into_iter()
+        .map(|e| {
+            let graph = e.role.starts_with("graph_");
+            let mut e = e.under(dir);
+            if graph {
+                e.rows = Some(graph_cells.clone());
+                e.columns = Some(graph_cells.clone());
+            }
+            e
+        })
+        .collect()
+}

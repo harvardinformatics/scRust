@@ -27,6 +27,12 @@ pub fn find(dir: &Path, name: &str) -> io::Result<PathBuf> {
     Err(io::Error::new(io::ErrorKind::NotFound, format!("{}: no {name}(.gz)", dir.display())))
 }
 
+/// The three files of a 10x directory the readers here read, in this order: the matrix
+/// (`matrix.mtx(.gz)`), the barcodes and the features.
+pub fn input_files(dir: &Path) -> io::Result<[PathBuf; 3]> {
+    Ok([find(dir, "matrix.mtx")?, find(dir, "barcodes.tsv")?, find(dir, "features.tsv")?])
+}
+
 /// The bytes of a file, decompressed if it is gzipped.
 pub fn read_maybe_gz(path: &Path) -> io::Result<Vec<u8>> {
     let bytes = fs::read(path).map_err(|e| io::Error::new(e.kind(), format!("{}: {e}", path.display())))?;

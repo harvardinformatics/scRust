@@ -2,6 +2,7 @@
 //! (docs/PLAN.md A1 and B3b, milestone M5).
 
 use crate::cli::{self, Args, Phases};
+use scio::manifest::{Input, Manifest, Provenance};
 use rcompat::RRng;
 use scio::{Json, Table};
 use std::path::Path;
@@ -77,6 +78,28 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     cluster::metadata::carry(&sct, &out).map_err(|e| e.to_string())?;
     phases.mark("write");
 
+    // the manifest (docs/PLAN.md C3f, M13)
+    let read: Vec<std::path::PathBuf> = ["cell_attr.tsv", "variable_features.tsv", "scale_data.npy", cluster::metadata::FILE].iter().map(|f| sct.join(f)).filter(|p| p.is_file()).collect();
+    let mut m = Manifest::new(
+        "pca",
+        Provenance {
+            scrust_version: env!("CARGO_PKG_VERSION").into(),
+            command_line: cli::command_line("pca", argv),
+            command: scio::manifest::canonical_command("pca", argv, &["out", "threads"], &[]),
+            inputs: vec![Input::digest("sct", &sct, &read.iter().map(|p| p.as_path()).collect::<Vec<_>>()).map_err(|e| e.to_string())?],
+            reproduces: vec![pca::REFERENCE.into()],
+            parameters: pca::output::params_json(&params),
+            seeds: Json::obj(vec![("RunPCA seed.use", params.seed_use.map(|v| Json::Int(v as i64)).unwrap_or(Json::Null))]),
+        },
+    );
+    m.push(Manifest::summary_entry());
+    m.entries.extend(pca::output::manifest_entries(""));
+    if out.join(cluster::metadata::FILE).is_file() {
+        m.push(crate::cmd_sctransform::rna_entry(cluster::metadata::FILE, nc));
+    }
+    m.fill_shapes(&out).map_err(|e| e.to_string())?;
+    let files = cli::finish_manifest(&out, &mut m, threads)?;
+
     let fingerprint = Json::parse(&crate::fingerprint::json()).unwrap_or(Json::Null);
     let ir = &p.irlba;
     let nk = p.features.len();
@@ -101,6 +124,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
                 ("fingerprint", fingerprint),
             ]),
         ),
+        ("files", files),
     ]);
     write(&out.join("summary.json"), &scio::json::to_file_text(&summary))?;
     eprintln!(

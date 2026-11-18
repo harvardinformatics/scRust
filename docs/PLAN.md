@@ -74,7 +74,7 @@ scRust/
   - conda-forge `rust` 1.99.x;
   - the exact BLAS builds of the R env, so FFI calls hit the same kernels: `libopenblas 0.3.34 pthreads_hf13c14d_2`, `libblas`/`liblapack 3.11.0-12 *_openblas`.
 - **R reference env:** the production env (`/n/holylfs05/LABS/informatics/Users/afreedman/smk-conda-envs/d3ca7f730a70e6f748bb65a12a5ed3f9_`): R 4.5.3, Seurat 5.5.1, sctransform 0.4.3, glmGamPoi 1.22.0, irlba 2.4.1, fields 17.3, DoubletFinder 2.0.6 (commit `1b244d8`), DropletUtils 1.30.0, SoupX 1.6.2, decontX 1.8.0, scDblFinder 1.24.10, xgboost 3.2.0. Copy its spec into `envs/r-reference/` so it can be rebuilt. The CellBender env is added when that tool starts.
-- **Loader test envs (C3g):** the R loader is tested in the R reference env, installed into a library inside the repo (`.rlib/`, gitignored), never into the env itself. The Python loader is tested in `envs/loaders-py.yml`, a project-local env.
+- **Loader test envs (C3g):** the R loader is tested in the R reference env, installed into a library inside the repo (`.rlib/`, gitignored), never into the env itself. The Python loader is tested in `envs/loaders-py.yml`, a project-local env (`.envs/loaders-py`), with its solve recorded in `envs/loaders-py.linux-64.pin.txt` as `rust-dev`'s is. M13 created it, with scanpy, for the export's guard test (C3f); M14 extends it.
 - **Running R:** always with `env -u R_LIBS_USER -u R_LIBS_SITE -u R_LIBS -u PERL5LIB` and `PYTHONNOUSERSITE=1`. Anything that reads `.rds` runs through sbatch or srun, never on a login node. sbatch wrappers source the node guard and `--exclude` the two nodes known to lose a Lustre OST.
 - **Pipeline repo:** read-only from scRust. Never write there and never run Snakemake there.
 
@@ -98,7 +98,7 @@ Each tool's real inputs and outputs are sparse matrices and small per-cell table
   - The corrected counts are integers (sctransform's `correct()` rounds them). A tool given them as a 10x directory would take them for raw counts without complaint.
   - Normalised matrices go into the export of C3f instead, next to the original counts and a per-cell metadata table. They are Matrix Market or `.npy` files under names that no 10x reader accepts, each marked with what it holds and how it was made.
   - The loaders (C3g) put them only into slots meant for normalised data.
-- **Formats:** count matrices in 10x Matrix Market (and 10x HDF5 later); normalised matrices in Matrix Market or `.npy` under other names; tables as TSV; run metadata (parameters, seed, versions, timings) in `summary.json`. From M13 on, `summary.json` also lists every output file with its role (C3f).
+- **Formats:** count matrices in 10x Matrix Market (and 10x HDF5 later); normalised matrices in Matrix Market or `.npy` under other names; tables as TSV; run metadata (parameters, seed, versions, timings) in `summary.json`. From M13 on, `summary.json` also lists every output file with its role and scale (C3f), in the schema of [`docs/output_manifest.md`](output_manifest.md).
 - **Where Seurat appears:**
   - In the workflow, Seurat objects are only containers, plus R's processing after each tool (SCTransform, clustering), which is not part of these tools.
   - Some tool inputs (cluster labels) were made by Seurat upstream; they become plain input files.
@@ -699,7 +699,7 @@ The clustering changes no counts, so it writes no new count data (A3). The expor
 - **`pca`:** used as it is.
 - **`knn`:** new: the search `neighborPurity` makes, with knncolle's arithmetic (C3e).
 - **`rcompat`:** `set.seed` and `sample` for GroupSingletons; long-double `mean` and `sum`, whose accumulator R's `colMeans`, `colSums` and `rowSums` also use (small additions); R's `median`; R's number formatting for the `res.` names; and `order`. `set.seed`, `sample`, the long-double `mean` and the number formatting exist since M1, and GroupSingletons and the `res.` names use them as they are (M10).
-- **`scio`:** 10x reading, TSV, `.npy` and JSON. New: the TOML reader, the stage-dump layout (moved from `doubletfinder`, so the chain and DoubletFinder share it) and kernel-gated grading (M11); Matrix Market writers for real and integer matrices, with comment lines; the manifest; copying a directory with its checksums (M13).
+- **`scio`:** 10x reading, TSV, `.npy` and JSON. New: the TOML reader, the stage-dump layout (moved from `doubletfinder`, so the chain and DoubletFinder share it) and kernel-gated grading (M11); Matrix Market writers for real and integer matrices, with comment lines (values computed as they are written, so the corrected counts' `log1p` needs no second matrix); the manifest (`scio::manifest`, schema `scrust-files` 1: `docs/output_manifest.md`), with its naming rules; copying the input's 10x files with their checksums (M13).
 - **`scrust`:** the commands above, `scrust validate cluster`, and the new options of `scrust doubletfinder` (C3h).
 - **`loaders/`** (new, outside the Cargo workspace): the R and Python packages (C3g).
 
@@ -817,7 +817,8 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
 - **For each bin of 500 model genes,** in the counts' gene order: μ at the median depth is exp of the regularised parameters times those regressors (`tcrossprod`, the OpenBLAS `dgemm` call R makes, with the same shapes); its variance is μ + μ²/θ (μ where θ = ∞), not floored; the corrected value is μ + residual·√variance.
 - **Rounding:** `round(x, 0)` (half to even), negatives set to 0, zeros dropped (`make.sparse`). The results are integer counts, stored sparse.
 - **The rest of the assay:** `data` is their `log1p` (glibc's), and `nCount_SCT` and `nFeature_SCT` are their column sums and nonzero counts.
-- They are computed only for the export, because clustering doesn't need them.
+- They are computed only when asked for (`scrust cluster --export`, `scrust sctransform --corrected-counts`), because clustering doesn't need them.
+- **In S2d's pass (M13).** They are made in the same pass as vst's residuals, from each residual before vst clips it: per bin, R's `dgemm` at the median depth runs first, in the product buffer that the bin's own product then fills, and is kept as its runs of equal values per gene (in exact arithmetic every cell has the same regressors; the kernel's blocks of columns can differ in their last bits, and the runs keep R's bits where they change). Each gene's corrected counts are kept sparse, as integers, and transposed into compressed columns at the end: no dense genes × cells matrix, and no product buffer beyond S2d's two.
 
 *The export* keeps the original counts, the normalised data and the per-cell metadata together, as plain files. `scrust cluster --export` writes all of it; `scrust sctransform --corrected-counts` writes the SCT part alone:
 
@@ -828,7 +829,8 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
                                    provenance (scrust version, command line, the input's path and sha256,
                                    the R functions reproduced, parameters, seeds)
   metadata.tsv                     one row per cell (C3's outputs)
-  counts/                          the input counts, copied byte for byte: the export's only 10x directory
+  counts/                          the input counts (its matrix, barcodes and features files, as the
+                                   readers found them), copied byte for byte: the export's only 10x directory
   sct/                             the SCT assay, never in 10x layout:
     corrected_counts.mtx.gz        Seurat's SCT `counts` (integer Matrix Market)
     log1p_corrected_counts.mtx.gz  Seurat's SCT `data`
@@ -843,11 +845,13 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
 
 *How it guards against being taken for counts:*
 - **No 10x names for normalised data.** No directory holding normalised data has a `matrix.mtx`, `barcodes.tsv`, `features.tsv` or `genes.tsv` file, and no normalised file's name ends in `matrix.mtx(.gz)`. Seurat's `Read10X` and scanpy's `read_10x_mtx` (even with its `prefix=` argument) therefore fail on `sct/` and on the export's top level. Tests check both.
-- **Each normalised file says what it holds.** Comment lines right after the Matrix Market banner state what the matrix is, that it is not raw counts, how it was made (the scrust version and command) and the input's sha256. Matrix Market readers skip comments, and Cell Ranger's own matrices carry one, so the files stay readable.
-- **The manifest gives every file a role and a scale** (`raw_counts`, `corrected_counts`, `log1p`, `residuals`, …). The loaders put a matrix only into a slot meant for its scale, and refuse a file whose role doesn't fit.
+- **Each normalised file says what it holds.** Comment lines right after the Matrix Market banner state what the matrix is, that it is not raw counts, how it was made (the scrust version and command) and the input's sha256 (each input file's, as `sha256sum` prints them). The command leaves out the options that change no value of the file (`--out`, `--threads`, `--keep-stages`, `--dump-stages`, ...), so the files do not depend on them; the manifest keeps the command line as given. Matrix Market readers skip comments, and Cell Ranger's own matrices carry one, so the files stay readable.
+- **The manifest gives every file a role and a scale** (`raw_counts`, `corrected_counts`, `log1p_corrected_counts`, `residuals`, …; the schema, with every role and scale: [`docs/output_manifest.md`](output_manifest.md)). The loaders put a matrix only into a slot meant for its scale, and refuse a file whose role doesn't fit.
 - **The only 10x directory is `counts/`,** which holds the raw counts, as A3 requires.
 
-*One manifest for every command.* From M13 on, every scrust command's `summary.json` gains a `files` section in this schema, `scrust doubletfinder`'s included (`cells.tsv`, the sweep tables, `singlets/`). One loader per language therefore reads any scrust output.
+*One manifest for every command.* From M13 on, every scrust command's `summary.json` gains a `files` section in this schema, `scrust doubletfinder`'s included (`cells.tsv`, the sweep tables, `singlets/`). One loader per language therefore reads any scrust output. The schema is versioned (`scrust-files`, version 1) and documented in [`docs/output_manifest.md`](output_manifest.md), which the loaders are written against; each command checks its manifest against its directory before writing it, and `scrust validate manifest --dir <dir>` checks any output.
+
+*Which routes export (M13).* Only a run from the counts (`scrust cluster --counts ... --export`): the export copies the input counts, and the corrected counts need vst's residuals of every model gene before clipping, which only SCTransform's own pass has (`scrust sctransform` keeps the variable features' clipped residuals). The staged starts (`--sct`, `--pca`, `--snn`) refuse `--export` with that reason; `scrust sctransform --corrected-counts` writes the SCT part alone.
 
 *Why plain files rather than h5ad written by Rust:*
 - **Plain files keep A3's formats and the workspace's dependencies** (the standard library and OpenBLAS). Writing h5ad needs an HDF5 writer: libhdf5 linked through FFI, or our own writer for a complex format. Either way, anndata's on-disk spec has to be tracked as it changes.
@@ -855,7 +859,7 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
 - **h5ad and `.rds` files come from the loaders when wanted** (`write_h5ad`, `saveRDS`), each also as a one-line command.
 - Reading 10x HDF5 (A3, later) is a separate, smaller matter.
 
-**C3g. Loaders.** Small packages in the repo, `loaders/R/scrustio` and `loaders/python/scrustio`, read any scrust output through its manifest:
+**C3g. Loaders.** Small packages in the repo, `loaders/R/scrustio` and `loaders/python/scrustio`, read any scrust output through its manifest (schema `scrust-files` 1, [`docs/output_manifest.md`](output_manifest.md)):
 
 | Object | Raw counts | SCT corrected counts and their log1p | Residuals (variable features only) | Metadata, PCA, graphs |
 |---|---|---|---|---|
@@ -992,7 +996,7 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
 | K7 clustering | given R's SNN graph: the labels, the levels and every `res.` column; the nodes, edges, communities and singletons; the maximum modularity (`%.4f`, as logged) and every start's modularity as a double (against the instrumented optimizer) | identical |
 | K8 end to end | from the counts: K1–K7, the labels and the silhouette widths against the instrumented runs; the files against the direct runs | identical under the reference's kernel |
 | K9 purity | given R's embeddings and labels: each cell's 50th distance, the radius, each cell's neighbour count (and list, where R kept them), the weights, sums, totals, purity and maximum; the certificate. From the counts: the same against the instrumented runs, the files against the direct runs | identical (from the counts, under the reference's kernel); flagged pairs reported, not failed, each labelled by kind (M12's decision: the median pair of an odd-sized object lies on the radius by construction) |
-| K10 corrected counts | given R's model parameters: every corrected count, the log1p data, `nCount_SCT` and `nFeature_SCT`; the same from the counts, end to end | identical under the reference's kernel |
+| K10 corrected counts | given R's model parameters (teacher-forced: `model_pars_fit`, the cell attributes, `correct()`'s genes and the counts): every corrected count, the log1p data, `nCount_SCT` and `nFeature_SCT`, and the K10 stage values (the genes, the median log_umi, the residuals beyond the clip range); the same from the counts, end to end, against the instrumented runs; the files against the direct runs on their data lines, and by R's digest where R kept none (the log1p data at levels standard and light); `nCount_SCT` and `nFeature_SCT` against the saved objects | identical under the reference's kernel (teacher-forced: the validator's own kernel against R's) |
 | K11 export and loaders | each loader's object against the saved object: the counts, the SCT layers and model, the metadata, the PCA and the graphs; `Read10X` and `read_10x_mtx` on `sct/` and on the export's top level; a file offered to the wrong slot | identical; both readers fail; the loader refuses |
 | K12 on the fly | `scrust doubletfinder` given no `--clusters`, on the 150 DoubletFinder inputs: the labels it computed against the inputs' `seurat_clusters`; the outputs against the saved outputs (M7's criteria) and against M7's Rust outputs | identical; files byte-identical apart from timings and the clustering's own outputs |
 | K13 markers (Seurat loader) | the workflow's marker steps on the loaded object, for every cluster: the combined table against the saved `<prefix>_markergenes.csv` (T and P) | byte-identical |

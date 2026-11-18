@@ -10,6 +10,8 @@
 //!   and `purity_maximum` (when computed), then the columns of `--metadata`;
 //! - with `--keep-stages`: `sct/` in `scrust sctransform`'s layout (`sctransform::output`), and
 //!   every random start's partition (`stages/<column>_partitions.npy`);
+//! - with `--export` (M13): `sct/` with the SCT assay's corrected counts and their `log1p`
+//!   (`sctransform::correct`), and `metadata.tsv`'s `nCount_SCT` and `nFeature_SCT`;
 //! - with `--dump-stages <level>`: `stages/`, the stage dumps of M8's instrumented runs in their
 //!   layout (context `chain`): S2a-S2d, S3, K3 (Annoy's items), K4 (`annoy.ann`), K5, K7, K8, K9
 //!   (purity; its neighbour lists with `purity_lists`; the certificate's flagged pairs, which R
@@ -53,6 +55,19 @@ pub struct Writer {
     /// `--metadata`'s columns: names and, per column, the cells' values.
     pub extra: Option<(Vec<String>, Vec<Vec<String>>)>,
     pub keep_stages: bool,
+    /// `--export` (M13): `sct/` with the corrected counts, `nCount_SCT` and `nFeature_SCT`; the
+    /// command and the input's checksums the normalised matrices' comment lines give.
+    pub export: bool,
+    pub command: String,
+    pub input_checksums: Vec<(String, String)>,
+    /// `nCount_SCT` and `nFeature_SCT`, from the corrected counts, once made.
+    pub sct_columns: Option<(Vec<f64>, Vec<u32>)>,
+    /// `sct/`'s entries in the manifest, once written.
+    pub sct_entries: Vec<scio::manifest::Entry>,
+    /// The graphs' stored entries (`neighbors/`), once made.
+    pub graph_nnz: Option<(usize, usize)>,
+    /// SCTransform's bin size (`vst`'s `bin_size`, which `correct()` reuses), for the K10 dumps.
+    pub sct_bin_size: usize,
     pub annoy: bool,
     /// Purity's neighbour lists in the stage dumps (R's `--purity-lists`).
     pub purity_lists: bool,
@@ -99,6 +114,13 @@ impl Writer {
             rna: None,
             extra: None,
             keep_stages: false,
+            export: false,
+            command: String::new(),
+            input_checksums: Vec::new(),
+            sct_columns: None,
+            sct_entries: Vec::new(),
+            graph_nnz: None,
+            sct_bin_size: 500,
             annoy: false,
             purity_lists: false,
             threads,
@@ -176,6 +198,13 @@ impl Writer {
             cols.push(a);
             names.push("nFeature_RNA".into());
             cols.push(b);
+        }
+        // with --export (M13): the SCT assay's columns, after the counts', as Seurat orders them
+        if let Some((nc, nf)) = &self.sct_columns {
+            names.push("nCount_SCT".into());
+            cols.push(nc.iter().map(|&v| fmt17(v)).collect());
+            names.push("nFeature_SCT".into());
+            cols.push(nf.iter().map(|v| v.to_string()).collect());
         }
         for x in &r.resolutions {
             names.push(x.column.name.clone());
@@ -257,6 +286,62 @@ impl Writer {
     fn rec(&mut self) -> Option<&mut StageRecorder> {
         self.dumps.as_mut()
     }
+
+    /// The manifest's entries (docs/PLAN.md C3f, M13) of every file this writer wrote or copied
+    /// (`files`), each with its role, scale and identifiers; the tables' and arrays' shapes are
+    /// read from the files ([`scio::manifest::Manifest::fill_shapes`]). Fails on a file it does
+    /// not know, so that nothing goes undescribed.
+    pub fn manifest_entries(&self) -> io::Result<Vec<scio::manifest::Entry>> {
+        use scio::manifest::{Entry, Ids};
+        let n = self.barcodes.len();
+        let cells = |f: &str| Ids::named("cells", f, "barcode");
+        let pca = pca::output::manifest_entries("pca");
+        // the graphs' cells: metadata.tsv's, which every route writes (a staged start's
+        // neighbors/ may hold R's graphs without knn_index.tsv)
+        let nb = neighbors::output::manifest_entries("neighbors", n, self.graph_nnz, true, Some(Ids::named("cells", "metadata.tsv", "barcode")));
+        // sct/ copied by a staged start (--sct with --keep-stages): its entries, shapes from the files
+        let sct_copied: Vec<Entry> = sctransform::output::manifest_entries("sct", 0, 0, 0, 0, None)
+            .into_iter()
+            .map(|mut e| {
+                e.shape = None;
+                e
+            })
+            .collect();
+        let stages = scio::manifest::stage_entries(&self.out, "stages")?;
+        let mut out = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+        for f in &self.files {
+            if !seen.insert(f.clone()) {
+                continue;
+            }
+            let found = |v: &[Entry]| v.iter().find(|e| &e.path == f).cloned();
+            let e = match f.as_str() {
+                "metadata.tsv" => Entry::new(f, "cell_metadata", "none", "tsv", "one row per cell, in the counts' column order: barcode, nCount_RNA, nFeature_RNA, nCount_SCT and nFeature_SCT (with --export), each res. column, seurat_clusters, silhouette_width, silhouette_other, neighborhood_purity, purity_maximum, then --metadata's columns; Seurat's meta.data")
+                    .header(true)
+                    .rows(cells(f)),
+                "seurat_clusters.tsv" => Entry::new(f, "cluster_labels", "none", "tsv", "the cluster labels (seurat_clusters), as scrust doubletfinder --clusters reads them: barcode, seurat_clusters").header(true).rows(cells(f)),
+                "seurat_clusters_levels.txt" => Entry::new(f, "cluster_levels", "none", "tsv", "seurat_clusters' levels, in the factor's order, one per line").header(false),
+                "clusters.tsv" => Entry::new(f, "cluster_columns", "none", "tsv", "one column per resolution, named as Seurat names it (SCT_snn_res.0.8): barcode, then the columns").header(true).rows(cells(f)),
+                "cluster_ids.txt" => Entry::new(f, "workflow_cluster_ids", "none", "tsv", "the identities' levels, as the workflow's write_cluster_metadata writes them, one per line").header(false),
+                "nclusters.txt" => Entry::new(f, "workflow_nclusters", "none", "text", "their number, as the workflow's write_cluster_metadata writes it"),
+                "optimizer_ids.tsv" => Entry::new(f, "optimizer_ids", "none", "tsv", "each resolution's modularity-optimizer result before GroupSingletons, numbered by size: barcode, then one column per resolution").header(true).rows(cells(f)),
+                _ if f.ends_with("_levels.txt") && !f.contains('/') => Entry::new(f, "cluster_levels", "none", "tsv", "this resolution's column's levels, in the factor's order, one per line").header(false),
+                _ if f.starts_with("pca/") => found(&pca).ok_or_else(|| io::Error::other(format!("{f}: a file of pca/ the manifest does not know")))?,
+                _ if f.starts_with("neighbors/") => found(&nb).ok_or_else(|| io::Error::other(format!("{f}: a file of neighbors/ the manifest does not know")))?,
+                _ if f.starts_with("sct/") => found(&self.sct_entries).or_else(|| found(&sct_copied)).ok_or_else(|| io::Error::other(format!("{f}: a file of sct/ the manifest does not know")))?,
+                _ if f.starts_with("stages/") => found(&stages).ok_or_else(|| io::Error::other(format!("{f}: not among the stage dumps")))?,
+                _ => return Err(io::Error::other(format!("{f}: a file the manifest does not know"))),
+            };
+            out.push(e);
+        }
+        // the stage files nobody listed by name (each one written is in stages/)
+        for e in stages {
+            if seen.insert(e.path.clone()) {
+                out.push(e);
+            }
+        }
+        Ok(out)
+    }
 }
 
 impl Observer for Writer {
@@ -265,7 +350,8 @@ impl Observer for Writer {
         self.sct_result = Some(sctransform::output::result_json(sct, nf));
         self.scale_data_sha256 = Some(sctransform::output::scale_data_sha256_r_order(&sct.residuals));
         self.rng_after_sct = Some(rng_digest(&sct.rng_exit));
-        if self.keep_stages {
+        let s = &sct.setup;
+        if self.keep_stages || self.export {
             let d = self.out.join("sct");
             mkdir(&d)?;
             let genes: Vec<sctransform::output::Gene> = self
@@ -277,9 +363,24 @@ impl Observer for Writer {
                 .collect();
             let files = sctransform::output::write_outputs(&d, &self.barcodes, &genes, sct)?;
             self.files.extend(files.into_iter().map(|f| format!("sct/{f}")));
+            let written = if self.export { sct.corrected.as_ref() } else { None };
+            if let Some(c) = written {
+                let names: Vec<String> = s.genes.iter().map(|&g| genes[g].name.clone()).collect();
+                let (cc, dc) = sctransform::output::corrected_comments(&self.command, &self.input_checksums, c);
+                let files = c.write(&d, &names, &self.barcodes, &cc, &dc, self.threads)?;
+                self.files.extend(files.into_iter().map(|f| format!("sct/{f}")));
+            }
+            self.sct_entries = sctransform::output::manifest_entries("sct", s.n_cells, s.genes.len(), s.genes_step1.len(), sct.residuals.top_features.len(), written);
         }
+        if let Some(c) = &sct.corrected {
+            self.sct_columns = Some((c.n_count(), c.n_feature()));
+        }
+        let bin_size = self.sct_bin_size;
         if let Some(r) = self.rec() {
             sctransform::record::record(r, CTX, &sct.setup, &sct.fits, sct.mean_cell_sum, &sct.reg, &sct.residuals, &sct.rng_entry, &sct.rng_exit)?;
+            if let Some(c) = &sct.corrected {
+                record_correct(r, &sct.setup.genes, c, &sct.rng_exit, sct.residuals.res_clip, bin_size);
+            }
         }
         Ok(())
     }
@@ -304,6 +405,7 @@ impl Observer for Writer {
     fn neighbors(&mut self, r: &Neighbors, ncol: usize) -> io::Result<()> {
         let d = self.out.join("neighbors");
         mkdir(&d)?;
+        self.graph_nnz = Some((r.nn.nnz(), r.snn.nnz()));
         let files = neighbors::output::write_outputs(&d, &self.barcodes, r, self.annoy, self.threads)?;
         self.files.extend(files.into_iter().map(|f| format!("neighbors/{f}")));
         self.neighbors_result = Some(neighbors::output::result_json(r, ncol));
@@ -502,6 +604,35 @@ impl Observer for Writer {
         self.phases.push((name.to_string(), self.start.elapsed().as_secs_f64(), peak_rss_kib()));
     }
 
+}
+
+/// The K10 stage dumps (M13), in the layout of the instrumented R runs' hooks on `correct()`
+/// (`validation/R/lib/clustering_hooks.R`): `K10_genes` (the genes it corrects: rows of the counts,
+/// 0-based), the scalars the hooks record, and `.Random.seed` at its entry (vst's state after the
+/// fits: `correct()` comes before `vst_exit` and draws nothing), placed where R records it.
+pub fn record_correct(rec: &mut StageRecorder, genes: &[usize], c: &sctransform::Corrected, rng_exit: &[i32], res_clip: (f64, f64), bin_size: usize) {
+    rec.writer.add_i32("K10_genes", CTX, genes.iter().map(|&g| g as i32).collect(), genes.len(), 1, "K10");
+    let at = rec.rng.iter().position(|k| k.ctx == CTX && k.label == "vst_exit").unwrap_or(rec.rng.len());
+    rec.rng.insert(at, scio::stages::Checkpoint { ctx: CTX.into(), stage: "K10".into(), label: "correct_entry".into(), state: rng_exit.to_vec() });
+    let int = |v: usize| Json::Int(v as i64);
+    for (k, v) in [
+        ("correct_n_genes", int(c.ngenes)),
+        ("correct_n_cells", int(c.ncells)),
+        ("correct_res_clip_range", Json::nums(&[res_clip.0, res_clip.1])),
+        ("correct_residuals_beyond_clip", Json::Int(c.beyond_clip as i64)),
+        ("correct_bin_size", int(bin_size)),
+        ("correct_y_is_data", Json::Bool(true)),
+        ("correct_latent_var", Json::Str("log_umi".into())),
+        ("correct_median_log_umi", Json::Num(c.median_log_umi)),
+        ("correct_median_is_R_median", Json::Bool(true)),
+        ("correct_regressor_row", Json::nums(&[1.0, c.median_log_umi])),
+        ("correct_scale_factor", Json::Null),
+        ("correct_do_round", Json::Bool(true)),
+        ("correct_do_pos", Json::Bool(true)),
+        ("vst_umi_corrected_nnz", int(c.nnz())),
+    ] {
+        rec.scalar(CTX, k, v);
+    }
 }
 
 /// `summary.json`'s `result.purity`: what was computed, its summary, and the certificate (every

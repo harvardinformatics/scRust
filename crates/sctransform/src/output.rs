@@ -98,7 +98,7 @@ pub fn result_json(sct: &Sct, n_features: usize) -> Json {
     let s = &sct.setup;
     let res = &sct.residuals;
     let n_out = sct.reg.outliers.iter().filter(|&&o| o).count();
-    Json::obj(vec![
+    let mut out = Json::obj(vec![
         ("n_cells", Json::Int(s.n_cells as i64)),
         ("n_features", Json::Int(n_features as i64)),
         ("n_genes_kept", Json::Int(s.genes.len() as i64)),
@@ -115,6 +115,30 @@ pub fn result_json(sct: &Sct, n_features: usize) -> Json {
         ("res_clip_range", Json::nums(&[res.res_clip.0, res.res_clip.1])),
         ("clip_range", Json::nums(&[res.clip.0, res.clip.1])),
         ("n_variable_features", Json::Int(res.top_features.len() as i64)),
+    ]);
+    // the corrected counts (M13), when computed: the members R's reference runs record
+    if let (Json::Object(m), Some(c)) = (&mut out, &sct.corrected) {
+        m.push(("corrected".into(), corrected_json(c)));
+    }
+    out
+}
+
+/// `result`'s summary of the corrected counts, with the digests R's reference runs record
+/// (`sct_counts_x_sha256`, `sct_data_x_sha256`: the stored values as doubles, in stored order).
+pub fn corrected_json(c: &crate::Corrected) -> Json {
+    let nc = c.n_count();
+    let total: f64 = nc.iter().sum();
+    Json::obj(vec![
+        ("n_features", Json::Int(c.ngenes as i64)),
+        ("n_cells", Json::Int(c.ncells as i64)),
+        ("nnz", Json::Int(c.nnz() as i64)),
+        ("min", c.min().map(|v| Json::Int(v as i64)).unwrap_or(Json::Null)),
+        ("explicit_zeros", Json::Int(0)),
+        ("median_log_umi", Json::Num(c.median_log_umi)),
+        ("residuals_beyond_clip", Json::Int(c.beyond_clip as i64)),
+        ("total", Json::Num(total)),
+        ("counts_x_sha256", Json::Str(c.x_sha256(false))),
+        ("data_x_sha256", Json::Str(c.x_sha256(true))),
     ])
 }
 
@@ -138,4 +162,82 @@ pub fn scale_data_sha256_r_order(res: &crate::Residuals) -> String {
         h.update(&buf);
     }
     h.hex()
+}
+
+/// The Matrix Market comment lines of the SCT assay's two layers (docs/PLAN.md C3f): what the
+/// matrix is, that it is not raw counts, how it was made (scrust's version and command) and the
+/// input's checksums (`inputs`: SHA-256 and name of each input file, as `sha256sum` prints
+/// them). Each line is written after `%`. Returns (counts layer, data layer).
+pub fn corrected_comments(command: &str, inputs: &[(String, String)], c: &crate::Corrected) -> (Vec<String>, Vec<String>) {
+    let version = env!("CARGO_PKG_VERSION");
+    let tail = |v: &mut Vec<String>| {
+        v.push(format!(" They are sctransform 0.4.3's correct() as Seurat 5.5.1's SCTransform() makes them: every cell's counts corrected to the median sequencing depth (log10 UMIs {}) and rounded.", scio::fmt17(c.median_log_umi)));
+        v.push(" Rows: the model genes, sct_features.tsv.gz; columns: the cells, sct_cells.tsv.gz. The raw counts are elsewhere (an export's counts/).".into());
+        v.push(format!(" Made by scrust {version}: {command}"));
+        for (sha, name) in inputs {
+            v.push(format!(" Input sha256: {sha}  {name}"));
+        }
+        v.push(" Described in summary.json (files) and README.txt.".into());
+    };
+    let mut counts = vec![" scrust: SCTransform's CORRECTED counts (Seurat's SCT assay, counts layer). NOT raw counts: do not use them as raw UMI counts.".to_string()];
+    tail(&mut counts);
+    let mut data = vec![" scrust: log1p of SCTransform's corrected counts (Seurat's SCT assay, data layer). NOT raw counts.".to_string()];
+    tail(&mut data);
+    (counts, data)
+}
+
+/// The manifest's entries for `scrust sctransform`'s layout (as [`write_outputs`] writes it), in
+/// the directory `dir` relative to the output directory (`""` or `"sct"`): `ncells` cells,
+/// `ngenes` kept genes, `n_step1` fitting genes, `nvf` variable features. With `corrected`, also
+/// the SCT assay's `counts` and `data` layers and their rows and columns ([`crate::Corrected::write`]).
+pub fn manifest_entries(dir: &str, ncells: usize, ngenes: usize, n_step1: usize, nvf: usize, corrected: Option<&crate::Corrected>) -> Vec<scio::manifest::Entry> {
+    use scio::manifest::{Entry, Ids};
+    let cells = Ids::named("cells", "cell_attr.tsv", "barcode");
+    let mut v = vec![
+        Entry::new("cell_attr.tsv", "sct_cell_attributes", "none", "tsv", "vst's cell attributes: barcode, umi (the cell's total count), log_umi (its log10); Seurat's SCTModel cell.attributes")
+            .header(true)
+            .shape(&[ncells, 3])
+            .rows(cells.clone()),
+        Entry::new("gene_attr.tsv", "sct_feature_attributes", "none", "tsv", "vst's attributes of the kept genes (detected in at least 5 cells), in the counts' order: id, name, detection_rate, gmean, amean, variance, residual_mean, residual_variance; Seurat's SCTModel feature.attributes")
+            .header(true)
+            .shape(&[ngenes, 8])
+            .rows(Ids::named("features", "gene_attr.tsv", "name")),
+        Entry::new("model_pars.tsv", "sct_model_pars", "none", "tsv", "the fitting genes' parameters (theta after the 1e-7 floor, (Intercept), log_umi), in sampling order")
+            .header(true)
+            .shape(&[n_step1, 5])
+            .rows(Ids::named("features", "model_pars.tsv", "name")),
+        Entry::new("model_pars_fit.tsv", "sct_model_pars_fit", "none", "tsv", "the regularised parameters (theta, (Intercept), log_umi) of every kept gene, in the counts' order; Seurat's SCTModel model.pars")
+            .header(true)
+            .shape(&[ngenes, 5])
+            .rows(Ids::named("features", "model_pars_fit.tsv", "name")),
+        Entry::new("variable_features.tsv", "sct_variable_features", "none", "tsv", "the variable features (id, name), highest residual variance first: Seurat's VariableFeatures(), the rows of scale_data.npy")
+            .header(true)
+            .shape(&[nvf, 2])
+            .rows(Ids::named("variable_features", "variable_features.tsv", "name")),
+        Entry::new("scale_data.npy", "sct_scale_data", "residuals", "npy", "Seurat's SCT scale.data: the variable features' Pearson residuals, clipped to +-sqrt(cells/30) and centred; float64, variable features x cells, column-major. NOT counts")
+            .shape(&[nvf, ncells])
+            .rows(Ids::named("variable_features", "variable_features.tsv", "name"))
+            .columns(cells),
+    ];
+    if let Some(c) = corrected {
+        let genes = Ids::numbered("features", "sct_features.tsv.gz", 1);
+        let cols = Ids::numbered("cells", "sct_cells.tsv.gz", 1);
+        v.push(
+            Entry::new("corrected_counts.mtx.gz", "sct_counts", "corrected_counts", "matrix_market", "Seurat's SCT counts layer: sctransform's correct() counts, corrected to the median depth and rounded (integers); model genes x cells. NOT raw counts")
+                .shape(&[c.ngenes, c.ncells])
+                .nnz(c.nnz())
+                .rows(genes.clone())
+                .columns(cols.clone()),
+        );
+        v.push(
+            Entry::new("log1p_corrected_counts.mtx.gz", "sct_data", "log1p_corrected_counts", "matrix_market", "Seurat's SCT data layer: log1p of the corrected counts; model genes x cells, the same entries. NOT raw counts")
+                .shape(&[c.ngenes, c.ncells])
+                .nnz(c.nnz())
+                .rows(genes)
+                .columns(cols),
+        );
+        v.push(Entry::new("sct_features.tsv.gz", "sct_features", "none", "tsv", "the model genes, one name per line, in the counts' order: the rows of the SCT counts and data layers").header(false).shape(&[c.ngenes, 1]));
+        v.push(Entry::new("sct_cells.tsv.gz", "sct_cells", "none", "tsv", "the cells, one barcode per line, in the counts' order: the columns of the SCT counts and data layers").header(false).shape(&[c.ncells, 1]));
+    }
+    v.into_iter().map(|e| e.under(dir)).collect()
 }

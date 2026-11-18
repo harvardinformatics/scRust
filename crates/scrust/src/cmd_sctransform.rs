@@ -1,14 +1,35 @@
 //! `scrust sctransform`: SCTransform v2 as Seurat 5.5.1's `SCTransform()` runs it with its
-//! defaults (docs/PLAN.md B3a, milestone M4), on a 10x counts directory.
+//! defaults (docs/PLAN.md B3a, milestone M4), on a 10x counts directory; with
+//! `--corrected-counts`, also the SCT assay's corrected counts and their `log1p` (C3f, M13): the
+//! SCT part of `scrust cluster --export`.
 
 use crate::cli::{self, Args, Phases};
 use rcompat::RRng;
+use scio::manifest::{Entry, Ids, Input, Manifest, Provenance};
 use scio::{tenx, Json};
 use std::path::Path;
 
+/// The manifest's entry for `cell_metadata.tsv` (the counts' per-cell columns, M11), at `path`.
+pub fn rna_entry(path: &str, ncells: usize) -> Entry {
+    Entry::new(path, "rna_cell_metadata", "none", "tsv", "the counts' per-cell columns, as CreateSeuratObject computes them: barcode, nCount_RNA, nFeature_RNA")
+        .header(true)
+        .shape(&[ncells, 3])
+        .rows(Ids::named("cells", path, "barcode"))
+}
+
+/// What README.txt says first about the SCT part (`scrust sctransform --corrected-counts`, and
+/// `sct/` of `scrust cluster --export`).
+pub fn readme_intro() -> Vec<String> {
+    vec![
+        "These files hold SCTransform's model and normalised data as Seurat 5.5.1's SCTransform() makes them (sctransform 0.4.3, glmGamPoi 1.22.0), computed by scrust. NONE OF THE MATRICES HERE ARE RAW COUNTS. The corrected counts are integers, corrected to the median sequencing depth by sctransform's correct(): read as raw counts, they would be taken for counts without complaint. For that reason no file here has a name a 10x reader looks for (matrix.mtx, barcodes.tsv, features.tsv, genes.tsv), and each matrix says what it holds in its comment lines.".into(),
+        "summary.json lists every file (its files section): its role, its scale (raw_counts, corrected_counts, log1p_corrected_counts, residuals, ...), its shape, where its row and column names are, its size and SHA-256, and how the output was made. The schema is described in docs/output_manifest.md of the scRust repository.".into(),
+        "Loaders that build Seurat, SingleCellExperiment and AnnData objects from these files, each layer in a slot meant for its scale, are coming (scRust milestone M14, loaders/). Until then, each file below loads with standard readers, as shown.".into(),
+    ]
+}
+
 pub const USAGE: &str = "\
 Usage: scrust sctransform --counts <10x dir> --out <dir> [--threads N] [--seed 1448145]
-                          [--variable-features 3000] [--ncells 5000]
+                          [--variable-features 3000] [--ncells 5000] [--corrected-counts]
                           [--from-stages <dir> --context <ctx>]
 
 SCTransform v2 as Seurat 5.5.1's SCTransform() runs it with its defaults: sctransform 0.4.3's
@@ -23,6 +44,9 @@ and scale.data, computed as R computes them (bit for bit under the same OpenBLAS
   --seed N                   seed.use, set before vst (default 1448145, Seurat's)
   --variable-features N      variable.features.n (default 3000)
   --ncells N                 cells used to fit the per-gene models (default 5000)
+  --corrected-counts         also the corrected counts of sctransform's correct() (Seurat's SCT
+                             counts layer, do.correct.umi = TRUE) and their log1p (its data
+                             layer): the SCT part of scrust cluster --export, never in 10x layout
   --from-stages <dir>        with --context: run on the SCT input of one DoubletFinder context
   --context <ctx>            (sweep_pN<pN> or final) of an instrumented R run, built from the
                              counts and the run's draws (S1): the real cells, then the doublets
@@ -38,9 +62,22 @@ Outputs:
   variable_features.tsv      id and name of the variable features, highest residual variance first
   scale_data.npy             scale.data: variable features x cells, float64, column-major (R's
                              layout; NumPy reads it with its shape)
-  summary.json               parameters, sizes, min_variance, bandwidth, timings, peak memory
+  cell_metadata.tsv          barcode, nCount_RNA, nFeature_RNA (CreateSeuratObject's columns)
+  summary.json               parameters, sizes, min_variance, bandwidth, timings, peak memory,
+                             and the manifest (files): every file's role, scale, shape and
+                             checksum, and how the output was made (docs/output_manifest.md)
+With --corrected-counts, also (none of them raw counts, none under a 10x name):
+  corrected_counts.mtx.gz        the corrected counts (integer Matrix Market): model genes x cells
+  log1p_corrected_counts.mtx.gz  their log1p (real Matrix Market)
+  sct_features.tsv.gz            the model genes (both matrices' rows), in the counts' order
+  sct_cells.tsv.gz               the cells (their columns)
+  README.txt                     what each file holds and how to load it
 Doubles are written with 17 significant digits.
 ";
+
+/// Options that change no value of any file the command writes: left out of the command the
+/// normalised matrices' comment lines give, so that the files do not depend on them.
+const OUTPUT_ONLY: [&str; 2] = ["out", "threads"];
 
 fn write(path: &Path, text: &str) -> Result<(), String> {
     std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
@@ -49,8 +86,12 @@ fn write(path: &Path, text: &str) -> Result<(), String> {
 pub fn main(argv: &[String]) -> Result<(), String> {
     let mut phases = Phases::new();
     let start_time = cli::utc_now();
-    let args = Args::parse(argv)?;
-    args.only(&["counts", "out", "threads", "seed", "variable-features", "ncells", "from-stages", "context"])?;
+    let args = Args::parse_with_flags(argv, &["corrected-counts"])?;
+    args.only(&["counts", "out", "threads", "seed", "variable-features", "ncells", "from-stages", "context", "corrected-counts"])?;
+    let correct = args.flag("corrected-counts");
+    if correct && args.get("from-stages").is_some() {
+        return Err("--corrected-counts: from the counts only, not with --from-stages".into());
+    }
     let counts_dir = args.path("counts")?;
     let out = args.path("out")?;
     let threads = cli::threads(&args)?;
@@ -63,6 +104,9 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         return Err(format!("{}: holds a previous run; choose another --out", out.display()));
     }
 
+    // the input's checksums: the manifest's provenance and the corrected counts' comment lines
+    let input_files = tenx::input_files(&counts_dir).map_err(|e| e.to_string())?;
+    let mut inputs = vec![Input::digest("counts", &counts_dir, &input_files.iter().map(|p| p.as_path()).collect::<Vec<_>>()).map_err(|e| e.to_string())?];
     let mut barcodes = tenx::read_barcodes(&counts_dir).map_err(|e| e.to_string())?;
     let features = tenx::read_features(&counts_dir).map_err(|e| e.to_string())?;
     let mut counts = scio::sparse::read_mtx(&counts_dir).map_err(|e| e.to_string())?;
@@ -77,6 +121,8 @@ pub fn main(argv: &[String]) -> Result<(), String> {
             let pairs = doublet_pairs(&stages, ctx).map_err(|e| e.to_string())?;
             counts = sct_input(&counts, &real, &pairs);
             barcodes = real.iter().map(|&c| barcodes[c].clone()).chain((1..=pairs.len()).map(|k| format!("X{k}"))).collect();
+            // the stage dumps' draws: their directory (a validation input; files not digested)
+            inputs.push(Input { option: "from-stages".into(), path: dir.to_string(), files: Vec::new() });
             Some((dir.to_string(), ctx.to_string()))
         }
         (None, None) => None,
@@ -86,7 +132,8 @@ pub fn main(argv: &[String]) -> Result<(), String> {
 
     // SCTransform seeds R's generator (set.seed(seed.use)) before it draws anything
     let mut rng = RRng::new(params.seed_use.unwrap_or(1448145));
-    let sct = sctransform::sctransform(&counts, &params, &mut rng, false, threads).map_err(|e| e.to_string())?;
+    let started = sctransform::start(&counts, &params, &mut rng).map_err(|e| e.to_string())?;
+    let sct = sctransform::finish_with(started, &params, &mut rng, false, correct, threads).map_err(|e| e.to_string())?;
     phases.mark("sctransform");
 
     std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
@@ -97,7 +144,39 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     if context.is_none() {
         cluster::metadata::RnaMetadata::of(&counts).write(&out.join(cluster::metadata::FILE), &barcodes).map_err(|e| e.to_string())?;
     }
+    let command = scio::manifest::canonical_command("sctransform", argv, &OUTPUT_ONLY, &["corrected-counts"]);
+    if let Some(c) = &sct.corrected {
+        let names: Vec<String> = sct.setup.genes.iter().map(|&g| features[g].name.clone()).collect();
+        let (cc, dc) = sctransform::output::corrected_comments(&command, &cli::input_checksums(&inputs), c);
+        c.write(&out, &names, &barcodes, &cc, &dc, threads).map_err(|e| e.to_string())?;
+    }
     phases.mark("write");
+
+    // the manifest (C3f): every file, its role and scale, and how the output was made
+    let s = &sct.setup;
+    let mut m = Manifest::new(
+        "sctransform",
+        Provenance {
+            scrust_version: env!("CARGO_PKG_VERSION").into(),
+            command_line: cli::command_line("sctransform", argv),
+            command,
+            inputs,
+            reproduces: vec![sctransform::REFERENCE.into()],
+            parameters: sctransform::output::params_json(&params),
+            seeds: Json::obj(vec![("SCTransform seed.use", params.seed_use.map(|v| Json::Int(v as i64)).unwrap_or(Json::Null))]),
+        },
+    );
+    m.push(Manifest::summary_entry());
+    m.entries.extend(sctransform::output::manifest_entries("", counts.ncol, s.genes.len(), s.genes_step1.len(), sct.residuals.top_features.len(), sct.corrected.as_ref()));
+    if context.is_none() {
+        m.push(rna_entry(cluster::metadata::FILE, counts.ncol));
+    }
+    if sct.corrected.is_some() {
+        m.push(Entry::new("README.txt", "readme", "none", "text", "this file: what each file holds and how to load it"));
+        let text = scio::manifest::readme(&m, "scrust sctransform --corrected-counts: SCTransform's model and its normalised data", &readme_intro());
+        write(&out.join("README.txt"), &text)?;
+    }
+    let files = cli::finish_manifest(&out, &mut m, threads)?;
 
     let fingerprint = Json::parse(&crate::fingerprint::json()).unwrap_or(Json::Null);
     let s = &sct.setup;
@@ -124,6 +203,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
                 ("fingerprint", fingerprint),
             ]),
         ),
+        ("files", files),
     ]);
     write(&out.join("summary.json"), &scio::json::to_file_text(&summary))?;
     eprintln!(

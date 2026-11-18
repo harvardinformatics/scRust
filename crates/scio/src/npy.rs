@@ -123,6 +123,44 @@ impl Npy {
         Ok(Npy { dtype, shape, fortran_order, data })
     }
 
+    /// The dtype and shape of the `.npy` file at `path`, from its header alone.
+    pub fn read_header(path: &Path) -> Result<(Dtype, Vec<usize>), NpyError> {
+        use std::io::Read;
+        let mut f = fs::File::open(path).map_err(|e| NpyError::Format(format!("{}: {e}", path.display())))?;
+        let mut head = vec![0u8; 12];
+        f.read_exact(&mut head).map_err(|e| NpyError::Format(format!("{}: {e}", path.display())))?;
+        if &head[..6] != b"\x93NUMPY" {
+            return Err(bad(path, "not a .npy file"));
+        }
+        let (hlen, hstart) = match head[6] {
+            1 => (u16::from_le_bytes([head[8], head[9]]) as usize, 10),
+            2 | 3 => (u32::from_le_bytes(head[8..12].try_into().unwrap()) as usize, 12),
+            v => return Err(bad(path, &format!("unsupported .npy version {v}"))),
+        };
+        let mut rest = vec![0u8; hstart + hlen - 12];
+        f.read_exact(&mut rest).map_err(|e| NpyError::Format(format!("{}: {e}", path.display())))?;
+        head.extend_from_slice(&rest);
+        // parse a header-only copy: the data length check is skipped by giving no data
+        let header = std::str::from_utf8(&head[hstart..]).map_err(|_| bad(path, "header is not text"))?;
+        let descr = header_field(header, "descr").ok_or_else(|| bad(path, "no descr"))?;
+        let dtype = if descr.starts_with("'<f8'") {
+            Dtype::F8
+        } else if descr.starts_with("'<i4'") {
+            Dtype::I4
+        } else {
+            return Err(bad(path, "unsupported dtype"));
+        };
+        let shape_txt = header_field(header, "shape").ok_or_else(|| bad(path, "no shape"))?;
+        let close = shape_txt.find(')').ok_or_else(|| bad(path, "bad shape"))?;
+        let shape = shape_txt[1..close]
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.parse().map_err(|_| bad(path, "bad shape")))
+            .collect::<Result<Vec<usize>, _>>()?;
+        Ok((dtype, shape))
+    }
+
     /// Rows: the first dimension (1 for a scalar).
     pub fn nrow(&self) -> usize {
         self.shape.first().copied().unwrap_or(1)
@@ -377,6 +415,8 @@ mod tests {
         write_f64_rows(&pr, &rows, nr, nc).unwrap();
         write_f64(&pc, &cols, &[nr, nc]).unwrap();
         assert_eq!(fs::read(&pr).unwrap(), fs::read(&pc).unwrap());
+        assert_eq!(Npy::read_header(&pr).unwrap(), (Dtype::F8, vec![nr, nc]));
+        assert_eq!(Npy::read_header(&q).unwrap(), (Dtype::I4, vec![2]));
         fs::remove_dir_all(&dir).unwrap();
     }
 }

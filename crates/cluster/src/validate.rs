@@ -14,8 +14,9 @@
 //!   neighbour counts, neighbour lists (cell by cell, where R kept them), weights, sums, totals,
 //!   purities and maxima), every `.Random.seed` checkpoint both recorded, and every scalar both
 //!   recorded (the radius among them). For runs that kept `scale.data` only as a digest (level
-//!   light), its digest (`result.scale_data_sha256`). Arrays of later milestones (K10: the
-//!   corrected counts, M13) are listed as not compared;
+//!   light), its digest (`result.scale_data_sha256`). Since M13 also K10: `correct()`'s genes
+//!   (`K10_genes`), its scalars (the median log_umi, the residuals beyond the clip range, ...) and
+//!   `.Random.seed` at its entry;
 //! - **K4: Annoy's index** (`stages/annoy.ann`), byte for byte;
 //! - **K6: the graphs**, R's `graphs/` against the candidate's `neighbors/`: dimensions, every
 //!   stored entry in order, every value;
@@ -30,8 +31,20 @@
 //!   `pca/` (embeddings, loadings and their features, standard deviations, total variance); the
 //!   `result` section's numbers (cells, clusters and their sizes, `scale.data`'s shape and digest,
 //!   the variable features, the optimizer's numbers, the digests of `.Random.seed` after
-//!   SCTransform and RunPCA). Columns of later milestones (`nCount_SCT`, `nFeature_SCT`: M13) are
-//!   left out;
+//!   SCTransform and RunPCA);
+//! - **K10: the corrected counts** (M13), when the candidate made them (`scrust cluster
+//!   --export`): `sct/corrected_counts.mtx.gz` and `log1p_corrected_counts.mtx.gz` against R's on
+//!   their data lines (R's comment lines name R's script, the candidate's scrust's command), or,
+//!   where R kept only a digest of the log1p data (levels standard and light), that digest as R
+//!   computed it; R's digest of the counts' values; `sct_features.tsv.gz` and `sct_cells.tsv.gz`;
+//!   `metadata.tsv`'s `nCount_SCT` and `nFeature_SCT`; and the same against the saved object;
+//! - **K10 teacher-forced**: `correct()` from R's own model parameters (`stages/vst/`), cell
+//!   attributes and the counts, against R's corrected counts, log1p data, `nCount_SCT`,
+//!   `nFeature_SCT` and K10 scalars. Its `mu` is a BLAS product, so it is graded under the
+//!   validator's own kernel against R's;
+//! - **the manifest** (M13): the candidate's `summary.json` `files` section describes its
+//!   directory: every file listed, every listed file present with its size and SHA-256, the
+//!   naming rules that keep normalised data from being read as raw counts;
 //! - **K9: the certificate** of the candidate's purity search (`result.purity.certificate`): the
 //!   pairs close enough to a threshold for KMKNN's floating-point bounds to treat them
 //!   differently, each labelled by kind (the median pair, on the radius by construction, or
@@ -480,6 +493,9 @@ pub struct CompareOptions {
     pub saved: Option<PathBuf>,
     /// The OpenBLAS kernel the saved objects were made with (default SapphireRapids, M8).
     pub saved_kernel: Option<String>,
+    /// The counts R's run read, for K10 teacher-forced (default: the R run's `run.input`, else the
+    /// candidate's `counts/`).
+    pub counts: Option<PathBuf>,
 }
 
 /// The kernel the saved objects were made with: every production job ran on Sapphire Rapids,
@@ -535,12 +551,15 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
         g.not_applicable("K1-K8", "stage dumps", Inputs::Free, "the reference has none (a direct run): its final files are compared".into());
     }
     compare_files(&mut g, reference, candidate, &r_summary, &c_result, &c_run, &r_meta, &c_meta)?;
+    compare_k10(&mut g, reference, candidate, &r_summary, &c_result, &r_meta, &c_meta)?;
     let saved_mode = match &opts.saved {
         Some(s) => Some(compare_saved(&mut g, s, opts.saved_kernel.as_deref().unwrap_or(SAVED_KERNEL), &c_summary, &c_meta, candidate)?),
         None => None,
     };
     teacher_forced_silhouette(&mut g, reference, &r_meta, r_scalars.as_ref())?;
     teacher_forced_purity(&mut g, reference, &r_meta, r_scalars.as_ref())?;
+    teacher_forced_correct(&mut g, reference, candidate, opts.counts.as_deref(), &r_summary, &r_meta, r_scalars.as_ref())?;
+    manifest_check(&mut g, candidate, &c_summary);
     Ok(Report { reference: reference.to_path_buf(), candidate: candidate.to_path_buf(), mode: g.mode, saved_mode, checks: g.checks })
 }
 
@@ -831,18 +850,21 @@ fn array_kind(array: &str) -> Option<(&'static str, Inputs, String, bool)> {
         "K7" => "K7",
         "K8" => "K8",
         "K9" => "K9",
+        "K10" => "K10",
         _ => return None,
     };
-    let inputs = if array.starts_with("S2a") { Inputs::Free } else if stage == "K1" { Inputs::Sct } else { Inputs::Pca };
+    // K10_genes: the kept genes (S2a), BLAS-free
+    let inputs = if array.starts_with("S2a") || array == "K10_genes" { Inputs::Free } else if stage == "K1" { Inputs::Sct } else { Inputs::Pca };
     let key = array.to_string();
     let align = matches!(array, "S3_embeddings" | "S3_loadings" | "K3_items" | "K8_centroids");
     Some((stage, inputs, key, align))
 }
 
-/// The later milestones' arrays, and what supplies them.
-fn later_milestone(array: &str) -> Option<&'static str> {
+/// R's arrays the candidate makes only on request, and the option that makes them: K10
+/// (`correct()`, M13) needs `--export`.
+fn on_request(array: &str) -> Option<&'static str> {
     if array.starts_with("K10") {
-        Some("the corrected counts, milestone M13")
+        Some("the corrected counts: scrust cluster --export")
     } else {
         None
     }
@@ -866,9 +888,11 @@ fn compare_stages(g: &mut Grader, reference: &Path, candidate: &Path, r_summary:
     for file in &files {
         for rb in rs.blocks_of(file) {
             let array = file.trim_end_matches(".npy").trim_end_matches(&format!(".{}", rb.ctx)).to_string();
-            if let Some(m) = later_milestone(&array) {
-                later.push(format!("{array} ({m})"));
-                continue;
+            if let Some(m) = on_request(&array) {
+                if cs.block(file, &rb.ctx).is_none() {
+                    later.push(format!("{array} ({m})"));
+                    continue;
+                }
             }
             if array == "K9_neighbors_ptr" || array == "K9_neighbors_idx" {
                 // compared cell by cell, below
@@ -929,7 +953,7 @@ fn compare_stages(g: &mut Grader, reference: &Path, candidate: &Path, r_summary:
     }
     if !later.is_empty() {
         later.dedup();
-        g.not_applicable("later", "arrays of later milestones", Inputs::Free, format!("not compared: {}", later.join(", ")));
+        g.not_applicable("K10", "arrays the candidate did not make", Inputs::Free, format!("not compared: {}", later.join(", ")));
     }
     // K9: purity's neighbour lists, cell by cell (where R kept them)
     if rs.has("K9_neighbors_ptr.npy", "chain") && rs.has("K9_neighbors_idx.npy", "chain") {
@@ -969,7 +993,8 @@ fn compare_stages(g: &mut Grader, reference: &Path, candidate: &Path, r_summary:
             "pca_entry" | "irlba_entry" => ("K2", Inputs::Free, None),
             "irlba_exit" | "pca_exit" => ("K2", Inputs::Pca, None),
             "groupsingletons_exit" => ("K7", Inputs::Pca, Some("compared under K7")),
-            "correct_entry" => ("later", Inputs::Free, Some("correct(): milestone M13")),
+            "correct_entry" if cr.state(&ctx, &label).is_none() => ("K10", Inputs::Free, Some("correct(): the candidate did not run it (scrust cluster --export)")),
+            "correct_entry" => ("K10", Inputs::Free, None),
             "chain_exit" => ("K9", Inputs::Free, Some("after neighborPurity, which draws nothing from R's stream (Rcpp's rng = false; KMKNN has its own generator): R's state after GroupSingletons where it drew, compared under K7, else after RunUMAP")),
             _ => ("K2", Inputs::Free, Some("after RunUMAP, which draws from R's stream and is not ported; nothing later reads these states (GroupSingletons reseeds)")),
         };
@@ -998,9 +1023,14 @@ fn compare_stages(g: &mut Grader, reference: &Path, candidate: &Path, r_summary:
             let inputs = match key.as_str() {
                 "vst_n_cells" | "n_genes" | "n_genes_step1" | "n_cells_step1" | "n_genes_step1_pool" | "gene_sampling" | "n_cells" | "density_bw" | "density_n" | "min_variance" | "res_clip_range" | "clip_range" | "n_bins_fit" => Inputs::Free,
                 "n_theta_below_1e7" | "n_theta_inf" | "reg_bw" | "mean_cell_sum" | "n_outliers" | "n_all_poisson_genes" | "n_smoothing_genes" => Inputs::Sct,
+                // correct() (K10): its setting and median from the counts; its residuals and
+                // counts from the fits and the residuals' products
+                "correct_residuals_beyond_clip" | "vst_umi_corrected_nnz" => Inputs::Sct,
+                k if k.starts_with("correct_") => Inputs::Free,
                 _ => Inputs::Pca,
             };
             let st: &'static str = match inputs {
+                _ if key.starts_with("correct_") || key == "vst_umi_corrected_nnz" => "K10",
                 Inputs::Free | Inputs::Sct => "K1",
                 Inputs::Pca if key.starts_with("pca") || key.starts_with("irlba") || key == "total_variance" => "K2",
                 Inputs::Pca if key.starts_with("annoy") => "K4",
@@ -1150,10 +1180,6 @@ fn compare_files(g: &mut Grader, reference: &Path, candidate: &Path, r_summary: 
     }
     // the candidate's certificate (C5: no flagged pair)
     certificate_check(g, "K9", "certificate of the candidate's purity search", Inputs::Free, c_result.get("purity"));
-    let later: Vec<&str> = ["nCount_SCT", "nFeature_SCT"].into_iter().filter(|c| r_meta.col(c).is_some()).collect();
-    if !later.is_empty() {
-        g.not_applicable("later", "metadata.tsv: columns of later milestones", Inputs::Free, format!("not compared: {} (M13)", later.join(", ")));
-    }
 
     // pca/: R's embeddings.npy, loadings.npy, loadings_features.tsv, stdev.npy, pca.json against
     // the candidate's scrust pca layout
@@ -1362,11 +1388,267 @@ fn compare_saved(g: &mut Grader, saved: &Path, saved_kernel: &str, c_summary: &J
         (Some(_), _) => g.not_applicable("saved", "neighborhood_purity", Inputs::Pca, "the candidate did not compute purities".into()),
         _ => {}
     }
-    let later: Vec<&str> = ["nCount_SCT", "nFeature_SCT"].into_iter().filter(|c| s_meta.col(c).is_some()).collect();
-    if !later.is_empty() {
-        g.not_applicable("later", "saved: columns of later milestones", Inputs::Free, format!("not compared: {} (M13)", later.join(", ")));
-    }
+    // K10 against the saved object (M13): nCount_SCT and nFeature_SCT, and its SCT counts and
+    // data layers; graded under the saved object's kernel (the floor: identical across kernels)
+    let keep = std::mem::replace(&mut g.mode, mode.clone());
+    let res = (|| -> Result<(), String> {
+        let saved_result = if exists_any(&saved.join("object.json")) { Some(read_json(&saved.join("object.json"))?) } else { None };
+        let c_result = c_summary.get("result").cloned().unwrap_or(Json::Null);
+        k10_columns(g, "saved", &s_meta, c_meta, &format!("saved under {saved_kernel}"));
+        k10_layers(g, "saved", saved, candidate, saved_result.as_ref(), &c_result, true)
+    })();
+    g.mode = keep;
+    res?;
     Ok(mode)
+}
+
+/// `nCount_SCT` and `nFeature_SCT` (K10): `reference`'s metadata against the candidate's, as text
+/// (R writes the integers as integers), when both have them.
+fn k10_columns(g: &mut Grader, stage: &'static str, r_meta: &Table, c_meta: &Table, what: &str) {
+    let n = r_meta.rows.len();
+    for col in ["nCount_SCT", "nFeature_SCT"] {
+        match (r_meta.col(col), c_meta.col(col)) {
+            (Some(a), Some(b)) if c_meta.rows.len() == n => {
+                let nd = (0..n).filter(|&i| r_meta.rows[i].get(a) != c_meta.rows[i].get(b)).count();
+                g.exact(stage, &format!("metadata.tsv: {col}"), Inputs::Sct, n, nd, format!("as text; {what}"));
+            }
+            (Some(_), None) => g.not_applicable(stage, &format!("metadata.tsv: {col}"), Inputs::Sct, "the candidate made no corrected counts (scrust cluster --export)".into()),
+            (Some(_), Some(_)) => g.exact(stage, &format!("metadata.tsv: {col}"), Inputs::Sct, n, n, format!("{n} cells in R's, {} in the candidate's", c_meta.rows.len())),
+            _ => {}
+        }
+    }
+}
+
+/// K10's layers: the reference's `sct/` (an R run's, or the saved object's export) against the
+/// candidate's: the corrected counts on their data lines, the log1p data on its data lines or,
+/// where the reference kept only a digest, by R's digest of its values; R's digest of the
+/// counts' values and the counts' summary (`facts`: R's `result` section or the saved object's
+/// `object.json`); the rows and columns (`sct_features.tsv.gz`, `sct_cells.tsv.gz`).
+fn k10_layers(g: &mut Grader, stage: &'static str, reference: &Path, candidate: &Path, facts: Option<&Json>, c_result: &Json, compare_files_too: bool) -> Result<(), String> {
+    let rs = reference.join("sct");
+    let cs = candidate.join("sct");
+    let r_has = exists_any(&rs.join("corrected_counts.mtx.gz"));
+    let c_corr = c_result.get("sctransform").and_then(|s| s.get("corrected")).filter(|c| !matches!(c, Json::Null));
+    if !cs.join("corrected_counts.mtx.gz").exists() || c_corr.is_none() {
+        if r_has {
+            g.not_applicable(stage, "sct/ corrected counts", Inputs::Sct, "the candidate made no corrected counts (scrust cluster --export)".into());
+        }
+        return Ok(());
+    }
+    let c_corr = c_corr.expect("checked");
+    if compare_files_too && r_has {
+        for (file, inputs) in [("corrected_counts.mtx.gz", Inputs::Sct), ("log1p_corrected_counts.mtx.gz", Inputs::Sct)] {
+            if !exists_any(&rs.join(file)) {
+                continue;
+            }
+            let d = scio::mtx::compare_data_lines(&rs.join(file), &cs.join(file)).map_err(|e| e.to_string())?;
+            let mut detail = format!("banner, size line and {} entries in R's, {} in the candidate's", d.entries.0, d.entries.1);
+            if d.banner.0 != d.banner.1 {
+                detail.push_str(&format!("; banners differ: R {:?}, Rust {:?}", d.banner.0, d.banner.1));
+            }
+            if d.size.0 != d.size.1 {
+                detail.push_str(&format!("; size lines differ: R {:?}, Rust {:?}", d.size.0, d.size.1));
+            }
+            if let Some((k, a, b)) = &d.first {
+                detail.push_str(&format!("; first difference at entry {k}: R {a:?}, Rust {b:?}"));
+            }
+            let nd = d.differing + (d.banner.0 != d.banner.1) as usize + (d.size.0 != d.size.1) as usize;
+            g.exact(stage, &format!("sct/{file} (data lines)"), inputs, d.entries.0.max(d.entries.1), nd, detail);
+        }
+        for file in ["sct_features.tsv.gz", "sct_cells.tsv.gz"] {
+            match (read_any(&rs.join(file)), read_any(&cs.join(file))) {
+                (Ok(a), Ok(b)) => {
+                    let (la, lb): (Vec<&[u8]>, Vec<&[u8]>) = (a.split(|&c| c == b'\n').collect(), b.split(|&c| c == b'\n').collect());
+                    let nd = if la.len() != lb.len() { la.len().max(lb.len()) } else { la.iter().zip(&lb).filter(|(x, y)| x != y).count() };
+                    g.exact(stage, &format!("sct/{file}"), Inputs::Free, la.len().saturating_sub(1), nd, "decompressed, line by line".into());
+                }
+                (Err(e), _) | (_, Err(e)) => g.missing(stage, &format!("sct/{file}"), Inputs::Free, e),
+            }
+        }
+    }
+    // R's digests of the values (sct_counts_x_sha256, sct_data_x_sha256) and the summary
+    if let Some(f) = facts {
+        let log1p_kept = exists_any(&rs.join("log1p_corrected_counts.mtx.gz"));
+        for (rk, ck, what) in [("sct_counts_x_sha256", "counts_x_sha256", "the corrected counts' values (R's digest)"), ("sct_data_x_sha256", "data_x_sha256", "the log1p data's values (R's digest)")] {
+            let (Some(a), Some(b)) = (f.get(rk).and_then(Json::as_str), c_corr.get(ck).and_then(Json::as_str)) else {
+                continue;
+            };
+            let name = if rk == "sct_data_x_sha256" && !log1p_kept { format!("{what}; R kept no copy") } else { what.to_string() };
+            g.exact(stage, &name, Inputs::Sct, 1, (a != b) as usize, if a == b { format!("sha256 {a}") } else { format!("R {a}, Rust {b}") });
+        }
+        let int = |j: Option<&Json>| j.and_then(Json::as_f64).map(|v| (v as i64).to_string()).unwrap_or_else(|| "-".into());
+        for (rk, ck, inputs) in [("sct_n_features", "n_features", Inputs::Free), ("sct_nnz", "nnz", Inputs::Sct), ("sct_counts_min", "min", Inputs::Sct), ("sct_counts_explicit_zeros", "explicit_zeros", Inputs::Sct)] {
+            if f.get(rk).is_none() {
+                continue;
+            }
+            let (a, b) = (int(f.get(rk)), int(c_corr.get(ck)));
+            g.exact(stage, &format!("corrected counts: {rk}"), inputs, 1, (a != b) as usize, if a == b { a } else { format!("R {a}, Rust {b}") });
+        }
+    }
+    Ok(())
+}
+
+/// K10 (M13), against R's final files and `result` section: the layers ([`k10_layers`]) and the
+/// metadata's `nCount_SCT` and `nFeature_SCT`.
+fn compare_k10(g: &mut Grader, reference: &Path, candidate: &Path, r_summary: &Option<Json>, c_result: &Json, r_meta: &Table, c_meta: &Table) -> Result<(), String> {
+    k10_columns(g, "K10", r_meta, c_meta, "against R's metadata.tsv");
+    let facts = r_summary.as_ref().and_then(|s| s.get("result"));
+    k10_layers(g, "K10", reference, candidate, facts, c_result, true)
+}
+
+/// The candidate's manifest (M13): its `summary.json` `files` section describes its directory
+/// (every file listed, every listed file present with its size and SHA-256, every role, scale and
+/// format known, the naming rules). BLAS-free: a property of the candidate's own files.
+fn manifest_check(g: &mut Grader, candidate: &Path, c_summary: &Json) {
+    let Some(files) = c_summary.get("files") else {
+        g.not_applicable("files", "manifest (summary.json files)", Inputs::Free, "the candidate's summary.json has no files section (made before M13)".into());
+        return;
+    };
+    match scio::manifest::Manifest::from_json(files) {
+        Ok(m) => match m.check(candidate, true) {
+            Ok(problems) => {
+                let n = m.entries.len();
+                let detail = if problems.is_empty() {
+                    format!("{n} files listed, each present with its size and SHA-256; the naming rules hold; schema {} {}", scio::manifest::SCHEMA, scio::manifest::VERSION)
+                } else {
+                    format!("{}: {}", problems.len(), problems.iter().take(8).cloned().collect::<Vec<_>>().join("; "))
+                };
+                g.push("files", "manifest (summary.json files)", Class::BlasFree, "exact".into(), if problems.is_empty() { Status::Identical } else { Status::Differ }, n, problems.len(), detail);
+            }
+            Err(e) => g.missing("files", "manifest (summary.json files)", Inputs::Free, e.to_string()),
+        },
+        Err(e) => g.push("files", "manifest (summary.json files)", Class::BlasFree, "exact".into(), Status::Differ, 1, 1, e),
+    }
+}
+
+/// `correct()` from R's own model parameters (`stages/vst/model_pars_fit.tsv`), cell attributes
+/// (`stages/vst/cell_attr.tsv`), genes (`K10_genes`) and the counts R read (teacher forcing,
+/// K10): the corrected counts, their log1p, `nCount_SCT`, `nFeature_SCT` and the K10 scalars,
+/// against R's. Its products are OpenBLAS's, so it is graded under the validator's own kernel
+/// against R's recorded one.
+fn teacher_forced_correct(g: &mut Grader, reference: &Path, candidate: &Path, counts: Option<&Path>, r_summary: &Option<Json>, r_meta: &Table, r_scalars: Option<&Json>) -> Result<(), String> {
+    let vst = reference.join("stages/vst");
+    let genes_path = reference.join("stages/K10_genes.npy");
+    if !exists_any(&vst.join("model_pars_fit.tsv")) || !exists_any(&vst.join("cell_attr.tsv")) || !exists_any(&genes_path) {
+        return Ok(());
+    }
+    // the counts R read: given, R's run.input, or the candidate's copy
+    let from_r = r_summary.as_ref().and_then(|s| s.get("run")).and_then(|r| r.get("input")).and_then(Json::as_str).map(PathBuf::from);
+    let dir = match (counts, from_r) {
+        (Some(c), _) => c.to_path_buf(),
+        (None, Some(p)) if p.is_dir() => p,
+        _ if candidate.join("counts").is_dir() => candidate.join("counts"),
+        _ => {
+            g.not_applicable("K10 teacher", "correct() on R's model", Inputs::Free, "no counts found (give --counts)".into());
+            return Ok(());
+        }
+    };
+    let counts = scio::sparse::read_mtx(&dir).map_err(|e| e.to_string())?;
+    let features = scio::tenx::read_features(&dir).map_err(|e| e.to_string())?;
+    let gi = read_npy(&genes_path)?;
+    let genes: Vec<usize> = (0..gi.nrow()).map(|i| gi.get_i32(i, 0) as usize).collect();
+    let mp = read_table(&vst.join("model_pars_fit.tsv"))?;
+    let (nc_, tc, ic, lc) = (mp.col("name").ok_or("model_pars_fit.tsv: no name")?, mp.col("theta").ok_or("no theta")?, mp.col("(Intercept)").ok_or("no (Intercept)")?, mp.col("log_umi").ok_or("no log_umi")?);
+    if mp.rows.len() != genes.len() || genes.iter().zip(&mp.rows).any(|(&k, r)| features.get(k).map(|f| &f.name) != r.get(nc_)) {
+        return Err(format!("{}: its genes are not K10_genes' rows of {}", vst.join("model_pars_fit.tsv").display(), dir.display()));
+    }
+    let num = |v: &str| scio::parse17(v).ok_or_else(|| format!("model_pars_fit.tsv: bad value {v}"));
+    let mut pars: Vec<[f64; 3]> = Vec::with_capacity(genes.len());
+    for r in &mp.rows {
+        pars.push([num(&r[tc])?, num(&r[ic])?, num(&r[lc])?]);
+    }
+    let ca = read_table(&vst.join("cell_attr.tsv"))?;
+    let luc = ca.col("log_umi").ok_or("cell_attr.tsv: no log_umi")?;
+    let log_umi: Vec<f64> = ca.rows.iter().map(|r| num(&r[luc])).collect::<Result<_, _>>()?;
+    if log_umi.len() != counts.ncol {
+        return Err(format!("cell_attr.tsv: {} cells, the counts {}", log_umi.len(), counts.ncol));
+    }
+    let rows = sctransform::GeneRows::from_csc(&counts, &genes);
+    drop(counts);
+    let bin_size = r_scalars.and_then(|s| jnum(s, "correct_bin_size")).map(|v| v as usize).unwrap_or(500);
+    let params = sctransform::SctParams { bin_size, ..sctransform::SctParams::default() };
+    let threads = std::thread::available_parallelism().map(|v| v.get()).unwrap_or(1);
+    let (_, c) = sctransform::residuals_corrected(&rows, &sctransform::ResidualInput { model_pars_fit: &pars, log_umi: &log_umi }, &params, false, threads).map_err(|e| e.to_string())?;
+    drop(rows);
+    // the mode: R's kernel against the one this process runs
+    let running = rcompat::blas::corename();
+    let mode = grade::mode(grade::recorded_kernel(r_summary.as_ref()).as_deref(), Some(running.as_str()));
+    let keep = std::mem::replace(&mut g.mode, mode.clone());
+    let class = Class::BlasDependent;
+    let crit = if g.mode.is_exact() { "exact".to_string() } else { "exact (the floor: identical across kernels)".to_string() };
+    let push = |g: &mut Grader, name: &str, n: usize, nd: usize, detail: String| {
+        g.push("K10 teacher", name, class, crit.clone(), if nd == 0 { Status::Identical } else { Status::Differ }, n, nd, detail);
+    };
+    let kernel_note = format!("under this process's kernel {running}: {} mode", mode.name());
+    // the corrected counts and their log1p against R's files, entry by entry (where R's run has
+    // them: the committed fixtures keep R's model and metadata only)
+    let has_counts = exists_any(&reference.join("sct/corrected_counts.mtx.gz"));
+    let entries_differ = |vals: &dyn Fn(usize) -> f64, e: &scio::mtx::Entries| -> (usize, Option<String>) {
+        let m = e.vals.len().min(c.nnz());
+        let mut col_of = vec![0u32; c.nnz()];
+        for j in 0..c.ncells {
+            for k in c.p[j]..c.p[j + 1] {
+                col_of[k] = j as u32;
+            }
+        }
+        let mut nd = e.vals.len().max(c.nnz()) - m;
+        let mut first = None;
+        for k in 0..m {
+            if e.rows[k] != c.i[k] || e.cols[k] != col_of[k] || e.vals[k].to_bits() != vals(k).to_bits() {
+                nd += 1;
+                if first.is_none() {
+                    first = Some(format!("first at entry {}: R ({}, {}) {}, Rust ({}, {}) {}", k + 1, e.rows[k] + 1, e.cols[k] + 1, scio::fmt17(e.vals[k]), c.i[k] + 1, col_of[k] + 1, scio::fmt17(vals(k))));
+                }
+            }
+        }
+        (nd, first)
+    };
+    if has_counts {
+        let r_cnt = scio::mtx::read_entries(&reference.join("sct/corrected_counts.mtx.gz")).map_err(|e| e.to_string())?;
+        let (nd, first) = entries_differ(&|k| c.x[k] as f64, &r_cnt);
+        let dims_ok = (r_cnt.nrow, r_cnt.ncol) == (c.ngenes, c.ncells);
+        push(g, "corrected counts (R's model; against R's sct/corrected_counts.mtx.gz)", r_cnt.vals.len(), nd + (!dims_ok) as usize, format!("{} entries in R's, {} in Rust's; {kernel_note}{}", r_cnt.vals.len(), c.nnz(), first.map(|f| format!("; {f}")).unwrap_or_default()));
+    }
+    let l = sctransform::correct::Log1p::new();
+    if exists_any(&reference.join("sct/log1p_corrected_counts.mtx.gz")) {
+        let r_dat = scio::mtx::read_entries(&reference.join("sct/log1p_corrected_counts.mtx.gz")).map_err(|e| e.to_string())?;
+        let (nd, first) = entries_differ(&|k| l.of(c.x[k]), &r_dat);
+        push(g, "log1p data (R's model; against R's sct/log1p_corrected_counts.mtx.gz)", r_dat.vals.len(), nd, format!("{} entries; {kernel_note}{}", r_dat.vals.len(), first.map(|f| format!("; {f}")).unwrap_or_default()));
+    }
+    if let Some(res) = r_summary.as_ref().and_then(|s| s.get("result")) {
+        for (rk, log1p, what) in [("sct_counts_x_sha256", false, "corrected counts' values (R's model; R's digest)"), ("sct_data_x_sha256", true, "log1p data's values (R's model; R's digest)")] {
+            if let Some(a) = res.get(rk).and_then(Json::as_str) {
+                let b = c.x_sha256(log1p);
+                push(g, what, 1, (a != b) as usize, if a == b { format!("sha256 {a}; {kernel_note}") } else { format!("R {a}, Rust {b}; {kernel_note}") });
+            }
+        }
+    }
+    // nCount_SCT and nFeature_SCT against R's metadata.tsv
+    let n = r_meta.rows.len();
+    let (ncount, nfeat) = (c.n_count(), c.n_feature());
+    for (col, got) in [("nCount_SCT", ncount.iter().map(|&v| scio::fmt17(v)).collect::<Vec<_>>()), ("nFeature_SCT", nfeat.iter().map(|v| v.to_string()).collect())] {
+        if let Some(a) = r_meta.col(col) {
+            let nd = if got.len() != n { n.max(got.len()) } else { (0..n).filter(|&i| r_meta.rows[i].get(a) != Some(&got[i])).count() };
+            push(g, &format!("{col} (R's model; against R's metadata.tsv)"), n, nd, kernel_note.clone());
+        }
+    }
+    // the K10 scalars R's hooks recorded
+    if let Some(sc) = r_scalars {
+        let pairs: [(&str, String); 4] = [
+            ("correct_median_log_umi", scio::fmt17(c.median_log_umi)),
+            ("correct_residuals_beyond_clip", c.beyond_clip.to_string()),
+            ("vst_umi_corrected_nnz", c.nnz().to_string()),
+            ("correct_n_genes", c.ngenes.to_string()),
+        ];
+        for (key, got) in pairs {
+            if let Some(v) = sc.get(key) {
+                let want = atoms_text(v);
+                push(g, &format!("{key} (R's model)"), 1, (want != got) as usize, if want == got { want } else { format!("R {want}, Rust {got}") });
+            }
+        }
+    }
+    g.mode = keep;
+    Ok(())
 }
 
 /// approxSilhouette on R's own embeddings and labels (teacher forcing): exact on any machine.

@@ -18,8 +18,9 @@ Usage: scrust validate doubletfinder --candidate <Rust output dir> [--reference 
                                  [--json <file>] [--markdown <file>]
        scrust validate cluster --reference <R run dir> --candidate <Rust output dir>
                                [--optimizer <dir>] [--panel <tsv> --object <name>]
-                               [--saved <dir>] [--saved-kernel <name>]
+                               [--saved <dir>] [--saved-kernel <name>] [--counts <10x dir>]
                                [--json <file>] [--markdown <file>]
+       scrust validate manifest --dir <scrust output dir> [--json <file>]
 
 doubletfinder: compares a Rust run with an R reference run (--reference): cells.tsv,
 sweep_stats.tsv and bcmvn.tsv byte for byte and the result section of summary.json field by
@@ -70,7 +71,21 @@ res.<r>), every start's iterations and modularity as a double, the best start, i
 each start's partition when the candidate ran with --keep-stages. With --panel
 (validation/clustering_panel.tsv) and --object, the numbers the workflow job logged. A run
 started from R's own embeddings or SNN graph uses no BLAS, so its comparison is exact on any
-machine.
+machine. K10 (M13), when the candidate ran with --export: sct/corrected_counts.mtx.gz and
+log1p_corrected_counts.mtx.gz against R's on their data lines (or, where R kept only a digest of
+the log1p data, by R's digest of its values), R's digest of the counts' values, sct_features and
+sct_cells, metadata.tsv's nCount_SCT and nFeature_SCT, the K10 stage dumps (correct()'s genes,
+its median log_umi, the residuals beyond the clip range, .Random.seed at its entry), the same
+against the saved object; and teacher-forced, correct() on R's own model parameters, cell
+attributes and counts (--counts, else the R run's input, else the candidate's counts/), graded
+under this process's OpenBLAS kernel against R's. And the candidate's manifest (summary.json's
+files section) against its directory.
+
+manifest: checks that an output directory's manifest (summary.json's files section, docs/PLAN.md
+C3f) describes it: every file listed once, every listed file present with its size and SHA-256,
+every role, scale and format known, every identifier file listed, and the naming rules that keep
+normalised data from being read as raw counts (no 10x file name outside raw counts, no
+normalised file name ending in matrix.mtx(.gz)).
 
 Exit status 0 when nothing differs beyond what the grading allows, 1 otherwise.
 ";
@@ -87,6 +102,9 @@ pub fn main(argv: &[String]) -> Result<bool, String> {
     }
     if tool == "floor" {
         return floor_report(&argv[1..]);
+    }
+    if tool == "manifest" {
+        return manifest_report(&argv[1..]);
     }
     let report = match tool.as_str() {
         "doubletfinder" => doubletfinder_report(&argv[1..])?,
@@ -154,7 +172,7 @@ fn neighbors_report(argv: &[String]) -> Result<bool, String> {
 
 fn cluster_report(argv: &[String]) -> Result<bool, String> {
     let args = Args::parse(argv)?;
-    args.only(&["reference", "candidate", "optimizer", "panel", "object", "saved", "saved-kernel", "json", "markdown"])?;
+    args.only(&["reference", "candidate", "optimizer", "panel", "object", "saved", "saved-kernel", "counts", "json", "markdown"])?;
     let reference = args.path("reference")?;
     let candidate = args.path("candidate")?;
     let panel = match (args.get("panel"), args.get("object")) {
@@ -167,6 +185,7 @@ fn cluster_report(argv: &[String]) -> Result<bool, String> {
         panel,
         saved: args.get("saved").map(PathBuf::from),
         saved_kernel: args.get("saved-kernel").map(String::from),
+        counts: args.get("counts").map(PathBuf::from),
     };
     let report = cluster::validate::compare(&reference, &candidate, &opts)?;
     if let Some(p) = args.get("json").map(PathBuf::from) {
@@ -201,6 +220,46 @@ fn cluster_report(argv: &[String]) -> Result<bool, String> {
     }
     eprintln!("{verdict}");
     Ok(report.pass())
+}
+
+/// `scrust validate manifest`: an output directory's manifest against the directory.
+fn manifest_report(argv: &[String]) -> Result<bool, String> {
+    let args = Args::parse(argv)?;
+    args.only(&["dir", "json"])?;
+    let dir = args.path("dir")?;
+    let m = scio::manifest::Manifest::read(&dir)?;
+    let problems = m.check(&dir, true).map_err(|e| e.to_string())?;
+    let mut by_role: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+    for e in &m.entries {
+        *by_role.entry(e.role.as_str()).or_default() += 1;
+    }
+    let bytes: u64 = m.entries.iter().filter_map(|e| e.bytes).sum();
+    if let Some(p) = args.get("json").map(PathBuf::from) {
+        let j = scio::Json::obj(vec![
+            ("dir", scio::Json::Str(dir.display().to_string())),
+            ("command", scio::Json::Str(m.command.clone())),
+            ("schema", scio::Json::Str(format!("{} {}", scio::manifest::SCHEMA, scio::manifest::VERSION))),
+            ("files", scio::Json::Int(m.entries.len() as i64)),
+            ("bytes", scio::Json::Int(bytes as i64)),
+            ("roles", scio::Json::Object(by_role.iter().map(|(k, v)| (k.to_string(), scio::Json::Int(*v as i64))).collect())),
+            ("problems", scio::Json::strs(&problems)),
+            ("pass", scio::Json::Bool(problems.is_empty())),
+        ]);
+        std::fs::write(&p, scio::json::to_file_text(&j)).map_err(|e| format!("{}: {e}", p.display()))?;
+    }
+    for p in &problems {
+        eprintln!("  {p}");
+    }
+    eprintln!(
+        "{}: scrust {} manifest ({} {}): {} files, {bytes} bytes; roles: {}",
+        if problems.is_empty() { "pass" } else { "FAIL" },
+        m.command,
+        scio::manifest::SCHEMA,
+        scio::manifest::VERSION,
+        m.entries.len(),
+        by_role.iter().map(|(k, v)| format!("{k} {v}")).collect::<Vec<_>>().join(", ")
+    );
+    Ok(problems.is_empty())
 }
 
 /// `scrust validate floor`: the R-vs-R floor between pairs of runs that differ only in their

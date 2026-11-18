@@ -1,0 +1,24 @@
+# Python env for the export's guard test (docs/PLAN.md C3f, milestone M13): scanpy's
+# read_10x_mtx must fail on an export's sct/ and top directory, with and without prefix=, and
+# read its counts/ (validation/python/guard_read10x.py). Milestone M14 extends it for the Python
+# loader (C3g: numpy, scipy, pandas, anndata), as plan A1 and A2 name it.
+#
+# Create it as a project-local env inside the repo (gitignored), never under the home directory,
+# with conda's package cache off the home directory (conda config --show pkgs_dirs) and without
+# registering it in ~/.conda/environments.txt:
+#   module load python
+#   CONDA_REGISTER_ENVS=false conda env create -p .envs/loaders-py -f envs/loaders-py.yml
+# loaders-py.linux-64.pin.txt next to this file records the exact solve; to rebuild exactly that:
+#   CONDA_REGISTER_ENVS=false conda create -p .envs/loaders-py --file envs/loaders-py.linux-64.pin.txt
+# Use it with PYTHONNOUSERSITE=1 (env.sh sets it), so that nothing from ~/.local is imported:
+#   PYTHONNOUSERSITE=1 .envs/loaders-py/bin/python -I validation/python/guard_read10x.py ...
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.13.18
+  - scanpy=1.13.0
+  - anndata=0.13.4
+  - numpy=2.5.5
+  - scipy=1.18.1
+  - pandas=3.1.1

@@ -130,6 +130,25 @@ crates/knn and crates/cluster (milestone M12) port:
   differently (the certificate). Equal raw distances are reported by cell
   index, where KMKNN orders them by its own internal index.
 
+crates/sctransform and crates/cluster (milestone M13) port:
+
+- sctransform 0.4.3 (Christoph Hafemeister and Saket Choudhary, GPL-3):
+  correct() (R/denoise.R), as vst() calls it with return_corrected_umi = TRUE
+  (R/vst.R), and make.sparse() (R/utils.R): the regressors at the median of
+  log_umi, the products per bin of genes, the variance at the median depth,
+  the corrected values, round(x, 0), negatives to 0 and the zeros dropped,
+  in crates/sctransform/src/correct.rs and residuals.rs. Changes: the
+  corrected values are made in the same pass as vst's residuals (S2d), from
+  each residual before vst clips it, one bin's products at a time, and kept
+  sparse; the product at the median depth is kept as its runs of equal values
+  per gene. R's round(x, 0) is nearbyint() (R 4.5.3's src/nmath/fround.c,
+  GPL (>= 2)).
+- Seurat 5.5.1 (MIT): SCTransform.Assay's SCT assay (R/preprocessing.R: the
+  corrected counts as its counts layer, their log1p as its data layer) and
+  the nCount_SCT and nFeature_SCT that adding the assay computes
+  (SeuratObject 5.4.0's .CalcN), in crates/sctransform/src/correct.rs and
+  crates/cluster/src/chain_output.rs.
+
 Planned, with licensing to be handled when the work starts
 ----------------------------------------------------------
 SoupX 1.6.2                            GPL-2 only. This is incompatible with
