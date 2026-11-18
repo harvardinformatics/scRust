@@ -221,7 +221,7 @@ Tools that take cluster labels (SoupX, decontX, DoubletFinder) accept them as an
   3. Port it.
   4. Validate stage by stage.
   5. Validate on T, P and the full panel.
-  6. Benchmark.
+  6. Benchmark the port against the workflow's R step by the method of `docs/benchmarks.md` (CPU time, peak memory, the share of each due to reading and writing files, and the input's size), and add its rows and update the findings there. This is a standing rule from the first benchmark (2026-11-18) on.
   7. Update the user documentation (M14b): the tool's page of formats and how to read them, the chaining page and the schematic. From M14b on this is a standing rule: every milestone or port that adds or changes a tool, a file or a loader updates those pages and the schematic in the same branch.
 - The details of each later tool (parameters as the workflow uses them, RNG use, exactness hazards) are researched when that tool starts, as was done for DoubletFinder.
 
