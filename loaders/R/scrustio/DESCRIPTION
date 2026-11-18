@@ -3,7 +3,7 @@ Type: Package
 Title: Load scrust Outputs into Seurat and SingleCellExperiment Objects
 Version: 0.1.0
 Author: scRust contributors
-Maintainer: scRust contributors <scrust-maintainers@example.org>
+Maintainer: Adam Freedman <adamfreedman@fas.harvard.edu>
 Description: Reads the plain files that scRust's command-line tool (scrust)
     writes, through the manifest in each output's summary.json (schema
     scrust-files, version 1), and builds Seurat 5.5.1 objects (with an SCT
