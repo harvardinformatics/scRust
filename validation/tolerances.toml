@@ -675,6 +675,52 @@ teacher_forced = "exact under the validator's own kernel when it is R's; otherwi
 # placeholders for M13 are compared, identical (validation/slurm/m13_unchanged.sh).
 settled = { comparisons = 222, k10_identical = 4200, saved_k10_identical = 2632, teacher_forced_identical = 964, mismatched_k10_identical = 1890, mismatched_teacher_forced_identical = 666, m12_checks_unchanged = 36337, m12_placeholders_compared = 678 }
 
+# K11, the export and the loaders (M14; docs/PLAN.md C3g, C4 "Loader tests"): each loader's object,
+# built from a `scrust cluster --export` output (M13's validation exports), against the saved
+# workflow object: the R loaders' Seurat object and SingleCellExperiment against the saved .rds
+# (validation/R/loader_compare.R), the Python loader's AnnData against M8's export of it
+# (validation/python/loader_compare.py). Compared: the raw counts, the SCT layers (corrected
+# counts, log1p, scale.data), the SCTModel (every slot), the variable features, the chain's metadata
+# columns with their levels, the identities, the PCA (embeddings, loadings, stdev, total variance)
+# and both graphs. Graded as M11-M13 grade: exact when the export's recorded OpenBLAS kernel is the
+# saved objects' (production profile); otherwise BLAS-free components exact and BLAS-dependent ones
+# within [clustering.floor.kernel] (portable profile). Also: every value the loaders read equals
+# the file's (%.17g text identity in R, an independent correctly rounded parse in Python, .npy as
+# bytes); the one-line commands' .rds and .h5ad reload into objects identical to the loaders';
+# Seurat's Read10X and scanpy's read_10x_mtx fail on sct/ and on the export's top level of every
+# export loaded; every slot refuses every other role, scale and format, and the loaders refuse
+# tampered manifests. Components the export does not hold are reported as not rebuilt (the UMAP,
+# the commands, other workflow steps' metadata columns, the RNA assay's v3 class on the emptyDrops
+# path, and in the Python loader cells_step1 above 5,000 cells).
+[clustering.K11]
+criterion = "exact"
+profile_production = "identical objects: every component identical"
+profile_portable = { files = "exact (the objects hold what the files hold)", saved = "floor", floor = "clustering.floor.kernel" }
+readers = "Read10X and read_10x_mtx fail on sct/ and on the top level of every export loaded; read counts/ as the input"
+wrong_slot = "refused: every role, scale and format other than the slot's"
+round_trip = "identical"
+# Settled (M14; M13's exports, label m13-9ce0adb; validation/slurm/m14_loaders.sbatch): 204
+# comparisons of the 34 objects' exports (both profiles, three loaders) and 60 of the ten scrust
+# doubletfinder outputs, all passing. Production profile: every component identical (Seurat 1,800,
+# SingleCellExperiment 1,428, AnnData 1,619, the DoubletFinder outputs' 130). Portable profile:
+# 249 (Seurat), 201 (SingleCellExperiment) and 198 (AnnData) components within the floor, each
+# object's differences M8's measurement of it, none beyond it; the AnnData's scale.data of the
+# three light-level objects compared by M8's digest, reported. Every value read checked against
+# the files: 3,627,555,688 in R and 3,627,049,492 in Python, none differing. The 264 round trips
+# identical. Read10X and read_10x_mtx on all 68 exports: 340 directories and 52,088 attempts, all
+# as required. Wrong slots: 8,496 (R) and 4,248 (Python) combinations, every one refused.
+settled = { comparisons = 264, export_comparisons = 204, doubletfinder_comparisons = 60, production_identical_seurat = 1800, production_identical_sce = 1428, production_identical_anndata = 1619, portable_within_floor_seurat = 249, portable_within_floor_sce = 201, portable_within_floor_anndata = 198, beyond_floor = 0, values_checked_r = 3627555688, values_checked_python = 3627049492, round_trips = 264, readers_exports = 68, read10x_directories = 340, read_10x_mtx_attempts = 52088, wrong_combinations_r = 8496, wrong_combinations_python = 4248 }
+
+# K13, markers (M14; docs/PLAN.md C4 "Markers"): the workflow's find_markers.R and combine_markers.R
+# steps on the Seurat loader's object (validation/R/markers_from_loader.R), the clusters combined
+# in the saved table's order, against the saved <prefix>_markergenes.csv.
+[clustering.K13]
+criterion = "exact"
+compare = "the combined table, byte for byte"
+# Settled (M14; validation/slurm/m14_markers.sbatch): the 34 objects' tables from both profiles'
+# exports, 68 of 68 identical byte for byte (82 to 327 rows on tier T, 22,943 to 81,448 on tier P).
+settled = { tables = 68, identical = 68 }
+
 # Kernel-gated grading shown on deliberately mismatched pairs (M11): each Rust run against the
 # other profile's instrumented R run on Sapphire Rapids, 68 pairs of the 34 objects in both
 # directions: all in tolerance mode, every BLAS-free check identical, 1,028 BLAS-dependent checks

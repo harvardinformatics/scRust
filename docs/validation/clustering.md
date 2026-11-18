@@ -1,12 +1,32 @@
-# Clustering in Rust (Step 2; milestones M11, M12 and M13)
+# Clustering in Rust (Step 2; milestones M11, M12, M13 and M14)
 
 M11 runs the workflow's clustering chain end to end in Rust, from the counts to the labels and the silhouette widths (docs/PLAN.md C1, C3, C5, C6): SCTransform at seed 12345, the workflow's PCA guard, RunPCA with 50 PCs, FindNeighbors (Annoy, k = 20, dims 1:30), FindClusters (Louvain, resolution 0.8, seed 12345, singletons grouped) and bluster's `approxSilhouette`. It chains the `sctransform` and `pca` crates of Step 1 with M9's `neighbors` and M10's `cluster`, and adds the silhouette widths, `scrust cluster --counts` with its staged starts, parameters, preset and TOML file, and `scrust validate cluster` for the whole chain. It also adds kernel-gated grading (A5b mechanism 3) to both validators and a kernel check to the fixture tests.
 
 M12 adds the workflow's second score, neighbourhood purity: bluster's `neighborPurity`, with its search done exhaustively with knncolle's arithmetic and a certificate of where KMKNN, the algorithm R uses, could differ. Its outcome comes after M13's ([M12 outcome](#m12-outcome)), its details after M11's ([M12: neighbourhood purity](#m12-neighbourhood-purity)).
 
-M13 adds the rest of the SCT assay, the corrected counts of sctransform's `correct()`, and the export: the input counts, SCTransform's normalised data and the per-cell metadata as plain files that no 10x reader takes for raw counts, with a manifest of every file in every command's `summary.json`. Its outcome comes first ([M13 outcome](#m13-outcome)), its details last ([M13: the corrected counts and the export](#m13-the-corrected-counts-and-the-export)).
+M13 adds the rest of the SCT assay, the corrected counts of sctransform's `correct()`, and the export: the input counts, SCTransform's normalised data and the per-cell metadata as plain files that no 10x reader takes for raw counts, with a manifest of every file in every command's `summary.json`. Its outcome comes after M14's ([M13 outcome](#m13-outcome)), its details after M12's ([M13: the corrected counts and the export](#m13-the-corrected-counts-and-the-export)).
+
+M14 adds the loaders: an R package (Seurat, SingleCellExperiment) and a Python package (AnnData) that read any scrust output through its manifest and put each matrix only into a slot meant for its scale. Each loader's object is compared with the saved workflow object (K11), and the workflow's own marker steps run on the Seurat loader's object (K13). Its outcome comes first ([M14 outcome](#m14-outcome)), its details last ([M14: the loaders](#m14-the-loaders)).
 
 This is Step 2's main report, as [doubletfinder.md](doubletfinder.md) is Step 1's; M13 to M17 extend it. The milestones before it have their own: [clustering_m8.md](clustering_m8.md) (the R reference data and the R-vs-R floor), [clustering_m9.md](clustering_m9.md) (Annoy and the SNN graph), [clustering_m10.md](clustering_m10.md) (FindClusters).
+
+## M14 outcome
+
+| Done when (plan C6's M14 row, and the brief) | Result |
+|---|---|
+| K11, the R loaders (Seurat, SingleCellExperiment), against the saved `.rds` on T and P | **Production profile: identical; portable profile: within the floor.** 136 comparisons (34 objects, 2 profiles, 2 loaders), all passing. In the production profile every component of the Seurat object (1,800) and of the SingleCellExperiment (1,428) is identical to the saved `.rds`: the RNA counts, the SCT layers, the SCTModel and the SCT assay (also as whole objects), the chain's metadata columns and levels, the identities, the PCA and both graphs. In the portable profile 249 and 201 components differ within `[clustering.floor.kernel]` (the PCA, silhouette widths, a few purities, and on tier P scale.data and the model's residual statistics: exactly M8's measured floor), none beyond it, and every other component is identical ([K11 results](#k11-results)). |
+| K11, the Python loader (AnnData), against M8's exports of the saved objects on T and P | **The same.** 68 comparisons, all passing: in the production profile 1,619 components identical to M8's exports of the saved objects; in the portable profile 198 within the floor, none beyond; the scale.data of the three light-level objects, of which M8 kept only a digest, reported as differing from it in the portable profile (graded by the R loaders against the `.rds`). |
+| The exports load exactly what their files hold | **Yes, both profiles.** Every value the loaders read was checked against the files: 3,627,555,688 values in R (formatted again with `%.17g` against the files' text, `.npy` as bytes) and 3,627,049,492 in Python (parsed again with Python's `float()`), none differing. |
+| `Read10X` and `read_10x_mtx` fail on `sct/` and on the top level of every export loaded | **Yes, on all 68 exports.** Seurat 5.5.1's `Read10X` fails on every one of the 340 directories but the 68 `counts/`, which it reads as the input; scanpy 1.13.0's `read_10x_mtx`, with every prefix (52,088 attempts), reads only `counts/` (directly, and from the top directory with `prefix="counts/"`), as the input. |
+| A file offered to the wrong slot is refused, every combination of role, scale and slot | **Yes.** The R loaders' 18 slots and the Python loader's 9 each take one role, one scale and one format; their tests offer every other one of schema 1 (8,496 and 4,248 wrong combinations) and every one is refused. Tampered manifests (the corrected counts declared raw counts; only their scale changed; the residuals declared raw counts; the counts and log1p layers swapped) are refused by all three builders, by the slot check or by the comment lines' "NOT raw counts" ([M14 tests](#m14-tests)). |
+| What is not rebuilt, and why | Listed in every comparison as not rebuilt, since the export does not hold them: the `umap` reduction (not part of the chain), the `commands` (scrust records its run in `summary.json`), other workflow steps' metadata columns (`percent.mt`; scDblFinder's and DoubletFinder's columns on their outputs; the emptyDrops objects' `as.Seurat()` columns), and the RNA assay's v3 class on the emptyDrops path (the counts are identical); in the AnnData, the SCTModel's `cells_step1` above 5,000 cells. The export adds bluster's `silhouette_other` and `purity_maximum` ([what the loaders do not rebuild](#what-the-loaders-do-not-rebuild)). |
+| K13 on T and P | **Byte-identical, 68 of 68.** The workflow's marker steps on the Seurat loader's object reproduce the saved `<prefix>_markergenes.csv` of all 34 objects from both profiles' exports, the clusters combined in the saved table's order: 82 to 327 rows on tier T, 22,943 to 81,448 on tier P, up to 5.3 minutes and 9.8 GiB ([K13](#k13-the-markers)). |
+| The one-line commands' `.rds` and `.h5ad` reload into identical objects | **Yes, all 264:** every `.rds` from `save_rds()` (Seurat and SingleCellExperiment) and `.h5ad` from `write_h5ad()` (`python -m scrustio h5ad`) rereads into an object identical to the loader's, for the 68 exports and the 20 DoubletFinder outputs (up to 2.1 GB of `.rds` and 3.8 GB of `.h5ad`). |
+| Other commands' outputs | **Loaded as the saved objects hold them.** The ten `scrust doubletfinder` outputs (five tier-T and five tier-P inputs, both profiles) load into objects whose singlets' raw counts and DoubletFinder columns, named as DoubletFinder names them, equal the saved DoubletFinder objects' (60 comparisons, R and Python). `scrust sctransform --corrected-counts` loads as the SCT assay alone, `add_scrust()` adds calls and labels to an existing object (the packages' tests). |
+| The R loader ready for M17 | **Ready.** `loader_compare.R --loaders seurat --files no --round-trip no` compares one export with its saved `.rds` and writes `k11.tsv` and `compare.json`; it passes on both assay paths, the emptyDrops objects, the objects with singletons and the 99,452-feature object, and takes at most 4.0 minutes (the 99,452-feature object) and 25.8 GiB (the 79,409-cell objects); 10 s and 0.4 GiB on tier T ([the R loader for M17](#the-r-loader-for-m17)). |
+| Packaging and envs | The R package installs into the repository's `.rlib/` (gitignored), never into the R env, and checks Seurat 5.5.1 and SeuratObject 5.4.0 (warning with others); the Python package is put on the path by its tests, not installed; `envs/loaders-py.yml` gains pytest 9.2.0, re-solved, the pin recorded and `.envs/loaders-py` recreated from it. |
+| Tests | `cargo test --workspace` passes in debug and in release: 281 tests in 41 suites each, none failing or ignored, no compiler warnings (M14 changes no Rust code but two README sentences). The R loader's tests: 59, all passing; the Python loader's: 12, all passing (in the production R env and in `.envs/loaders-py` rebuilt from the new pin) ([M14 tests](#m14-tests)). |
+| Documentation | This report; each package's README; `[clustering.K11]` and `[clustering.K13]` in `validation/tolerances.toml`; M14's section of `validation/manifest.toml`; the loaders in `NOTICE`; `docs/output_manifest.md`'s "For loaders"; the plan's corrections and the M14b milestone ([M14 corrections](#m14-corrections-to-the-plan)). |
 
 ## M13 outcome
 
@@ -66,6 +86,7 @@ This is Step 2's main report, as [doubletfinder.md](doubletfinder.md) is Step 1'
 | M11 | the chain from the counts, `approxSilhouette`, `scrust cluster --counts` and its staged starts, kernel-gated grading in both validators, the benchmark | this report |
 | M12 | `neighborPurity`: the exhaustive search with knncolle's arithmetic and its certificate, the weights and sums, purity in `scrust cluster` and its validation; at the decision point the user chose to keep the exhaustive result and report the flagged pairs (the median pair of every odd-sized object) | this report |
 | M13 | sctransform's `correct()` (the corrected counts, their log1p, `nCount_SCT`, `nFeature_SCT`), `scrust sctransform --corrected-counts` and `scrust cluster --export`, the guards against reading normalised data as raw counts, the output manifest of every command (`docs/output_manifest.md`) | this report |
+| M14 | the loaders, `loaders/R/scrustio` (Seurat, SingleCellExperiment) and `loaders/python/scrustio` (AnnData): the manifest's rules, the slots and their guard, the SCT assay and its SCTModel as SCTransform makes them, the one-line `.rds` and `.h5ad` commands; K11 and K13 on T and P in both profiles; the R loader's comparison for M17 | this report |
 
 ## What was built
 
@@ -1084,3 +1105,270 @@ target/release/scrust validate manifest --dir /tmp/soupx_tenx_test_export
 ```
 
 `README.txt` lists every file and how to read it; `sct/corrected_counts.mtx.gz`'s comment lines say what it is; `summary.json`'s `files` section is the manifest.
+
+## M14: the loaders
+
+M14 builds the loaders of plan C3g: two small packages in `loaders/`, outside the Cargo workspace, that read any scrust output through its manifest ([`docs/output_manifest.md`](../output_manifest.md)) and build the objects R and Python users work with, each matrix only in a slot meant for its scale. They are checked against the saved workflow objects (K11), through the workflow's own marker steps (K13), and by their own tests.
+
+### What M14 built
+
+| Where | M14 contents |
+|---|---|
+| `loaders/R/scrustio` (new) | the R package ([its README](../../loaders/R/scrustio/README.md)): `read_manifest()`, `manifest_entries()`, `check_manifest()`, `read_entry()`; the slots and their guard (`slot_table()`, `read_for_slot()`); `load_seurat()`, `load_sce()`, `add_scrust()`; `save_rds()`, the one-line `.rds` command; `seurat_feature_names()`; its tests (`tests/scrustio_tests.R`). Imports Matrix and jsonlite; Seurat, SeuratObject and SingleCellExperiment when their objects are built |
+| `loaders/python/scrustio` (new) | the Python package ([its README](../../loaders/python/scrustio/README.md)): `read_manifest()`, `slot_table()`, `read_for_slot()`, `load_anndata()`, `write_h5ad()`, `python -m scrustio h5ad` (and `manifest`); its tests (pytest, `tests/`). Needs numpy, scipy, pandas and anndata |
+| `validation/R/loader_compare.R`, `lib/loaders.R` (new) | K11 for the R loaders, and M17's comparison: the Seurat object and the SingleCellExperiment against the saved `.rds`, component by component, graded as M11–M13 grade; every value read against the files' text; the `.rds` round trips |
+| `validation/python/loader_compare.py` (new) | K11 for the Python loader: the AnnData against M8's export of the saved object; every value read against the files, parsed again independently; the `.h5ad` round trip |
+| `validation/R/markers_from_loader.R` (new) | K13: the workflow's `find_markers.R` and `combine_markers.R` steps (copied, with their source cited) on the Seurat loader's object |
+| `validation/slurm` | `m14_loaders.sbatch` (K11 for the three loaders, with the 10x readers on each export), `m14_markers.sbatch` (K13, an array), `m14_m17.sbatch` (M17's comparison, timed), `m14_tests.sbatch` (the packages' own tests), `m14_cargo_tests.sbatch`, `m14_report.sh`, `m14_manifest.sh` |
+| `envs/loaders-py.yml`, `.linux-64.pin.txt` | pytest 9.2.0 added for the Python loader's tests; re-solved and the pin recorded |
+| `crates/scrust` | the README of `scrust cluster --export` and of `scrust sctransform --corrected-counts` now names the loaders (it said they were coming); no file, role or value changes |
+| `third_party/fetch_sources.sh`, `SHA256SUMS` | SingleCellExperiment 1.32.0's source, the version whose classes the R loader fills |
+| `.gitignore` | `.rlib/`, the repository's own R library the loader is installed into for its tests |
+
+### The R loader
+
+**The manifest.** `read_manifest(dir)` reads `summary.json`'s `files` section and refuses it if its `schema` is not `scrust-files` or its `version` not 1. Every listed file must exist with its listed size (with `check_sha256 = TRUE`, its SHA-256 too), every path must stay inside the output, and no path may be listed twice. Files are found by their role (`manifest_entries(m, "sct_counts")`), never by name: a test renames the corrected counts and their row file, edits only the manifest, and loads an identical object. Each matrix's row and column names come from the files its `rows` and `columns` name, and their number is checked against its `shape` (and Matrix Market's stored entries against `nnz`). The one file name a loader reads is a levels file's: `cluster_levels` files are tied to their column only by their documented name (`<column>_levels.txt`), as the schema has no field for it ([findings](#m14-findings)).
+
+**The slots.** `slot_table()` lists the 18 slots the R loaders fill from matrix files (9 of Seurat's, 9 of the SingleCellExperiment's), each with the one role, scale and format it takes; the raw-count slots (Seurat's RNA `counts`, the SingleCellExperiment's `counts`) take only `raw_counts`. `read_for_slot()` refuses any other role, scale or format, and reads the Matrix Market file's comment lines: a file marked "NOT raw counts" (as scrust marks every normalised matrix) is refused for a raw-count slot, and an unmarked file for a slot of SCTransform's layers.
+
+**The Seurat object** is built with the calls the workflow's chain makes it with, so that every incidental slot (keys, `misc`, `meta.features`, the computed metadata columns) is Seurat's:
+
+1. the raw counts (`counts/`) through `CreateSeuratObject()`: an `Assay5` named RNA, `orig.ident`, `nCount_RNA` and `nFeature_RNA`;
+2. the SCT assay as SCTransform.Assay assembles it: `CreateAssayObject()` on the corrected counts, the variable features, `SetAssayData()` for the `data` layer (read from its file, and checked to be `log1p` of the counts) and for `scale.data` (which puts its rows into the assay's gene order, as Seurat keeps them; the file has them in `VariableFeatures()` order); then the `SCTAssay` class with one `SCTModel` named `model1` and `assay.orig` RNA, added with `[[<-`, which computes `nCount_SCT` and `nFeature_SCT` (checked against the export's);
+3. the metadata, typed as Seurat holds them (doubles, R integers, factors in their levels' order), the identities from `seurat_clusters`, and SCT the default assay;
+4. the `pca` reduction with `CreateDimReducObject()` as RunPCA.default makes it (key `PC_`, assay SCT, `misc$total.variance` from the summary), and both graphs with `as.Graph()`, assay SCT.
+
+**The SCTModel** is rebuilt from the model files as Seurat's `PrepVSTResults()` assembles it from vst()'s result, step for step: the feature attributes from `gene_attr.tsv` (vst's five columns), `model_pars_fit.tsv` (theta, intercept, slope) and `model_pars.tsv` (the step-1 genes and their fits); the cell attributes from `cell_attr.tsv`; the clip ranges, `set_min_var` and the parameters from the summary; vst()'s 31 recorded arguments with Seurat's values; the median UMI. Two values are not in the files:
+
+- **`cells_step1`**, which cells vst() fitted on: all of them up to `ncells` (5,000), else `sample(colnames(umi), 5000)`, the first draw after SCTransform's `set.seed()`. The export records the seed and the number of step-1 cells, and the loader makes the same draw with R's own `sample()` under R's default generator kinds, saving and restoring the caller's random-number state (the coordinating session was asked whether to export the cells instead; [notes](#m14-deviations-and-notes)). K11 compares the result with the six tier-P objects above 5,000 cells.
+- **`verbosity`**, which records the R call's `verbose` (0 for the workflow's `verbose = FALSE`): the loader writes the workflow's 0.
+
+**Feature names** follow Seurat's rules: `Read10X()`'s `make.unique()`, then `_` and `|` replaced by `-` (`CheckFeaturesNames()`); every list of features of the output (the SCT genes, the variable features, the step-1 genes, the PCA's genes) is mapped onto the counts' rows by name, or by id where names repeat. The workflow's objects need neither rule; the tests' fixtures do not either.
+
+**The SingleCellExperiment** holds the raw counts as `counts` (rows named by the features' names, made unique; `rowData` the ids, names and types), the SCT layers as `altExp(sce, "SCT")` (assays `corrected_counts` and `logcounts`; the SCTModel's feature attributes as its `rowData`, its cell attributes as its `colData`, its other slots and the variable features in its `metadata()`), the residuals as `altExp(sce, "SCT_scale_data")` (assay `scaledata`, in `VariableFeatures()` order), the metadata as `colData`, the PCA as `reducedDim(sce, "PCA")` (attributes `rotation`, `stdev`, `total.variance`) and both graphs as `colPairs`.
+
+**Other outputs.** `scrust sctransform --corrected-counts` loads as the SCT assay alone (it has no raw counts); `scrust doubletfinder` as the singlets' raw counts with DoubletFinder's calls as metadata columns, named as DoubletFinder names them (`pANN_<pN>_<pK>_<nExp>`, `DF.classifications_<pN>_<pK>_<nExp>`, from the summary). An output with neither raw counts nor SCT layers (`scrust cluster` without `--export`, `scrust pca`, `scrust neighbors`) is refused by the object builders; `add_scrust()` adds any output's per-cell columns (the calls, the cluster labels with their levels, the scores) to an object the user already has, by barcode.
+
+**Writing.** `save_rds(dir, file, object = "seurat" | "sce")` builds the object and saves it: `Rscript -e 'scrustio::save_rds("export", "object.rds")'`. **Versions:** the loader checks Seurat (5.5.1) and SeuratObject (5.4.0) and warns, carrying on, with others. **Install:** `R CMD INSTALL --library=.rlib loaders/R/scrustio` in the repository's own library, never into the R env.
+
+### The Python loader
+
+The same manifest rules, slots (9: `layers["counts"]`, `X`, `layers["sct_corrected_counts"]`, `obsm["sct_scale_data"]`, `obsm["X_pca"]`, `varm["PCs"]`, `uns["pca"]["stdev"]`, `obsp["sct_nn"]`, `obsp["sct_snn"]`) and content rule. `load_anndata(dir)` builds:
+
+- `layers["counts"]`: the raw counts, cells x genes;
+- `X`: the log1p corrected counts (Seurat's `data`), with scanpy's `uns["log1p"] = {"base": None}`, and `layers["sct_corrected_counts"]`, both over every gene, 0 outside SCTransform's model (`var["sct_modelled"]`);
+- `obsm["sct_scale_data"]`: the residuals as a data frame (cells x variable features, in `VariableFeatures()` order), with `var["sct_variable"]`;
+- `uns["sct_model"]`: the SCTModel's tables and values, as the R loader rebuilds them, but for `cells_step1` above 5,000 cells (R's generator is not reproduced);
+- `obs`: the metadata, R integers as int32 and factors as categoricals in their levels' order;
+- `obsm["X_pca"]`, `varm["PCs"]` (0 for genes outside the PCA), `uns["pca"]` (Seurat's `stdev`, `variance`, `variance_ratio`, `total_variance`, and `features`, the loadings' genes in order);
+- `obsp["sct_nn"]`, `obsp["sct_snn"]`, and `uns["sct_snn"] = {"connectivities_key": "sct_snn", "params": ...}` for scanpy's `neighbors_key`.
+
+Text columns with repeated values are made categorical as anndata makes them when it writes `.h5ad` (`strings_to_categoricals()`), so a written and reread object equals the loader's. `python -m scrustio h5ad <dir> <file.h5ad>` is the one-line command. Matrix Market files are read with scipy's `mmread` (fast_matrix_market, correctly rounded) and tables with pandas' `float_precision="round_trip"`.
+
+**numpy's `log1p` is not R's.** Seurat's `data` layer holds the C library's `log1p` of the corrected counts; numpy 2.5.5's `np.log1p` (vectorised code) differs from it in the last bit for 13,457 of the 65,546 values of a tier-T export, while `math.log1p` (the C library's) matches all of them. So the loader reads `X` from the file and checks it with `math.log1p` (per distinct value), and Python users should not recompute Seurat's `data` with numpy.
+
+### How K11 compares
+
+The exports loaded are M13's validation runs (label `m13-9ce0adb`: `scrust cluster --counts ... --preset workflow --export`, 8 threads, with stage dumps), 34 objects in both profiles: 68 exports, made by the binary of commit 9ce0adb, whose code main still has. `validation/slurm/m14_loaders.sbatch` runs, for each:
+
+- **the R loaders** (`loader_compare.R`): the Seurat object and the SingleCellExperiment against the saved `.rds`, read directly. Compared, with `identical()` and statistics: the RNA counts (every entry and dimname; the RNA assay as a whole where the saved one is an `Assay5`); `orig.ident` and the chain's metadata columns (`nCount_RNA`, `nFeature_RNA`, `nCount_SCT`, `nFeature_SCT`, `SCT_snn_res.0.8` and `seurat_clusters` with their levels, `silhouette_width`, `neighborhood_purity`); the identities; the default assay; the SCT layers (`counts`, `data`, `scale.data` with its row order), the variable features and the assay's other slots; the SCTModel slot by slot and column by column (and as a whole); the PCA (embeddings, dims 1:30 and 31:50, the loadings and their genes, the standard deviations, the total variance, the other slots); both graphs (as `Graph` objects, `assay.used` included); the project name and SeuratObject version. The SingleCellExperiment's counterparts likewise (its `colPairs` as sparse matrices);
+- **the Python loader** (`loader_compare.py`): the AnnData against M8's export of the saved object (`data/clustering/<object>/saved/`, and `input/` for the RNA counts): the same components; where M8 kept only R's digest (scale.data at the standard and light levels, the log1p layer at those levels) by that digest;
+- **the files**: the loaders load exactly what the files hold. In R every value read from text is formatted again with `%.17g` and compared with the file's text (one-to-one on doubles), entry by entry for the Matrix Market files (row, column and value, in stored order), column by column for the tables; `scale_data.npy` as bytes; the summary's numbers by R's parse against jsonlite's. In Python every value is parsed again from the files with Python's own `float()` and compared bit for bit, and `.npy` as bytes;
+- **the round trips**: `save_rds()` (Seurat and SingleCellExperiment) and `python -m scrustio h5ad`'s `write_h5ad()`, reread with `readRDS()` and `anndata.read_h5ad()`, against the loader's object (`identical()` in R; every slot, dtype and category in Python);
+- **the 10x readers**: Seurat's `Read10X` and scanpy's `read_10x_mtx` (with every prefix) on every directory of the export, as M13's guard (`guard_read10x.R`, `guard_read10x.py`): only `counts/` may be read, as the input.
+
+**Grading** is M11–M13's. Exact mode when the export's recorded OpenBLAS kernel is the saved objects' (SapphireRapids): every component must be identical. Floor mode otherwise (the portable profile's Haswell): the BLAS-free components (the counts, `nCount_RNA`, `nFeature_RNA`, the step-1 statistics `detection_rate`, `gmean`, `variance`, the model's cell attributes, the slots' layout) stay exact, and the BLAS-dependent ones may differ within `[clustering.floor.kernel]` of `validation/tolerances.toml`, as measured by M8 and M11: scale.data (`S2d_scale_data`), the model's `residual_mean` and `residual_variance` together (`S2d_residual_stats`), the embeddings (`S3_embeddings_dims_1_30`, `_31_50`, each component's sign aligned first), the loadings (`S3_loadings`, aligned), the standard deviations (`S3_sdev`), the silhouette widths (`K8_silhouette_width`) and the purities (`K9_purity`). What the floor does not list stays exact: the corrected counts and their log1p, `nCount_SCT`, `nFeature_SCT`, the labels, levels and identities, both graphs, the total variance, theta and the regularised parameters. A whole object (the SCT assay, the SCTModel, the PCA) is graded by its parts.
+
+**DoubletFinder.** The same scripts with `--kind doubletfinder` load the `scrust doubletfinder` outputs of M13's Step 1 check (label `m13-9ce0adb`, the five tier-T and five tier-P inputs, both profiles) and compare the singlets' raw counts and DoubletFinder's two metadata columns with the saved DoubletFinder objects (R: the `.rds`; Python: M6b's and M7's export, `data/doubletfinder/<input>/saved/`).
+
+### K11 results
+
+Label `m13-9ce0adb` (M13's exports, binary `scrust-m13-9ce0adb`); [`m14_loaders.sbatch`](../../validation/slurm/m14_loaders.sbatch), on `shared` nodes (Cascade Lake, Xeon Platinum 8268: no step uses BLAS), the R loaders installed in `.rlib/`, the Python loader in an env solved from `envs/loaders-py.yml` identically to the recorded pin. One row per object, profile and loader: [`clustering_m14.tsv`](clustering_m14.tsv) ([`m14_report.sh`](../../validation/slurm/m14_report.sh)).
+
+| outputs | tier | profile | loader | objects | passing | components identical | within the floor | beyond | differing | not rebuilt | added | values read, checked against the files | differing | round trips identical |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| exports | P | portable | seurat | 7 | 7 | 289 | 81 | 0 | 0 | 22 | 7 | 1,597,635,968 | 0 | 7 of 7 |
+| exports | P | portable | sce | 7 | 7 | 234 | 60 | 0 | 0 | 0 | 0 | (Seurat's) |  | 7 of 7 |
+| exports | P | portable | anndata | 7 | 7 | 263 | 57 | 0 | 0 | 20 | 0 | 1,597,593,954 | 0 | 7 of 7 |
+| exports | P | production | seurat | 7 | 7 | 370 | 0 | 0 | 0 | 22 | 7 | 1,597,635,968 | 0 | 7 of 7 |
+| exports | P | production | sce | 7 | 7 | 294 | 0 | 0 | 0 | 0 | 0 | (Seurat's) |  | 7 of 7 |
+| exports | P | production | anndata | 7 | 7 | 323 | 0 | 0 | 0 | 20 | 0 | 1,597,593,954 | 0 | 7 of 7 |
+| exports | T | portable | seurat | 27 | 27 | 1,262 | 168 | 0 | 0 | 82 | 27 | 11,044,969 | 0 | 27 of 27 |
+| exports | T | portable | sce | 27 | 27 | 993 | 141 | 0 | 0 | 0 | 0 | (Seurat's) |  | 27 of 27 |
+| exports | T | portable | anndata | 27 | 27 | 1,155 | 141 | 0 | 0 | 54 | 0 | 10,993,321 | 0 | 27 of 27 |
+| exports | T | production | seurat | 27 | 27 | 1,430 | 0 | 0 | 0 | 82 | 27 | 11,044,969 | 0 | 27 of 27 |
+| exports | T | production | sce | 27 | 27 | 1,134 | 0 | 0 | 0 | 0 | 0 | (Seurat's) |  | 27 of 27 |
+| exports | T | production | anndata | 27 | 27 | 1,296 | 0 | 0 | 0 | 54 | 0 | 10,993,321 | 0 | 27 of 27 |
+| doubletfinder | P | portable | seurat | 5 | 5 | 25 | 0 | 0 | 0 | 0 | 0 | 204,823,477 | 0 | 5 of 5 |
+| doubletfinder | P | portable | sce | 5 | 5 | 15 | 0 | 0 | 0 | 0 | 0 | (Seurat's) |  | 5 of 5 |
+| doubletfinder | P | portable | anndata | 5 | 5 | 25 | 0 | 0 | 0 | 0 | 0 | 204,665,311 | 0 | 5 of 5 |
+| doubletfinder | P | production | seurat | 5 | 5 | 25 | 0 | 0 | 0 | 0 | 0 | 204,823,477 | 0 | 5 of 5 |
+| doubletfinder | P | production | sce | 5 | 5 | 15 | 0 | 0 | 0 | 0 | 0 | (Seurat's) |  | 5 of 5 |
+| doubletfinder | P | production | anndata | 5 | 5 | 25 | 0 | 0 | 0 | 0 | 0 | 204,665,311 | 0 | 5 of 5 |
+| doubletfinder | T | portable | seurat | 5 | 5 | 25 | 0 | 0 | 0 | 0 | 0 | 273,430 | 0 | 5 of 5 |
+| doubletfinder | T | portable | sce | 5 | 5 | 15 | 0 | 0 | 0 | 0 | 0 | (Seurat's) |  | 5 of 5 |
+| doubletfinder | T | portable | anndata | 5 | 5 | 25 | 0 | 0 | 0 | 0 | 0 | 272,160 | 0 | 5 of 5 |
+| doubletfinder | T | production | seurat | 5 | 5 | 25 | 0 | 0 | 0 | 0 | 0 | 273,430 | 0 | 5 of 5 |
+| doubletfinder | T | production | sce | 5 | 5 | 15 | 0 | 0 | 0 | 0 | 0 | (Seurat's) |  | 5 of 5 |
+| doubletfinder | T | production | anndata | 5 | 5 | 25 | 0 | 0 | 0 | 0 | 0 | 272,160 | 0 | 5 of 5 |
+
+*Components*: the rows of `k11.tsv` (Seurat 57, SingleCellExperiment 42, AnnData 49 to 50 per export; 5, 3 and 5 per DoubletFinder output). *Values read*: every value the Seurat loader (R) or the AnnData loader (Python) read from the export's text files and `.npy` files, checked against the files; the SingleCellExperiment reads the same files through the same readers. *Not rebuilt* and *added*: [below](#what-the-loaders-do-not-rebuild).
+
+**The production profile: identical objects.** In all 102 comparisons of the 34 exports, every component is identical to the saved object: the RNA counts (explicit zeros included), the SCT layers, scale.data in the SCT assay's gene order, the variable features, the SCTModel column by column and as a whole object (`cells_step1` included on the six objects above 5,000 cells), the SCT assay as a whole object, `orig.ident`, the chain's metadata columns with their types and levels, the identities, the PCA (every slot, and as a whole object), both graphs as `Graph` objects; the SingleCellExperiment's counterparts and the AnnData's against M8's exports. The RNA assay is identical as a whole object wherever the saved one is an `Assay5` (32 objects).
+
+**The portable profile: the files exactly, the saved objects within the floor.** Every value the loaders read is the files' (the files check), and the objects differ from the saved ones only in the BLAS-dependent components M8 measured, each within `[clustering.floor.kernel]`; every other component is identical, the corrected counts, their log1p, `nCount_SCT`, `nFeature_SCT`, the labels, levels, identities, graphs, theta, the regularised parameters, the total variance and the step-1 statistics included. Over the 34 objects, for the Seurat loader (the SingleCellExperiment and the AnnData give the same statistics, the AnnData's scale.data on the four objects whose export M8 kept in full):
+
+| floor entry | tier | objects within it | beyond | values differing (of those compared in these objects) | largest absolute difference | largest scaled difference | the floor's bounds |
+|---|---|---|---|---|---|---|---|
+| `K8_silhouette_width` | P | 7 | 0 | 269,054 (271,509) | 3.26e-13 | 3.48e-13 | max_abs 3.3e-13, fraction_differing 0.99 |
+| `K8_silhouette_width` | T | 27 | 0 | 5,871 (5,904) | 2.41e-14 | 9.58e-14 | max_abs 3.3e-13, fraction_differing 0.99 |
+| `K9_purity` | P | 4 | 0 | 8 (229,972) | 0.0187 | 0.0187 | cells_differing 19, objects 10, max_abs 0.019 |
+| `K9_purity` | T | 6 | 0 | 11 (1,062) | 0.0142 | 0.0142 | cells_differing 19, objects 10, max_abs 0.019 |
+| `S2d_residual_stats` | P | 7 | 0 | 1,430 (360,212) | 1.42e-14 | 3.2e-17 | max_abs 1.5e-14, max_scaled 3.21e-17 |
+| `S2d_scale_data` | P | 7 | 0 | 3,559,615 (814,527,000) | 4.26e-14 | 9.54e-16 | max_abs 4.3e-14, max_fraction_differing 0.0072 |
+| `S3_embeddings_dims_1_30` | P | 7 | 0 | 8,108,432 (8,145,270) | 1.53e-10 | 2.02e-12 | max_abs 1.6e-10, max_scaled 2.4e-12 |
+| `S3_embeddings_dims_1_30` | T | 27 | 0 | 176,267 (177,120) | 3.66e-11 | 2.34e-12 | max_abs 1.6e-10, max_scaled 2.4e-12 |
+| `S3_embeddings_dims_31_50` | P | 7 | 0 | 5,428,912 (5,430,180) | 1.36e-10 | 2.31e-12 | max_abs 4.3e-06 |
+| `S3_embeddings_dims_31_50` | T | 27 | 0 | 118,067 (118,080) | 4.27e-06 | 5.69e-07 | max_abs 4.3e-06 |
+| `S3_loadings` | P | 7 | 0 | 1,045,743 (1,050,000) | 1.56e-12 | 2.96e-12 | max_abs 1.2e-07, max_scaled 4.5e-07 |
+| `S3_loadings` | T | 27 | 0 | 1,054,462 (1,057,600) | 1.19e-07 | 4.49e-07 | max_abs 1.2e-07, max_scaled 4.5e-07 |
+| `S3_sdev` | P | 7 | 0 | 333 (350) | 4.44e-14 | 1.8e-15 | max_abs 1.9e-13, max_scaled 3.6e-14 |
+| `S3_sdev` | T | 27 | 0 | 1,302 (1,350) | 1.85e-13 | 3.56e-14 | max_abs 1.9e-13, max_scaled 3.6e-14 |
+
+These are M8's measurements of the portable R runs against the saved objects, object by object ([clustering_m8.md](clustering_m8.md#portable-runs-against-the-saved-objects)): the 19 purities in 10 objects, the 3,559,615 scale.data values of tier P, the 1,430 residual statistics, the 269,054 tier-P silhouette widths. The portable exports equal R's portable runs (M13), so loading them reproduces that floor and nothing else. On the three light-level objects the AnnData's scale.data can be compared only with M8's digest of the saved one, which differs (reported, not graded, as M11-M13 report digests in tolerance mode); the R loaders compare those three element by element with the saved `.rds`, within the floor.
+
+**The 10x readers** fail, as required, on every directory of all 68 exports but `counts/`, which both read as the input:
+
+| tier | profile | exports | Read10X: directories tried, as required | read_10x_mtx: attempts (every prefix), exports all as required |
+|---|---|---|---|---|
+| P | portable | 7 | 35, 35 | 5,362, 7 of 7 |
+| P | production | 7 | 35, 35 | 5,362, 7 of 7 |
+| T | portable | 27 | 135, 135 | 20,682, 27 of 27 |
+| T | production | 27 | 135, 135 | 20,682, 27 of 27 |
+
+Each export has five directories (stage dumps aside): the top directory, `counts/`, `sct/`, `pca/` and `neighbors/`; scanpy's attempts cover every beginning of every file's path as `prefix=` (M13's 963 attempts per object also covered a `scrust sctransform` output).
+
+**The round trips:** all 264 `.rds` and `.h5ad` files written by the one-line commands reread into objects identical to the loaders' (`identical()` in R; every slot, dtype and category in Python), the largest `.rds` 2.1 GB and `.h5ad` 3.8 GB.
+
+**DoubletFinder.** The ten `scrust doubletfinder` outputs (five tier-T, five tier-P inputs) load in both profiles into objects whose singlets' raw counts and DoubletFinder columns (`pANN_<pN>_<pK>_<nExp>`, `DF.classifications_<pN>_<pK>_<nExp>`) equal the saved DoubletFinder objects', in all 60 comparisons (pANN stays identical across kernels, as M11 found).
+
+### What the loaders do not rebuild
+
+The export does not hold these, so the loaders do not rebuild them; every comparison lists them (status "not rebuilt"):
+
+| part of the saved object | objects | why |
+|---|---|---|
+| the `umap` reduction | 34 | RunUMAP is not part of the chain scrust reproduces; it changes nothing downstream (M8) |
+| `commands` (SCTransform.RNA, RunPCA.SCT, RunUMAP.SCT.pca, FindNeighbors.SCT.pca, FindClusters) | 34 | the R calls' records; scrust records its run (command line, parameters, versions, inputs' checksums) in `summary.json` |
+| metadata columns of other workflow steps | 34 | `percent.mt` (all 34); the emptyDrops objects' `nCount_originalexp`, `nFeature_originalexp`, `Sample`, `Barcode`, `sizeFactor` (`as.Seurat()`, 2); `scDblFinder.class` (the 5 scDblFinder outputs and their 5 post-hoc objects); DoubletFinder's `pANN_*` and `DF.classifications_*` (the 5 DoubletFinder outputs and their 5 post-hoc objects; the `scrust doubletfinder` outputs hold them, and `add_scrust()` adds them) |
+| the RNA assay's class on the emptyDrops path | 2 | the saved RNA assay is a v3 `Assay` made by `as.Seurat()` of a SingleCellExperiment, with a `data` layer and `meta.features` of its own; the loader makes the `Assay5` `CreateSeuratObject()` makes, with the identical counts |
+| `cells_step1` of the SCTModel, in the AnnData | 6 | above 5,000 cells vst() drew the step-1 cells with R's `sample()`; the Python loader does not reproduce R's generator (the R loader does) |
+
+The export also adds two columns the workflow drops: bluster's `silhouette_other` and `purity_maximum` (status "added"). The saved objects' `tools`, `misc`, `neighbors` and `images` are empty, as the loader's.
+
+### K13: the markers
+
+[`m14_markers.sbatch`](../../validation/slurm/m14_markers.sbatch), arrays over the 34 objects in each profile (`shared`). One row per object and profile: [`clustering_m14_k13.tsv`](clustering_m14_k13.tsv).
+
+**68 of 68 combined tables equal the saved `<prefix>_markergenes.csv` byte for byte**, from the portable and the production exports alike (FindMarkers reads the SCT `data` layer and the identities, which do not depend on the kernel). Tier T: 27 objects, 82 to 327 rows, under a minute and 0.43 GiB each. Tier P:
+
+| object | clusters | rows | identical (portable, production) | minutes | loading the export, s | peak RSS, GiB |
+|---|---|---|---|---|---|---|
+| soupx_tenx_SRR18256555 | 15 | 22,943 | TRUE, TRUE | 0.5, 0.4 | 15, 13 | 0.94, 0.94 |
+| soupx_tenx_10xmousebrain | 21 | 81,448 | TRUE, TRUE | 3.6, 3.6 | 79, 78 | 5.93, 5.93 |
+| filtered_seurat_tenx_10xmousebrain | 21 | 81,317 | TRUE, TRUE | 3.7, 4.5 | 81, 86 | 5.98, 5.98 |
+| soupx_emptydrops_4500871lane | 31 | 35,901 | TRUE, TRUE | 1.7, 1.5 | 55, 49 | 3.88, 3.89 |
+| soupx_emptydrops_sscovelli | 36 | 57,493 | TRUE, TRUE | 4.3, 5.3 | 100, 124 | 8.38, 8.38 |
+| filtered_seurat_emptydrops_sscovelli | 37 | 58,776 | TRUE, TRUE | 4.7, 4.4 | 96, 97 | 8.43, 8.44 |
+| cellbender_fromraw_ghirsutum2 | 22 | 44,222 | TRUE, TRUE | 5.1, 5.2 | 130, 132 | 9.78, 9.78 |
+
+The rows and the saved cluster orders are M8's marker references'.
+
+### The R loader for M17
+
+M17 compares each object's Rust export with its saved `.rds` through the Seurat loader: `loader_compare.R --object <name> --export <dir> --rds <saved .rds> --out <dir> --loaders seurat --files no --round-trip no`, which writes `k11.tsv` (one row per component) and `compare.json` (the mode, the counts by status, each step's time and peak RSS), after which the export's large files can go. It handles every kind of object in the panel: both assay paths (v5 and the emptyDrops objects' v3), objects with singletons (the six tier-P objects with 1 to 40), and the 99,452-feature object. Timed with [`m14_m17.sbatch`](../../validation/slurm/m14_m17.sbatch) on the production exports (one `shared` node, Xeon Platinum 8268, one object after another), every comparison passing ([`clustering_m14_m17.tsv`](clustering_m14_m17.tsv)):
+
+| object | cells | features | wall time | peak RSS | loading the export | reading the `.rds` | comparing |
+|---|---|---|---|---|---|---|---|
+| soupx_tenx_SRR18256555 | 3,108 | 32,285 | 0:24 | 1.5 GiB | 9 s | 1 s | 4 s |
+| soupx_tenx_10xmousebrain | 11,831 | 32,285 | 1:51 | 8.3 GiB | 77 s | 8 s | 18 s |
+| filtered_seurat_tenx_10xmousebrain | 11,831 | 32,285 | 1:48 | 8.2 GiB | 74 s | 8 s | 17 s |
+| soupx_emptydrops_4500871lane | 26,598 | 32,285 | 1:16 | 9.0 GiB | 43 s | 8 s | 16 s |
+| soupx_emptydrops_sscovelli | 79,409 | 28,754 | 2:46 | 25.8 GiB | 96 s | 21 s | 39 s |
+| filtered_seurat_emptydrops_sscovelli | 79,409 | 28,754 | 2:46 | 25.7 GiB | 92 s | 24 s | 41 s |
+| cellbender_fromraw_ghirsutum2 | 59,323 | 99,452 | 3:57 | 18.7 GiB | 133 s | 19 s | 40 s |
+| filtered_seurat_tenx_test | 300 | 2,000 | 0:10 | 0.4 GiB | 2 s | 0 s | 1 s |
+| filtered_seurat_emptydrops_test | 267 | 2,000 | 0:10 | 0.4 GiB | 1 s | 0 s | 1 s |
+
+So M17's array tasks need about 4 minutes and 32 GB for the largest objects (25.8 GiB used), and seconds and 1 GB for the small ones; the comparison is about the size of R's own `readRDS()` of the saved object plus the loaded one.
+
+### M14 tests
+
+- **cargo test --workspace** passes in debug and in release, 281 tests in 41 suites each, none failing or ignored, with no compiler warnings (job 61872136, `data/clustering/m14/cargo_tests/61872136/`) ([`m14_cargo_tests.sbatch`](../../validation/slurm/m14_cargo_tests.sbatch), env.sh's Haswell kernel). M14 changes no Rust code but two README sentences, so the suite is M13's; it runs on the final tree, `validation/tolerances.toml` (which the validators embed) included.
+- **The R loader's tests** (`loaders/R/scrustio/tests/scrustio_tests.R`, 59 tests, in the production R env through [`m14_tests.sbatch`](../../validation/slurm/m14_tests.sbatch), job 61873628, with this tree's release binary): every slot against every role, scale and format of schema 1 (18 slots, 8,496 wrong combinations, every one refused, the 18 right ones taken); the comment-line rule both ways; four tampered manifests refused by both builders (the corrected counts declared raw counts; their scale alone changed; the residuals declared raw counts; the counts and log1p layers swapped); the manifest's rules (another schema or version, a missing file, a changed size, a same-size change caught only with the checksum, a shape that does not match its identifiers, a path outside the output); files found by role (renamed files load the identical object); the Seurat object's layout and FindMarkers on it; the SingleCellExperiment's; `scrust sctransform --corrected-counts`', `scrust doubletfinder`'s and `scrust cluster`'s (without `--export`, refused) outputs; `add_scrust()` with DoubletFinder's calls and with the cluster labels; `save_rds()`'s `.rds` reloaded identical, both objects; the version warning.
+- **The Python loader's tests** (`loaders/python/scrustio/tests`, 12 tests, pytest 9.2.0 in `.envs/loaders-py` rebuilt from the new pin, the same job): the same checks for its 9 slots (4,248 wrong combinations, every one refused), the tampered manifests, the manifest's rules, files found by role, the AnnData's layout, the `.h5ad` written by the one-line command reread equal, the other commands' outputs, and C's `log1p` against numpy's.
+
+### M14 findings
+
+- **numpy's `log1p` is not the C library's.** numpy 2.5.5's `np.log1p` differs in the last bit from glibc's `log1p` (which R, and so Seurat's SCT `data` layer, use) for 13,457 of the 65,546 values of one tier-T export; `math.log1p` matches every one. Seurat's `data` layer must therefore be read, not recomputed with numpy; the Python loader reads it and checks it with `math.log1p`.
+- **`cells_step1` is reproducible from the export's record.** The step-1 cells are `sample(colnames(umi), 5000)` right after SCTransform's `set.seed(12345)`; R's own `sample()` with the recorded seed gives the saved objects' cells on all six tier-P objects above 5,000 cells (the SCTModel identical, K11).
+- **The SCT assay's incidental slots** (its key, an empty `misc`, an empty `meta.features`, `nCount_SCT` and `nFeature_SCT` as integer and double) come out as Seurat's only when the assay is built and added with Seurat's own calls in SCTransform's order; the loader does that rather than filling slots by hand, and every saved object's SCT assay, SCTModel and PCA compare identical as whole objects in the production profile.
+- **A levels file is tied to its column only by its name.** Schema 1 gives `cluster_levels` files no field naming their column; the loaders read `<column>_levels.txt`'s name for it, the one name they read ([docs/output_manifest.md](../output_manifest.md), "For loaders"). A field could be added within version 1.
+- **M17's comparison is affordable:** the Seurat loader's comparison of one export with its saved `.rds` takes at most 4.0 minutes (the 99,452-feature object) and 25.8 GiB (the 79,409-cell objects), most of it loading the export's text files (one R thread parsing up to 73.6 million entries per layer); M17's arrays can take 32 GB per task for the largest objects and far less for the median ones.
+
+### M14 corrections to the plan
+
+Corrected in [docs/PLAN.md](../PLAN.md) on this branch:
+
+- **C3g, the rule:** it said no loader puts corrected counts into a slot named `counts`, which contradicted C3g's own table and its acceptance test: in Seurat they go into the SCT assay's `counts` layer, where SCTransform keeps them and FindMarkers reads them. It now says never into a raw-count slot (Seurat's RNA `counts`, the SingleCellExperiment's `counts`, AnnData's `layers["counts"]`), as `docs/output_manifest.md`'s "For loaders" already did, and that each slot takes one role, scale and format.
+- **The user's documentation request (2026-11-18): a new milestone, M14b**, right after M14 (as Step 1's M6b): a page per command (`doubletfinder`, `sctransform`, `pca`, `neighbors`, `cluster`) with its inputs, outputs, formats and how to read each; a page on chaining (which outputs feed which tools, such as `scrust cluster`'s labels into `scrust doubletfinder --clusters` or R decontX's `z`, and where the loaders let R and Python steps join); a schematic (a Mermaid diagram, which GitHub renders). Done when every file, column and command the pages name is checked against real outputs. **The standing rule** joins A7's cycle as step 7: every later milestone or port that adds or changes a tool, a file or a loader updates those pages and the schematic. C6's order notes M14b after M14; whether Step 2's completion waits for it is left to the user (the completion criteria are unchanged).
+- **C3g, the table and the notes:** the SingleCellExperiment's SCTModel (`rowData`, `colData` and `metadata()` of `altExp(sce, "SCT")`) and its reduction's attributes; the AnnData's `uns["sct_model"]`, `var["sct_variable"]`, `uns["pca"]`'s contents and `uns["sct_snn"]`'s `connectivities_key`, and an empty `X` for outputs without SCTransform's data; how the Seurat object is built (Seurat's own calls, in SCTransform's order; Seurat's feature names); `cells_step1`; reading Seurat's data layer rather than recomputing it; what the loaders do not rebuild; `add_scrust()`; DoubletFinder's column names.
+- **A2:** M14 extended `envs/loaders-py.yml` with pytest and recorded the new pin; the loader is not installed into the env.
+- **C4, loader tests:** the exports compared (M13's, both profiles), the criteria per profile, the files check, the 10x readers on every export loaded, the wrong-slot and tampered-manifest tests, the round trips, and `scrust doubletfinder`'s outputs against the saved DoubletFinder objects. **C4, full panel:** M17's comparison script and its time and memory.
+- **C5, K11:** identical in the production profile; in the portable profile exactly what the files hold, with the differences from the saved objects within `[clustering.floor.kernel]`; the reloaded objects identical; what an export does not hold reported as not rebuilt.
+- **C7, the loaders follow Seurat's internals:** the outcome.
+
+### M14 deviations and notes
+
+- **`cells_step1` and the coordinating session.** The export does not list the step-1 cells (the SCTModel's `cells_step1` above 5,000 cells). The coordinating session was asked whether to export them (a new file and role), have the R loader redraw them with R's own `sample()` from the recorded seed (no export change), or leave them out; the loader does the second, the recommended option, which K11 confirms on every object it applies to. No answer had arrived when this report was written; the choice lives in one function (`.cells_step1()` in `loaders/R/scrustio/R/sctmodel.R`) and is easy to change, and it is listed as open.
+- **No new R reference runs and no new Rust validation runs.** M14 loads M13's exports (binary `scrust-m13-9ce0adb`, whose code main still has) and `scrust doubletfinder` outputs, and reads the saved `.rds` files in batch jobs; K13 runs FindMarkers on the loaded objects. The packages' tests make small outputs with the release binary of this branch's tree.
+- **The export's README** of `scrust cluster --export` and `scrust sctransform --corrected-counts` now names the loaders instead of saying they were coming. Only that sentence of `README.txt` changes; M13's exports keep theirs, and no loader reads `README.txt`.
+- **The R package's `Maintainer` field** holds a placeholder address (`scrust-maintainers@example.org`, a reserved domain), since `R CMD INSTALL` requires one; replace it before publishing the package.
+- **Grading statistics.** `S2d_residual_stats` is graded over `residual_mean` and `residual_variance` together, as the floor measured that array (`cbind(residual_mean, residual_variance)`); seven portable comparisons first graded each column alone (all within the floor) and were run again. Two runs that read `loader_compare.R` while it was being edited (`soupx_tenx_10xmousebrain`'s portable comparison and the M17 timing of `soupx_emptydrops_4500871lane`) stopped with a parse error and were run again; every result here is from the final scripts.
+- **The Python env** was re-solved from the extended yaml: pytest 9.2.0 and its dependencies (colorama, exceptiongroup, iniconfig, pluggy, pygments, tomli) added; libaec and numba rebuilt (same versions, new builds), platformdirs 4.14.5 to 4.14.7; every pinned package (Python 3.13.18, scanpy 1.13.0, anndata 0.13.4, numpy 2.5.5, scipy 1.18.1, pandas 3.1.1) and h5py 3.16.0 unchanged. `.envs/loaders-py` was recreated from the new pin; the K11 runs used an env created from the same yaml with the identical solve.
+- **The loader comparisons' outputs** (`data/clustering/<object>/loaders/`, `data/doubletfinder/<input>/loaders/`) are listed in M14's section of `validation/manifest.toml`; the exports they load are M13's, not listed, as in M9–M13.
+
+### Reproducing M14
+
+From the repository's top directory, after `source env.sh`, `cargo build --release -p scrust`, M13's validation runs (label `m13-9ce0adb`, their exports in `data/clustering/<object>/rust/m13-9ce0adb/<profile>/run`), and `.envs/loaders-py` created from `envs/loaders-py.linux-64.pin.txt` (as M13's report says):
+
+```bash
+sbatch validation/slurm/m14_tests.sbatch
+```
+
+(which installs the R loader into `.rlib/`, then runs both packages' tests), then:
+
+```bash
+sbatch --mem=8G validation/slurm/m14_loaders.sbatch m13-9ce0adb portable <tier-T objects> df:<tier-T DoubletFinder inputs>
+sbatch --mem=128G validation/slurm/m14_loaders.sbatch m13-9ce0adb portable <a tier-P object>
+sbatch --mem=8G validation/slurm/m14_loaders.sbatch m13-9ce0adb production <tier-T objects> df:<tier-T DoubletFinder inputs>
+sbatch --mem=128G validation/slurm/m14_loaders.sbatch m13-9ce0adb production <a tier-P object>
+sbatch --array=0-26 --mem=4G validation/slurm/m14_markers.sbatch m13-9ce0adb portable <the 27 tier-T objects>
+sbatch --array=0-6 --mem=32G validation/slurm/m14_markers.sbatch m13-9ce0adb production <the 7 tier-P objects>
+sbatch --mem=64G validation/slurm/m14_m17.sbatch m13-9ce0adb production <objects>
+sbatch validation/slurm/m14_cargo_tests.sbatch
+bash validation/slurm/m14_report.sh m13-9ce0adb > docs/validation/clustering_m14.tsv
+bash validation/slurm/m14_report.sh m13-9ce0adb k13 > docs/validation/clustering_m14_k13.tsv
+bash validation/slurm/m14_report.sh m13-9ce0adb m17 > docs/validation/clustering_m14_m17.tsv
+```
+
+(the markers array likewise for the other profile and tier). One loader by hand, on an export:
+
+```r
+library(scrustio)                       # installed in .rlib/
+obj <- load_seurat("export")           # or load_sce("export"); save_rds("export", "object.rds")
+```
+
+```bash
+python -m scrustio h5ad export object.h5ad    # with loaders/python/scrustio on the path or installed
+```

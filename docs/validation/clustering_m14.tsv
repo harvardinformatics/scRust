@@ -1,0 +1,265 @@
+object	tier	kind	profile	loader	mode	pass	components	identical	within_floor	beyond_floor	differing	not_rebuilt	added	files_values	files_differing	round_trip	wall_s	peak_gib	read10x_dirs	read10x_as_required	read_10x_mtx_attempts	read_10x_mtx_as_required
+cellbender_fromraw_ghirsutum2	P	cluster	portable	seurat	floor	TRUE	57	41	12	0	0	3	1	372442474	0	identical	1339	25.99	5	5	766	True
+cellbender_fromraw_ghirsutum2	P	cluster	portable	sce	floor	TRUE	42	33	9	0	0	0	0			identical	1339	25.99	5	5	766	True
+cellbender_fromraw_ghirsutum2	P	cluster	portable	anndata	floor	TRUE	49	37	8	0	0	3 (+1 reported)	0	372436472	0	identical	257	12.21				
+cellbender_fromraw_ghirsutum2	P	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	372442474	0	identical	1252	25.95	5	5	766	True
+cellbender_fromraw_ghirsutum2	P	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	1252	25.95	5	5	766	True
+cellbender_fromraw_ghirsutum2	P	cluster	production	anndata	exact	TRUE	49	46	0	0	0	3	0	372436472	0	identical	236	12.26				
+cellbender_fromraw_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	518099	0	identical	18	0.96	5	5	766	True
+cellbender_fromraw_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.96	5	5	766	True
+cellbender_fromraw_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	515988	0	identical	3	0.14				
+cellbender_fromraw_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	518099	0	identical	18	0.96	5	5	766	True
+cellbender_fromraw_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	18	0.96	5	5	766	True
+cellbender_fromraw_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	515988	0	identical	3	0.14				
+decontx_raw_emptydrops_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	465403	0	identical	18	0.96	5	5	766	True
+decontx_raw_emptydrops_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.96	5	5	766	True
+decontx_raw_emptydrops_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	463544	0	identical	3	0.14				
+decontx_raw_emptydrops_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	465403	0	identical	18	0.96	5	5	766	True
+decontx_raw_emptydrops_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	18	0.96	5	5	766	True
+decontx_raw_emptydrops_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	463544	0	identical	3	0.14				
+decontx_raw_tenx_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	510277	0	identical	18	0.96	5	5	766	True
+decontx_raw_tenx_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.96	5	5	766	True
+decontx_raw_tenx_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	508484	0	identical	3	0.14				
+decontx_raw_tenx_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	510277	0	identical	18	0.96	5	5	766	True
+decontx_raw_tenx_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	18	0.96	5	5	766	True
+decontx_raw_tenx_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	508484	0	identical	3	0.14				
+doubletfinder_cellbender_fromraw_test	T	cluster	portable	seurat	floor	TRUE	57	46	7	0	0	3	1	455185	0	identical	18	0.96	5	5	766	True
+doubletfinder_cellbender_fromraw_test	T	cluster	portable	sce	floor	TRUE	42	36	6	0	0	0	0			identical	18	0.96	5	5	766	True
+doubletfinder_cellbender_fromraw_test	T	cluster	portable	anndata	floor	TRUE	50	42	6	0	0	2	0	453185	0	identical	3	0.14				
+doubletfinder_cellbender_fromraw_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	455185	0	identical	17	0.96	5	5	766	True
+doubletfinder_cellbender_fromraw_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	17	0.96	5	5	766	True
+doubletfinder_cellbender_fromraw_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	453185	0	identical	3	0.14				
+doubletfinder_decontx_raw_emptydrops_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	414254	0	identical	19	0.96	5	5	766	True
+doubletfinder_decontx_raw_emptydrops_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	19	0.96	5	5	766	True
+doubletfinder_decontx_raw_emptydrops_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	412485	0	identical	7	0.14				
+doubletfinder_decontx_raw_emptydrops_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	414254	0	identical	17	0.95	5	5	766	True
+doubletfinder_decontx_raw_emptydrops_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	17	0.95	5	5	766	True
+doubletfinder_decontx_raw_emptydrops_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	412485	0	identical	3	0.14				
+doubletfinder_decontx_raw_tenx_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	465619	0	identical	18	0.96	5	5	766	True
+doubletfinder_decontx_raw_tenx_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.96	5	5	766	True
+doubletfinder_decontx_raw_tenx_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	463835	0	identical	4	0.14				
+doubletfinder_decontx_raw_tenx_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	465619	0	identical	19	0.96	5	5	766	True
+doubletfinder_decontx_raw_tenx_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	19	0.96	5	5	766	True
+doubletfinder_decontx_raw_tenx_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	463835	0	identical	6	0.14				
+doubletfinder_soupx_emptydrops_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	436802	0	identical	18	0.96	5	5	766	True
+doubletfinder_soupx_emptydrops_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.96	5	5	766	True
+doubletfinder_soupx_emptydrops_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	434721	0	identical	3	0.14				
+doubletfinder_soupx_emptydrops_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	436802	0	identical	17	0.94	5	5	766	True
+doubletfinder_soupx_emptydrops_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	17	0.94	5	5	766	True
+doubletfinder_soupx_emptydrops_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	434721	0	identical	3	0.14				
+doubletfinder_soupx_tenx_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	507453	0	identical	19	0.97	5	5	766	True
+doubletfinder_soupx_tenx_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	19	0.97	5	5	766	True
+doubletfinder_soupx_tenx_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	505327	0	identical	3	0.14				
+doubletfinder_soupx_tenx_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	507453	0	identical	18	0.97	5	5	766	True
+doubletfinder_soupx_tenx_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	18	0.97	5	5	766	True
+doubletfinder_soupx_tenx_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	505327	0	identical	10	0.14				
+filtered_seurat_emptydrops_sscovelli	P	cluster	portable	seurat	floor	TRUE	57	40	12	0	0	4	1	371669463	0	identical	972	33.41	5	5	766	True
+filtered_seurat_emptydrops_sscovelli	P	cluster	portable	sce	floor	TRUE	42	33	9	0	0	0	0			identical	972	33.41	5	5	766	True
+filtered_seurat_emptydrops_sscovelli	P	cluster	portable	anndata	floor	TRUE	49	37	8	0	0	3 (+1 reported)	0	371663461	0	identical	173	11.91				
+filtered_seurat_emptydrops_sscovelli	P	cluster	production	seurat	exact	TRUE	57	52	0	0	0	4	1	371669463	0	identical	994	33.41	5	5	766	True
+filtered_seurat_emptydrops_sscovelli	P	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	994	33.41	5	5	766	True
+filtered_seurat_emptydrops_sscovelli	P	cluster	production	anndata	exact	TRUE	49	46	0	0	0	3	0	371663461	0	identical	168	11.92				
+filtered_seurat_emptydrops_test	T	cluster	portable	seurat	floor	TRUE	57	45	7	0	0	4	1	498787	0	identical	18	0.96	5	5	766	True
+filtered_seurat_emptydrops_test	T	cluster	portable	sce	floor	TRUE	42	36	6	0	0	0	0			identical	18	0.96	5	5	766	True
+filtered_seurat_emptydrops_test	T	cluster	portable	anndata	floor	TRUE	50	42	6	0	0	2	0	496679	0	identical	3	0.14				
+filtered_seurat_emptydrops_test	T	cluster	production	seurat	exact	TRUE	57	52	0	0	0	4	1	498787	0	identical	18	0.96	5	5	766	True
+filtered_seurat_emptydrops_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	18	0.96	5	5	766	True
+filtered_seurat_emptydrops_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	496679	0	identical	3	0.14				
+filtered_seurat_tenx_10xmousebrain	P	cluster	portable	seurat	floor	TRUE	57	41	12	0	0	3	1	162961610	0	identical	681	12.89	5	5	766	True
+filtered_seurat_tenx_10xmousebrain	P	cluster	portable	sce	floor	TRUE	42	33	9	0	0	0	0			identical	681	12.89	5	5	766	True
+filtered_seurat_tenx_10xmousebrain	P	cluster	portable	anndata	floor	TRUE	49	37	9	0	0	3	0	162955608	0	identical	155	6.05				
+filtered_seurat_tenx_10xmousebrain	P	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	162961610	0	identical	694	12.89	5	5	766	True
+filtered_seurat_tenx_10xmousebrain	P	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	694	12.89	5	5	766	True
+filtered_seurat_tenx_10xmousebrain	P	cluster	production	anndata	exact	TRUE	49	46	0	0	0	3	0	162955608	0	identical	173	6.04				
+filtered_seurat_tenx_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	564028	0	identical	18	0.97	5	5	766	True
+filtered_seurat_tenx_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.97	5	5	766	True
+filtered_seurat_tenx_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	561878	0	identical	3	0.14				
+filtered_seurat_tenx_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	564028	0	identical	20	0.97	5	5	766	True
+filtered_seurat_tenx_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	20	0.97	5	5	766	True
+filtered_seurat_tenx_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	561878	0	identical	5	0.14				
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	281200	0	identical	15	0.93	5	5	766	True
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	15	0.93	5	5	766	True
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	279401	0	identical	3	0.13				
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	281200	0	identical	16	0.93	5	5	766	True
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	16	0.93	5	5	766	True
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	279401	0	identical	3	0.13				
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	197816	0	identical	16	0.92	5	5	766	True
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	16	0.92	5	5	766	True
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	196314	0	identical	4	0.13				
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	197816	0	identical	16	0.92	5	5	766	True
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	16	0.92	5	5	766	True
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	196314	0	identical	2	0.13				
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	174192	0	identical	16	0.91	5	5	766	True
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	16	0.91	5	5	766	True
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	172759	0	identical	3	0.13				
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	174192	0	identical	16	0.91	5	5	766	True
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	16	0.91	5	5	766	True
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	172759	0	identical	2	0.13				
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	cluster	portable	seurat	floor	TRUE	57	46	7	0	0	3	1	285488	0	identical	16	0.93	5	5	766	True
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	cluster	portable	sce	floor	TRUE	42	36	6	0	0	0	0			identical	16	0.93	5	5	766	True
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	cluster	portable	anndata	floor	TRUE	50	42	6	0	0	2	0	283578	0	identical	3	0.13				
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	285488	0	identical	18	0.93	5	5	766	True
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	18	0.93	5	5	766	True
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	283578	0	identical	7	0.13				
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	292758	0	identical	18	0.93	5	5	766	True
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.93	5	5	766	True
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	290833	0	identical	3	0.13				
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	292758	0	identical	17	0.93	5	5	766	True
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	17	0.93	5	5	766	True
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	290833	0	identical	3	0.13				
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	cluster	portable	seurat	floor	TRUE	57	46	7	0	0	3	1	339428	0	identical	16	0.94	5	5	766	True
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	cluster	portable	sce	floor	TRUE	42	36	6	0	0	0	0			identical	16	0.94	5	5	766	True
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	cluster	portable	anndata	floor	TRUE	50	42	6	0	0	2	0	337473	0	identical	3	0.14				
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	339428	0	identical	18	0.93	5	5	766	True
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	18	0.93	5	5	766	True
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	337473	0	identical	3	0.13				
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	234833	0	identical	16	0.93	5	5	766	True
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	16	0.93	5	5	766	True
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	233220	0	identical	3	0.13				
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	234833	0	identical	16	0.93	5	5	766	True
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	16	0.93	5	5	766	True
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	233220	0	identical	3	0.13				
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	cluster	portable	seurat	floor	TRUE	57	46	7	0	0	3	1	187080	0	identical	16	0.92	5	5	766	True
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	cluster	portable	sce	floor	TRUE	42	36	6	0	0	0	0			identical	16	0.92	5	5	766	True
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	cluster	portable	anndata	floor	TRUE	50	42	6	0	0	2	0	185584	0	identical	3	0.13				
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	187080	0	identical	16	0.92	5	5	766	True
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	16	0.92	5	5	766	True
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	185584	0	identical	2	0.13				
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	cluster	portable	seurat	floor	TRUE	57	46	7	0	0	3	1	332798	0	identical	17	0.94	5	5	766	True
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	cluster	portable	sce	floor	TRUE	42	36	6	0	0	0	0			identical	17	0.94	5	5	766	True
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	cluster	portable	anndata	floor	TRUE	50	42	6	0	0	2	0	330831	0	identical	3	0.13				
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	332798	0	identical	17	0.94	5	5	766	True
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	17	0.94	5	5	766	True
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	330831	0	identical	3	0.14				
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	317107	0	identical	18	0.93	5	5	766	True
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.93	5	5	766	True
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	315140	0	identical	4	0.13				
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	317107	0	identical	16	0.93	5	5	766	True
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	16	0.93	5	5	766	True
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	315140	0	identical	3	0.14				
+scdblfinder_cellbender_fromraw_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	518099	0	identical	19	0.96	5	5	766	True
+scdblfinder_cellbender_fromraw_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	19	0.96	5	5	766	True
+scdblfinder_cellbender_fromraw_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	515988	0	identical	3	0.14				
+scdblfinder_cellbender_fromraw_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	518099	0	identical	18	0.96	5	5	766	True
+scdblfinder_cellbender_fromraw_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	18	0.96	5	5	766	True
+scdblfinder_cellbender_fromraw_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	515988	0	identical	4	0.14				
+scdblfinder_decontx_raw_emptydrops_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	456952	0	identical	18	0.96	5	5	766	True
+scdblfinder_decontx_raw_emptydrops_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.96	5	5	766	True
+scdblfinder_decontx_raw_emptydrops_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	455090	0	identical	3	0.14				
+scdblfinder_decontx_raw_emptydrops_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	456952	0	identical	18	0.96	5	5	766	True
+scdblfinder_decontx_raw_emptydrops_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	18	0.96	5	5	766	True
+scdblfinder_decontx_raw_emptydrops_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	455090	0	identical	3	0.14				
+scdblfinder_decontx_raw_tenx_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	505451	0	identical	18	0.97	5	5	766	True
+scdblfinder_decontx_raw_tenx_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.97	5	5	766	True
+scdblfinder_decontx_raw_tenx_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	503664	0	identical	3	0.14				
+scdblfinder_decontx_raw_tenx_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	505451	0	identical	18	0.95	5	5	766	True
+scdblfinder_decontx_raw_tenx_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	18	0.95	5	5	766	True
+scdblfinder_decontx_raw_tenx_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	503664	0	identical	3	0.14				
+scdblfinder_soupx_emptydrops_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	490761	0	identical	18	0.97	5	5	766	True
+scdblfinder_soupx_emptydrops_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.97	5	5	766	True
+scdblfinder_soupx_emptydrops_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	488644	0	identical	3	0.14				
+scdblfinder_soupx_emptydrops_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	490761	0	identical	17	0.97	5	5	766	True
+scdblfinder_soupx_emptydrops_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	17	0.97	5	5	766	True
+scdblfinder_soupx_emptydrops_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	488644	0	identical	3	0.14				
+scdblfinder_soupx_tenx_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	540321	0	identical	18	0.96	5	5	766	True
+scdblfinder_soupx_tenx_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.96	5	5	766	True
+scdblfinder_soupx_tenx_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	538168	0	identical	3	0.14				
+scdblfinder_soupx_tenx_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	540321	0	identical	18	0.96	5	5	766	True
+scdblfinder_soupx_tenx_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	18	0.96	5	5	766	True
+scdblfinder_soupx_tenx_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	538168	0	identical	3	0.14				
+soupx_emptydrops_4500871lane	P	cluster	portable	seurat	floor	TRUE	57	42	11	0	0	3	1	142112111	0	identical	436	12.05	5	5	766	True
+soupx_emptydrops_4500871lane	P	cluster	portable	sce	floor	TRUE	42	34	8	0	0	0	0			identical	436	12.05	5	5	766	True
+soupx_emptydrops_4500871lane	P	cluster	portable	anndata	floor	TRUE	49	38	8	0	0	3	0	142106109	0	identical	85	5.69				
+soupx_emptydrops_4500871lane	P	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	142112111	0	identical	411	12.04	5	5	766	True
+soupx_emptydrops_4500871lane	P	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	411	12.04	5	5	766	True
+soupx_emptydrops_4500871lane	P	cluster	production	anndata	exact	TRUE	49	46	0	0	0	3	0	142106109	0	identical	80	5.71				
+soupx_emptydrops_sscovelli	P	cluster	portable	seurat	floor	TRUE	57	41	12	0	0	3	1	369130097	0	identical	1059	30.99	5	5	766	True
+soupx_emptydrops_sscovelli	P	cluster	portable	sce	floor	TRUE	42	33	9	0	0	0	0			identical	1059	30.99	5	5	766	True
+soupx_emptydrops_sscovelli	P	cluster	portable	anndata	floor	TRUE	49	37	8	0	0	3 (+1 reported)	0	369124095	0	identical	185	11.81				
+soupx_emptydrops_sscovelli	P	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	369130097	0	identical	991	30.78	5	5	766	True
+soupx_emptydrops_sscovelli	P	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	991	30.78	5	5	766	True
+soupx_emptydrops_sscovelli	P	cluster	production	anndata	exact	TRUE	49	46	0	0	0	3	0	369124095	0	identical	228	11.85				
+soupx_emptydrops_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	496475	0	identical	18	0.96	5	5	766	True
+soupx_emptydrops_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	18	0.96	5	5	766	True
+soupx_emptydrops_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	494358	0	identical	3	0.14				
+soupx_emptydrops_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	496475	0	identical	17	0.96	5	5	766	True
+soupx_emptydrops_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	17	0.96	5	5	766	True
+soupx_emptydrops_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	494358	0	identical	3	0.14				
+soupx_tenx_10xmousebrain	P	cluster	portable	seurat	floor	TRUE	57	42	11	0	0	3	1	161974986	0	identical	687	11.88	5	5	766	True
+soupx_tenx_10xmousebrain	P	cluster	portable	sce	floor	TRUE	42	34	8	0	0	0	0			identical	687	11.88	5	5	766	True
+soupx_tenx_10xmousebrain	P	cluster	portable	anndata	floor	TRUE	49	38	8	0	0	3	0	161968984	0	identical	156	6.01				
+soupx_tenx_10xmousebrain	P	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	161974986	0	identical	670	11.89	5	5	766	True
+soupx_tenx_10xmousebrain	P	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	670	11.89	5	5	766	True
+soupx_tenx_10xmousebrain	P	cluster	production	anndata	exact	TRUE	49	46	0	0	0	3	0	161968984	0	identical	154	6.20				
+soupx_tenx_SRR18256555	P	cluster	portable	seurat	floor	TRUE	57	42	11	0	0	3	1	17345227	0	identical	75	2.49	5	5	766	True
+soupx_tenx_SRR18256555	P	cluster	portable	sce	floor	TRUE	42	34	8	0	0	0	0			identical	75	2.49	5	5	766	True
+soupx_tenx_SRR18256555	P	cluster	portable	anndata	floor	TRUE	49	39	8	0	0	2	0	17339225	0	identical	17	0.90				
+soupx_tenx_SRR18256555	P	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	17345227	0	identical	73	2.48	5	5	766	True
+soupx_tenx_SRR18256555	P	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	73	2.48	5	5	766	True
+soupx_tenx_SRR18256555	P	cluster	production	anndata	exact	TRUE	49	47	0	0	0	2	0	17339225	0	identical	15	0.91				
+soupx_tenx_test	T	cluster	portable	seurat	floor	TRUE	57	47	6	0	0	3	1	558303	0	identical	19	0.96	5	5	766	True
+soupx_tenx_test	T	cluster	portable	sce	floor	TRUE	42	37	5	0	0	0	0			identical	19	0.96	5	5	766	True
+soupx_tenx_test	T	cluster	portable	anndata	floor	TRUE	50	43	5	0	0	2	0	556150	0	identical	3	0.14				
+soupx_tenx_test	T	cluster	production	seurat	exact	TRUE	57	53	0	0	0	3	1	558303	0	identical	18	0.97	5	5	766	True
+soupx_tenx_test	T	cluster	production	sce	exact	TRUE	42	42	0	0	0	0	0			identical	18	0.97	5	5	766	True
+soupx_tenx_test	T	cluster	production	anndata	exact	TRUE	50	48	0	0	0	2	0	556150	0	identical	3	0.14				
+doubletfinder_cellbender_fromraw_ghirsutum2	P	doubletfinder	portable	seurat	floor	TRUE	5	5	0	0	0	0	0	67233260	0	identical	368	11.62				
+doubletfinder_cellbender_fromraw_ghirsutum2	P	doubletfinder	portable	sce	floor	TRUE	3	3	0	0	0	0	0			identical	368	11.62				
+doubletfinder_cellbender_fromraw_ghirsutum2	P	doubletfinder	portable	anndata	floor	TRUE	5	5	0	0	0	0	0	67180706	0	identical	67	3.92				
+doubletfinder_cellbender_fromraw_ghirsutum2	P	doubletfinder	production	seurat	exact	TRUE	5	5	0	0	0	0	0	67233260	0	identical	362	11.62				
+doubletfinder_cellbender_fromraw_ghirsutum2	P	doubletfinder	production	sce	exact	TRUE	3	3	0	0	0	0	0			identical	362	11.62				
+doubletfinder_cellbender_fromraw_ghirsutum2	P	doubletfinder	production	anndata	exact	TRUE	5	5	0	0	0	0	0	67180706	0	identical	68	3.91				
+doubletfinder_cellbender_fromraw_test	T	doubletfinder	portable	seurat	floor	TRUE	5	5	0	0	0	0	0	55183	0	identical	13	0.92				
+doubletfinder_cellbender_fromraw_test	T	doubletfinder	portable	sce	floor	TRUE	3	3	0	0	0	0	0			identical	13	0.92				
+doubletfinder_cellbender_fromraw_test	T	doubletfinder	portable	anndata	floor	TRUE	5	5	0	0	0	0	0	54936	0	identical	1	0.12				
+doubletfinder_cellbender_fromraw_test	T	doubletfinder	production	seurat	exact	TRUE	5	5	0	0	0	0	0	55183	0	identical	14	0.92				
+doubletfinder_cellbender_fromraw_test	T	doubletfinder	production	sce	exact	TRUE	3	3	0	0	0	0	0			identical	14	0.92				
+doubletfinder_cellbender_fromraw_test	T	doubletfinder	production	anndata	exact	TRUE	5	5	0	0	0	0	0	54936	0	identical	1	0.11				
+doubletfinder_decontx_raw_emptydrops_test	T	doubletfinder	portable	seurat	floor	TRUE	5	5	0	0	0	0	0	51133	0	identical	13	0.92				
+doubletfinder_decontx_raw_emptydrops_test	T	doubletfinder	portable	sce	floor	TRUE	3	3	0	0	0	0	0			identical	13	0.92				
+doubletfinder_decontx_raw_emptydrops_test	T	doubletfinder	portable	anndata	floor	TRUE	5	5	0	0	0	0	0	50896	0	identical	1	0.12				
+doubletfinder_decontx_raw_emptydrops_test	T	doubletfinder	production	seurat	exact	TRUE	5	5	0	0	0	0	0	51133	0	identical	14	0.92				
+doubletfinder_decontx_raw_emptydrops_test	T	doubletfinder	production	sce	exact	TRUE	3	3	0	0	0	0	0			identical	14	0.92				
+doubletfinder_decontx_raw_emptydrops_test	T	doubletfinder	production	anndata	exact	TRUE	5	5	0	0	0	0	0	50896	0	identical	1	0.12				
+doubletfinder_decontx_raw_tenx_test	T	doubletfinder	portable	seurat	floor	TRUE	5	5	0	0	0	0	0	52605	0	identical	13	0.92				
+doubletfinder_decontx_raw_tenx_test	T	doubletfinder	portable	sce	floor	TRUE	3	3	0	0	0	0	0			identical	13	0.92				
+doubletfinder_decontx_raw_tenx_test	T	doubletfinder	portable	anndata	floor	TRUE	5	5	0	0	0	0	0	52332	0	identical	1	0.12				
+doubletfinder_decontx_raw_tenx_test	T	doubletfinder	production	seurat	exact	TRUE	5	5	0	0	0	0	0	52605	0	identical	14	0.92				
+doubletfinder_decontx_raw_tenx_test	T	doubletfinder	production	sce	exact	TRUE	3	3	0	0	0	0	0			identical	14	0.92				
+doubletfinder_decontx_raw_tenx_test	T	doubletfinder	production	anndata	exact	TRUE	5	5	0	0	0	0	0	52332	0	identical	1	0.12				
+doubletfinder_soupx_emptydrops_4500871lane	P	doubletfinder	portable	seurat	floor	TRUE	5	5	0	0	0	0	0	35930908	0	identical	197	6.14				
+doubletfinder_soupx_emptydrops_4500871lane	P	doubletfinder	portable	sce	floor	TRUE	3	3	0	0	0	0	0			identical	197	6.14				
+doubletfinder_soupx_emptydrops_4500871lane	P	doubletfinder	portable	anndata	floor	TRUE	5	5	0	0	0	0	0	35907669	0	identical	36	2.14				
+doubletfinder_soupx_emptydrops_4500871lane	P	doubletfinder	production	seurat	exact	TRUE	5	5	0	0	0	0	0	35930908	0	identical	196	6.00				
+doubletfinder_soupx_emptydrops_4500871lane	P	doubletfinder	production	sce	exact	TRUE	3	3	0	0	0	0	0			identical	196	6.00				
+doubletfinder_soupx_emptydrops_4500871lane	P	doubletfinder	production	anndata	exact	TRUE	5	5	0	0	0	0	0	35907669	0	identical	36	2.14				
+doubletfinder_soupx_emptydrops_sscovelli	P	doubletfinder	portable	seurat	floor	TRUE	5	5	0	0	0	0	0	62261130	0	identical	353	11.99				
+doubletfinder_soupx_emptydrops_sscovelli	P	doubletfinder	portable	sce	floor	TRUE	3	3	0	0	0	0	0			identical	353	11.99				
+doubletfinder_soupx_emptydrops_sscovelli	P	doubletfinder	portable	anndata	floor	TRUE	5	5	0	0	0	0	0	62191630	0	identical	63	3.62				
+doubletfinder_soupx_emptydrops_sscovelli	P	doubletfinder	production	seurat	exact	TRUE	5	5	0	0	0	0	0	62261130	0	identical	343	11.94				
+doubletfinder_soupx_emptydrops_sscovelli	P	doubletfinder	production	sce	exact	TRUE	3	3	0	0	0	0	0			identical	343	11.94				
+doubletfinder_soupx_emptydrops_sscovelli	P	doubletfinder	production	anndata	exact	TRUE	5	5	0	0	0	0	0	62191630	0	identical	61	3.62				
+doubletfinder_soupx_emptydrops_test	T	doubletfinder	portable	seurat	floor	TRUE	5	5	0	0	0	0	0	55130	0	identical	13	0.92				
+doubletfinder_soupx_emptydrops_test	T	doubletfinder	portable	sce	floor	TRUE	3	3	0	0	0	0	0			identical	13	0.92				
+doubletfinder_soupx_emptydrops_test	T	doubletfinder	portable	anndata	floor	TRUE	5	5	0	0	0	0	0	54893	0	identical	1	0.12				
+doubletfinder_soupx_emptydrops_test	T	doubletfinder	production	seurat	exact	TRUE	5	5	0	0	0	0	0	55130	0	identical	14	0.92				
+doubletfinder_soupx_emptydrops_test	T	doubletfinder	production	sce	exact	TRUE	3	3	0	0	0	0	0			identical	14	0.92				
+doubletfinder_soupx_emptydrops_test	T	doubletfinder	production	anndata	exact	TRUE	5	5	0	0	0	0	0	54893	0	identical	1	0.12				
+doubletfinder_soupx_tenx_10xmousebrain	P	doubletfinder	portable	seurat	floor	TRUE	5	5	0	0	0	0	0	36934012	0	identical	198	6.38				
+doubletfinder_soupx_tenx_10xmousebrain	P	doubletfinder	portable	sce	floor	TRUE	3	3	0	0	0	0	0			identical	198	6.38				
+doubletfinder_soupx_tenx_10xmousebrain	P	doubletfinder	portable	anndata	floor	TRUE	5	5	0	0	0	0	0	36923827	0	identical	37	2.20				
+doubletfinder_soupx_tenx_10xmousebrain	P	doubletfinder	production	seurat	exact	TRUE	5	5	0	0	0	0	0	36934012	0	identical	198	6.38				
+doubletfinder_soupx_tenx_10xmousebrain	P	doubletfinder	production	sce	exact	TRUE	3	3	0	0	0	0	0			identical	198	6.38				
+doubletfinder_soupx_tenx_10xmousebrain	P	doubletfinder	production	anndata	exact	TRUE	5	5	0	0	0	0	0	36923827	0	identical	36	2.20				
+doubletfinder_soupx_tenx_SRR18256555	P	doubletfinder	portable	seurat	floor	TRUE	5	5	0	0	0	0	0	2464167	0	identical	33	1.36				
+doubletfinder_soupx_tenx_SRR18256555	P	doubletfinder	portable	sce	floor	TRUE	3	3	0	0	0	0	0			identical	33	1.36				
+doubletfinder_soupx_tenx_SRR18256555	P	doubletfinder	portable	anndata	floor	TRUE	5	5	0	0	0	0	0	2461479	0	identical	7	0.29				
+doubletfinder_soupx_tenx_SRR18256555	P	doubletfinder	production	seurat	exact	TRUE	5	5	0	0	0	0	0	2464167	0	identical	36	1.36				
+doubletfinder_soupx_tenx_SRR18256555	P	doubletfinder	production	sce	exact	TRUE	3	3	0	0	0	0	0			identical	36	1.36				
+doubletfinder_soupx_tenx_SRR18256555	P	doubletfinder	production	anndata	exact	TRUE	5	5	0	0	0	0	0	2461479	0	identical	8	0.29				
+doubletfinder_soupx_tenx_test	T	doubletfinder	portable	seurat	floor	TRUE	5	5	0	0	0	0	0	59379	0	identical	13	0.92				
+doubletfinder_soupx_tenx_test	T	doubletfinder	portable	sce	floor	TRUE	3	3	0	0	0	0	0			identical	13	0.92				
+doubletfinder_soupx_tenx_test	T	doubletfinder	portable	anndata	floor	TRUE	5	5	0	0	0	0	0	59103	0	identical	1	0.11				
+doubletfinder_soupx_tenx_test	T	doubletfinder	production	seurat	exact	TRUE	5	5	0	0	0	0	0	59379	0	identical	14	0.92				
+doubletfinder_soupx_tenx_test	T	doubletfinder	production	sce	exact	TRUE	3	3	0	0	0	0	0			identical	14	0.92				
+doubletfinder_soupx_tenx_test	T	doubletfinder	production	anndata	exact	TRUE	5	5	0	0	0	0	0	59103	0	identical	1	0.12				
