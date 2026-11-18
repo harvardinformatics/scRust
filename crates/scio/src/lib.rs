@@ -20,10 +20,15 @@
 //! - [`toml`]: a small TOML reader, for parameter files and the repository's TOML files (M11);
 //! - [`manifest`]: the output manifest, `summary.json`'s `files` section, and the naming rules
 //!   that keep normalised data from being read as raw counts (M13);
-//! - [`copy`]: copying files with their checksums (the export's `counts/`, M13).
+//! - [`copy`]: copying files with their checksums (the export's `counts/`, M13);
+//! - [`counts`] and [`factor`]: what one tool hands to the next in memory (A3's in-memory
+//!   hand-offs, M15): a count matrix with its barcodes and feature lines, and cluster labels
+//!   with their levels.
 
 pub mod copy;
+pub mod counts;
 pub mod deflate;
+pub mod factor;
 pub mod grade;
 pub mod gz;
 pub mod json;
@@ -38,6 +43,8 @@ pub mod text;
 pub mod toml;
 pub mod tsv;
 
+pub use counts::Counts;
+pub use factor::Factor;
 pub use json::Json;
 pub use npy::Npy;
 pub use sparse::{CscMatrix, CsrMatrix};

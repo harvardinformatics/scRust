@@ -81,7 +81,7 @@ fn run(object: &str, dir: &Path, threads: usize) -> cluster::Chain {
     w.purity_lists = true;
     let params = ChainParams::workflow();
     w.neighbor_params = Some(params.neighbors.clone());
-    let r = chain::from_counts(counts, &params, threads, Options { keep_partitions: false, keep_residuals: true, keep_purity_lists: true, correct: false }, &mut w).unwrap();
+    let r = chain::from_counts(counts, &params, threads, Options { keep_partitions: false, keep_residuals: true, keep_purity_lists: true, correct: false, ..Options::default() }, &mut w).unwrap();
     w.finish_labels(&r.clusters, r.silhouette.as_ref(), r.purity.as_ref()).unwrap();
     w.finish_dumps().unwrap();
     r

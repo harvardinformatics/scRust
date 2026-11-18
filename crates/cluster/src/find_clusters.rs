@@ -49,26 +49,13 @@ impl fmt::Display for ClusterError {
 
 impl std::error::Error for ClusterError {}
 
-/// A factor: labels as codes into its levels.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Factor {
-    pub name: String,
-    pub levels: Vec<String>,
-    /// 0-based codes into `levels`, one per cell.
-    pub codes: Vec<u32>,
-}
+/// A factor: labels as codes into its levels. It is `scio`'s, the type the tools hand each other
+/// in memory (docs/PLAN.md A3; M15 moved it there).
+pub use scio::Factor;
 
-impl Factor {
-    /// The cells' labels as text.
-    pub fn labels(&self) -> Vec<&str> {
-        self.codes.iter().map(|&c| self.levels[c as usize].as_str()).collect()
-    }
-
-    /// A factor of `labels` with the given levels (every label must be one of them).
-    fn new(name: &str, labels: &[String], levels: Vec<String>) -> Factor {
-        let codes = labels.iter().map(|l| levels.iter().position(|v| v == l).expect("a label outside the levels") as u32).collect();
-        Factor { name: name.to_string(), levels, codes }
-    }
+/// A factor of `labels` with the given levels, every label one of them by construction.
+fn factor(name: &str, labels: &[String], levels: Vec<String>) -> Factor {
+    Factor::from_labels(name, labels, levels).expect("a label outside the levels")
 }
 
 /// One resolution of a FindClusters call.
@@ -212,7 +199,7 @@ pub fn find_clusters(snn: &CscMatrix, params: &ClusterParams, threads: usize, ke
         let grouped = singletons::group_singletons(&opt.ids, snn, params.group_singletons).map_err(ClusterError::Group)?;
         let group_seconds = tg.elapsed().as_secs_f64();
         let labels = grouped.label_strings();
-        let column = Factor::new(&params.column_name(r), &labels, res_levels(&labels));
+        let column = factor(&params.column_name(r), &labels, res_levels(&labels));
         Ok(ResolutionResult { resolution: r, res_name: ClusterParams::res_name(r), optimizer: opt, grouped, column, group_seconds })
     };
     let mut results: Vec<Option<Result<ResolutionResult, ClusterError>>> = (0..nres).map(|_| None).collect();
@@ -251,7 +238,7 @@ pub fn find_clusters(snn: &CscMatrix, params: &ClusterParams, threads: usize, ke
 
     let last = &resolutions.last().expect("at least one resolution").column;
     let labels: Vec<String> = last.labels().into_iter().map(String::from).collect();
-    let seurat_clusters = Factor::new("seurat_clusters", &labels, seurat_clusters_levels(&last.levels));
+    let seurat_clusters = factor("seurat_clusters", &labels, seurat_clusters_levels(&last.levels));
     Ok(FindClusters {
         params: params.clone(),
         n_cells: n,

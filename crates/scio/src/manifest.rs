@@ -49,6 +49,11 @@ pub const SCALES: [&str; 12] = [
 /// The formats a file can have.
 pub const FORMATS: [&str; 6] = ["matrix_market", "tsv", "npy", "json", "text", "annoy"];
 
+/// The role of a nested output's `summary.json` (M15): a subdirectory that is itself a scrust
+/// output, described by its own manifest. Its files are that manifest's, not the parent's: the
+/// parent lists only the nested `summary.json` (with its size and SHA-256), and the checks recurse.
+pub const NESTED_OUTPUT: &str = "nested_output";
+
 /// A column of the file holding identifiers: its header name, or its 1-based number when the file
 /// has no header.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -460,9 +465,10 @@ impl Manifest {
     }
 
     /// Fills every entry's size and SHA-256 from the files in `dir` (but `summary.json`'s), on up
-    /// to `threads` threads; the result does not depend on `threads`.
+    /// to `threads` threads; the result does not depend on `threads`. An entry that has both
+    /// already keeps them: the command that wrote the file digested it as it wrote it.
     pub fn fill_digests(&mut self, dir: &Path, threads: usize) -> io::Result<()> {
-        let todo: Vec<usize> = (0..self.entries.len()).filter(|&k| self.entries[k].path != "summary.json").collect();
+        let todo: Vec<usize> = (0..self.entries.len()).filter(|&k| self.entries[k].path != "summary.json" && !(self.entries[k].bytes.is_some() && self.entries[k].sha256.is_some())).collect();
         let paths: Vec<std::path::PathBuf> = todo.iter().map(|&k| dir.join(&self.entries[k].path)).collect();
         let results: Vec<io::Result<(u64, String)>> = if threads <= 1 || paths.len() <= 1 {
             paths.iter().map(|p| crate::sha256::file(p)).collect()
@@ -505,8 +511,10 @@ impl Manifest {
         if listed.len() != self.entries.len() {
             out.push("a path is listed more than once".into());
         }
+        // a nested output's files are its own manifest's (checked below)
+        let nested: Vec<String> = self.entries.iter().filter(|e| e.role == NESTED_OUTPUT).map(|e| format!("{}/", e.dir())).collect();
         for f in list_files(dir)? {
-            if !listed.contains(f.as_str()) {
+            if !listed.contains(f.as_str()) && !nested.iter().any(|d| d != "/" && f.starts_with(d.as_str())) {
                 out.push(format!("{f}: in the directory, not in the manifest"));
             }
         }
@@ -543,6 +551,20 @@ impl Manifest {
                 }
                 (Some(_), Some(_)) => {}
                 _ => out.push(format!("{}: no size or checksum", e.path)),
+            }
+        }
+        for e in self.entries.iter().filter(|e| e.role == NESTED_OUTPUT) {
+            if e.file_name() != "summary.json" || e.dir().is_empty() || e.format != "json" {
+                out.push(format!("{}: a nested output is listed by its own summary.json, in a subdirectory, as json", e.path));
+                continue;
+            }
+            if self.entries.iter().any(|x| x.path != e.path && x.path.starts_with(&format!("{}/", e.dir()))) {
+                out.push(format!("{}/: a nested output's files are listed by its own manifest, not by this one", e.dir()));
+            }
+            let sub = dir.join(e.dir());
+            match Manifest::read(&sub) {
+                Ok(m) => out.extend(m.check(&sub, verify_digests)?.into_iter().map(|p| format!("{}/: {p}", e.dir()))),
+                Err(x) => out.push(format!("{}: not a scrust output's manifest: {x}", e.path)),
             }
         }
         out.extend(naming_problems(&self.entries));
@@ -810,6 +832,53 @@ mod tests {
         m.push(Entry::new("gone.tsv", "x", "none", "tsv", ""));
         let p = m.check(&dir, true).unwrap();
         assert!(p.iter().any(|s| s.starts_with("extra.txt")) && p.iter().any(|s| s.starts_with("gone.tsv")) && p.iter().any(|s| s.starts_with("metadata.tsv")), "{p:?}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A nested output (M15): the parent lists only its `summary.json`; the check skips its files
+    /// and checks its own manifest instead; given digests are kept.
+    #[test]
+    fn nested_outputs() {
+        let dir = crate::test_dir("manifest_nested");
+        let _ = std::fs::remove_dir_all(&dir);
+        let sub = dir.join("recluster");
+        std::fs::create_dir_all(sub.join("counts")).unwrap();
+        std::fs::write(sub.join("metadata.tsv"), "barcode\tx\nA\t1\n").unwrap();
+        std::fs::write(sub.join("counts/matrix.mtx.gz"), b"m").unwrap();
+        let mut inner = Manifest::new("cluster", provenance());
+        inner.push(Manifest::summary_entry());
+        inner.push(Entry::new("metadata.tsv", "cell_metadata", "none", "tsv", "per cell").header(true).shape(&[1, 2]));
+        inner.push(Entry::new("counts/matrix.mtx.gz", "raw_counts", "raw_counts", "matrix_market", "counts"));
+        inner.fill_digests(&sub, 1).unwrap();
+        let write_summary = |d: &Path, m: &Manifest| std::fs::write(d.join("summary.json"), crate::json::to_file_text(&Json::obj(vec![("files", m.to_json())]))).unwrap();
+        write_summary(&sub, &inner);
+        std::fs::write(dir.join("cells.tsv"), "barcode\npANN\n").unwrap();
+        let mut m = Manifest::new("doubletfinder", provenance());
+        m.push(Manifest::summary_entry());
+        let mut cells = Entry::new("cells.tsv", "doublet_calls", "none", "tsv", "calls").header(true);
+        // a digest given by the writer is kept, not recomputed
+        cells.bytes = Some(15);
+        cells.sha256 = Some(crate::sha256::hex(b"barcode\npANN\n"));
+        m.push(cells);
+        m.push(Entry::new("recluster/summary.json", NESTED_OUTPUT, "none", "json", "nested"));
+        m.fill_digests(&dir, 2).unwrap();
+        assert_eq!(m.entries[1].bytes, Some(15), "the given size is kept");
+        assert!(m.entries[2].sha256.is_some(), "the nested summary.json is digested");
+        write_summary(&dir, &m);
+        let p = m.check(&dir, false).unwrap();
+        assert!(p.is_empty(), "{p:?}");
+        // the nested output's own problems are the parent's, under its directory
+        std::fs::write(sub.join("stray.txt"), "x").unwrap();
+        let p = m.check(&dir, false).unwrap();
+        assert_eq!(p, vec!["recluster/: stray.txt: in the directory, not in the manifest".to_string()]);
+        std::fs::remove_file(sub.join("stray.txt")).unwrap();
+        // a nested output's file listed by the parent too, and a nested entry not named summary.json
+        let mut m2 = m.clone();
+        m2.push(Entry::new("recluster/metadata.tsv", "cell_metadata", "none", "tsv", ""));
+        assert!(m2.check(&dir, false).unwrap().iter().any(|s| s.contains("listed by its own manifest")));
+        let mut m3 = m.clone();
+        m3.entries[2].path = "recluster/metadata.tsv".into();
+        assert!(m3.check(&dir, false).unwrap().iter().any(|s| s.contains("by its own summary.json")));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

@@ -51,7 +51,7 @@ pub use find_clusters::{find_clusters, ClusterError, Factor, FindClusters, Resol
 pub use java_random::JavaRandom;
 pub use network::Network;
 pub use optimizer::{OptimizerParams, OptimizerResult};
-pub use chain::{Chain, ChainError, Observer};
+pub use chain::{cluster_counts, Chain, ChainError, Clustered, Observer};
 pub use chain_params::{ChainParams, Stats};
 pub use params::{parse_resolutions, ClusterParams};
 pub use silhouette::{approx_silhouette, Silhouette};

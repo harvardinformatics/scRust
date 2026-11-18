@@ -63,19 +63,21 @@ pub struct Feature {
     pub kind: String,
 }
 
+impl Feature {
+    /// One line of `features.tsv`: id, name (the id when missing), type.
+    pub fn parse(line: &str) -> Feature {
+        let mut f = line.split('\t');
+        let id = f.next().unwrap_or("").to_string();
+        let name = f.next().unwrap_or(&id).to_string();
+        let kind = f.next().unwrap_or("").to_string();
+        Feature { id, name, kind }
+    }
+}
+
 /// The features, in row order.
 pub fn read_features(dir: &Path) -> io::Result<Vec<Feature>> {
     let lines = read_lines(&find(dir, "features.tsv")?)?;
-    Ok(lines
-        .iter()
-        .map(|l| {
-            let mut f = l.split('\t');
-            let id = f.next().unwrap_or("").to_string();
-            let name = f.next().unwrap_or(&id).to_string();
-            let kind = f.next().unwrap_or("").to_string();
-            Feature { id, name, kind }
-        })
-        .collect())
+    Ok(lines.iter().map(|l| Feature::parse(l)).collect())
 }
 
 /// The header of `matrix.mtx`: field type ("integer" or "real") and dimensions.
@@ -116,6 +118,38 @@ pub struct Written {
     pub nnz: usize,
     /// The header's field: "integer" when every value written is integer-valued, else "real".
     pub field: &'static str,
+    /// The files written, in the order the readers take them (matrix, barcodes, features), each
+    /// with its size and the SHA-256 of the bytes written, digested as they were written (M15):
+    /// a manifest needs not read them back.
+    pub files: Vec<WrittenFile>,
+}
+
+/// A file written, with its size and SHA-256.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WrittenFile {
+    pub name: String,
+    pub bytes: u64,
+    pub sha256: String,
+}
+
+/// A file writer that digests what it writes.
+struct Digesting {
+    file: fs::File,
+    h: crate::sha256::Sha256,
+    n: u64,
+}
+
+impl Write for Digesting {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let k = self.file.write(buf)?;
+        self.h.update(&buf[..k]);
+        self.n += k as u64;
+        Ok(k)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.file.flush()
+    }
 }
 
 /// Entries per piece of `matrix.mtx.gz`: each piece is formatted and compressed on its own
@@ -169,6 +203,7 @@ fn write_columns_in(dir: &Path, m: &CscMatrix, cols: &[usize], barcodes: &[Strin
 
     let path = dir.join("matrix.mtx.gz");
     let file = fs::File::create(&path).map_err(|e| io::Error::new(e.kind(), format!("{}: {e}", path.display())))?;
+    let file = Digesting { file, h: crate::sha256::Sha256::new(), n: 0 };
     let mut gz = GzWriter::new(io::BufWriter::with_capacity(1 << 20, file))?;
     let software = software.replace('\\', "\\\\").replace('"', "\\\"");
     let header = format!(
@@ -207,7 +242,8 @@ fn write_columns_in(dir: &Path, m: &CscMatrix, cols: &[usize], barcodes: &[Strin
         }
         first = last;
     }
-    gz.finish()?.flush()?;
+    let digesting = gz.finish()?.into_inner().map_err(|e| e.into_error())?;
+    let mut files = vec![WrittenFile { name: "matrix.mtx.gz".into(), bytes: digesting.n, sha256: digesting.h.hex() }];
 
     for (name, lines) in [("barcodes.tsv.gz", barcodes), ("features.tsv.gz", features)] {
         let mut text = Vec::with_capacity(lines.iter().map(|l| l.len() + 1).sum());
@@ -216,9 +252,11 @@ fn write_columns_in(dir: &Path, m: &CscMatrix, cols: &[usize], barcodes: &[Strin
             text.push(b'\n');
         }
         let path = dir.join(name);
-        fs::write(&path, gzip(&text)).map_err(|e| io::Error::new(e.kind(), format!("{}: {e}", path.display())))?;
+        let bytes = gzip(&text);
+        fs::write(&path, &bytes).map_err(|e| io::Error::new(e.kind(), format!("{}: {e}", path.display())))?;
+        files.push(WrittenFile { name: name.into(), bytes: bytes.len() as u64, sha256: crate::sha256::hex(&bytes) });
     }
-    Ok(Written { nrow: m.nrow, ncol: cols.len(), nnz, field })
+    Ok(Written { nrow: m.nrow, ncol: cols.len(), nnz, field, files })
 }
 
 /// The Matrix Market lines of output entries `a..b` (`starts`: where each written column's
@@ -380,7 +418,12 @@ mod tests {
         let cols: Vec<usize> = (0..m.ncol).collect();
         let dir = crate::test_dir("tenx_tier_t");
         let w = write_columns(&dir, &m, &cols, &barcodes, &features, "scio test", 2).unwrap();
-        assert_eq!(w, Written { nrow: 2000, ncol: 300, nnz: 64934, field: "integer" });
+        assert_eq!((w.nrow, w.ncol, w.nnz, w.field), (2000, 300, 64934, "integer"));
+        // each file's size and SHA-256, digested as it was written, are the file's
+        assert_eq!(w.files.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(), ["matrix.mtx.gz", "barcodes.tsv.gz", "features.tsv.gz"]);
+        for f in &w.files {
+            assert_eq!(crate::sha256::file(&dir.join(&f.name)).unwrap(), (f.bytes, f.sha256.clone()), "{}", f.name);
+        }
         assert_eq!(read_mtx(&dir).unwrap(), m);
         assert_eq!(read_barcodes(&dir).unwrap(), barcodes);
         assert_eq!(read_lines(&find(&dir, "features.tsv").unwrap()).unwrap(), features);
