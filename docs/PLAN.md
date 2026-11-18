@@ -99,6 +99,14 @@ Each tool's real inputs and outputs are sparse matrices and small per-cell table
   - Normalised matrices go into the export of C3f instead, next to the original counts and a per-cell metadata table. They are Matrix Market or `.npy` files under names that no 10x reader accepts, each marked with what it holds and how it was made.
   - The loaders (C3g) put them only into slots meant for normalised data.
 - **Formats:** count matrices in 10x Matrix Market (and 10x HDF5 later); normalised matrices in Matrix Market or `.npy` under other names; tables as TSV; run metadata (parameters, seed, versions, timings) in `summary.json`. From M13 on, `summary.json` also lists every output file with its role and scale (C3f), in the schema of [`docs/output_manifest.md`](output_manifest.md).
+- **In-memory hand-offs** (a standing rule from 2026-11-18). Every tool is built so that a later driver (A7) can run tools one after another in one process, handing each result to the next in memory, with or without writing each step's files:
+  - **A library function, no I/O inside:** each tool's crate exposes its whole computation as one function from typed inputs in memory to typed outputs in memory. It opens no files; paths, formats and the manifest belong to the command.
+  - **Shared types for what passes between tools:** the count matrix (`scio::CscMatrix`, R's `dgCMatrix` layout) with its barcodes and features, cluster labels with their levels, and per-cell tables. Every tool takes and returns these, so one tool's output is the next one's input, with no conversion and no re-parsing. A type that a new hand-off needs is added to `scio`, not to the tool.
+  - **The output value is complete:** it holds everything the command's files hold, the new count data (the matrices in bold above) included. The files are one way of writing it out.
+  - **The command is a thin layer:** read the inputs, call the function, write the outputs. Writing is separate from computing, so a driver can skip it, defer it or do it in the background.
+  - **Memory:** a function borrows its inputs or takes them by value, so that a chain can free each stage once the next one has what it needs. A chain's peak memory is then its largest step's, not the sum of its steps'.
+  - **Validated:** a port's tests show that writing the function's in-memory output gives files byte-identical to the command's. Where one tool feeds another, they show that the in-process route gives the same files as the commands run one after the other, as M15 checks for DoubletFinder and the clustering of its singlets.
+  - DoubletFinder and the clustering chain already compute from in-memory matrices inside their commands. M15 makes the chain one library entry point (C3h) and runs the first hand-off between tools in memory. Ports from scDblFinder on are built this way from the start; the earlier tools are aligned with the rule when the driver needs them.
 - **Where Seurat appears:**
   - In the workflow, Seurat objects are only containers, plus R's processing after each tool (SCTransform, clustering), which is not part of these tools.
   - Some tool inputs (cluster labels) were made by Seurat upstream; they become plain input files.
@@ -218,12 +226,16 @@ Tools that take cluster labels (SoupX, decontX, DoubletFinder) accept them as an
 - Each tool follows the same cycle:
   1. Read the exact code path in the pinned env.
   2. Write the export, direct reference and instrumented scripts.
-  3. Port it.
+  3. Port it, as a library under A3's in-memory hand-off rule: one function from typed inputs to typed outputs, with the command a thin layer around it.
   4. Validate stage by stage.
   5. Validate on T, P and the full panel.
   6. Benchmark the port against the workflow's R step by the method of `docs/benchmarks.md` (CPU time, peak memory, the share of each due to reading and writing files, and the input's size), and add its rows and update the findings there. This is a standing rule from the first benchmark (2026-11-18) on.
   7. Update the user documentation (M14b): the tool's page of formats and how to read them, the chaining page and the schematic. From M14b on this is a standing rule: every milestone or port that adds or changes a tool, a file or a loader updates those pages and the schematic in the same branch.
 - The details of each later tool (parameters as the workflow uses them, RNG use, exactness hazards) are researched when that tool starts, as was done for DoubletFinder.
+- **A driver after the ports** (the user's decision, 2026-11-18). A driver, `scrust --all`, will run a whole arm of the workflow in one process. It will either keep each step's outputs for inspection, or hand results on in memory and write only the final outputs.
+  - It starts once a whole arm runs in Rust, from cell calling through ambient correction and doublets to clustering, so that its design follows the tools' real inputs.
+  - Until then, ports come first. The first benchmark (`docs/benchmarks.md`) found each port's own gains (2.1–7.1× less CPU time and 8–40× less memory than R) far larger than what in-memory hand-offs would save (Rust's own file I/O, 5–18% of its CPU time without the export).
+  - A3's in-memory rule keeps every port ready for the driver.
 
 ### A7b. Clustering crate (after DoubletFinder)
 
