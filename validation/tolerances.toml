@@ -604,6 +604,17 @@ teacher_forced = "exact on any machine"
 saved_objects = "exact in the production profile; the portable runs graded under the saved objects' kernel against the floor (K9_purity), as M8 measured"
 certificate = "flagged pairs reported, not failed (M12's decision); every flag labelled median_pair or other"
 certificate_decision = "2026-11-17: keep the exhaustive result; report the flagged pairs; M17's saved purities check them; a KMKNN port is optional"
+# Settled (M12; label m12-4231635, validation/slurm/m12_cluster.sbatch, jobs 61652407, 61652409,
+# 61652412, 61652416): 222 comparisons of the chain from the counts with every R run of its profile
+# (the 27 tier-T and 7 tier-P objects, both profiles), all in exact mode and passing: 1,831 K9
+# checks identical (the stage dumps, the scalars, the files), none differing or missing; the saved
+# objects' purities identical in the production profile on all 34 objects, and in the portable
+# profile within the floor in the 28 runs M8 found (the median pair); teacher-forced on R's
+# embeddings, 1,033 checks identical in the 98 comparisons with instrumented runs. The certificate:
+# the median pair of every odd-sized object, whenever within the radius (17 objects; 23 of the 68
+# runs on R's embeddings), and nothing else; 102 certificates reported in the 222 comparisons.
+# Every check M11's 290 reports held keeps its status and counts (31,269).
+settled = { comparisons = 222, k9_identical = 1831, teacher_forced_identical = 1033, certificates_reported = 102, saved_within_floor_portable = 28, m11_checks_unchanged = 31269 }
 
 # Kernel-gated grading shown on deliberately mismatched pairs (M11): each Rust run against the
 # other profile's instrumented R run on Sapphire Rapids, 68 pairs of the 34 objects in both
@@ -616,6 +627,11 @@ certificate_decision = "2026-11-17: keep the exhaustive result; report the flagg
 pairs = 68
 passed = 68
 checks_within_floor = 1028
+# M12 (label m12-4231635): the same 68 pairs with purity, all in tolerance mode and passing: 1,304
+# checks within [clustering.floor.kernel], 276 of them K9's (the 50th distances, the radius, the
+# mean neighbour count, and the counts, lists, sums, totals and purities of the median pairs);
+# teacher-forced K9 identical (713 checks).
+m12 = { pairs = 68, passed = 68, checks_within_floor = 1304, k9_within_floor = 276 }
 
 # Threads (M9, scrust neighbors): 1 and 32 threads on both 79,409-cell objects give byte-identical
 # knn_index.tsv, knn_distance.tsv, nn.mtx.gz, snn.mtx.gz and annoy.ann (job 60383132,
@@ -728,6 +744,16 @@ compared = [
   { tier = "P", profile = "portable", objects = 7, threads = [8, 1], files = "55-56", differing = 0 },
   { tier = "P", profile = "production", objects = 7, threads = [1, 32, 8], files = 17, differing = 0 },
 ]
+# M12 (label m12-4231635; m12_cluster.sbatch, the one-thread tier-P run job 61652418, the benchmark
+# job 61652420), with purity: the same comparisons, every file byte-identical, the K9 dumps and the
+# certificate's arrays included; the one-thread tier-P runs' 17 reports equal the 8-thread runs'
+# check by check. cargo test compares 1, 2, 5 and 16 threads.
+compared_m12 = [
+  { tier = "T", profile = "portable", objects = 27, threads = [8, 1], files = "71 or 76", differing = 0 },
+  { tier = "T", profile = "production", objects = 27, threads = [8, 1], files = "71 or 76", differing = 0 },
+  { tier = "P", profile = "portable", objects = 7, threads = [8, 1], files = "63-68", differing = 0 },
+  { tier = "P", profile = "production", objects = 7, threads = [1, 32, 8], files = 17, differing = 0 },
+]
 
 # Performance (M11), the chain: scrust cluster --counts --preset workflow on the seven tier-P
 # objects, without stage dumps, at 1 and 32 threads, one Sapphire Rapids node (Xeon Platinum 8480CL,
@@ -775,4 +801,29 @@ measured_m11 = [
   { object = "cellbender_fromraw_ghirsutum2", side = "R", threads = 1, umap = true, wall_s = 1144.7, runumap_s = 82.9, peak_rss_gib = 104.13 },
   { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, wall_s = 255.5, sctransform_s = 181.3, pca_s = 39.8, neighbors_s = 14.3, cluster_s = 9.6, silhouette_s = 1.10, peak_rss_gib = 2.65 },
   { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, wall_s = 52.1, sctransform_s = 20.8, pca_s = 7.2, neighbors_s = 4.5, cluster_s = 9.2, silhouette_s = 1.10, peak_rss_gib = 2.69 },
+]
+# M12 (label m12-4231635; job 61652420, validation/slurm/m12_benchmark.sbatch, holy8a24302, Xeon
+# Platinum 8480CL, test partition, 32 CPUs reserved): the same runs with purity, against the same R
+# runs (measured_m11's R rows; R's purity_s is its neighborPurity). Settled (M12): met. Rust at one
+# thread takes 2.4-5.6 times less time than R's whole run and 1.9-2.7 times less than R's chain
+# through purity, at 32 threads 8.2-15.8 times less than R's whole run; peaks at 0.15-3.19 GiB
+# against R's 2.50-104.13 GiB; 3.15 GiB (1 thread) and 3.19 GiB (32) on the 79,409-cell objects.
+# Purity at one thread: 0.18-83.5 s against R's 0.18-192.6 s (R's KMKNN is faster on the two
+# 11,831-cell objects: 0.94-0.97 s against 1.87-1.88 s); at 32 threads 0.018-2.8 s. Purity never
+# raises the peak RSS (run.phases: the peak after it equals the peak before it).
+measured_m12 = [
+  { object = "soupx_tenx_SRR18256555", side = "Rust", threads = 1, wall_s = 11.3, sctransform_s = 6.8, pca_s = 3.1, neighbors_s = 0.6, cluster_s = 0.2, silhouette_s = 0.04, purity_s = 0.177, peak_rss_gib = 0.15 },
+  { object = "soupx_tenx_SRR18256555", side = "Rust", threads = 32, wall_s = 3.2, sctransform_s = 1.3, pca_s = 0.9, neighbors_s = 0.3, cluster_s = 0.2, silhouette_s = 0.04, purity_s = 0.018, peak_rss_gib = 0.18 },
+  { object = "soupx_tenx_10xmousebrain", side = "Rust", threads = 1, wall_s = 38.6, sctransform_s = 20.9, pca_s = 6.7, neighbors_s = 2.4, cluster_s = 1.0, silhouette_s = 0.20, purity_s = 1.880, peak_rss_gib = 1.44 },
+  { object = "soupx_tenx_10xmousebrain", side = "Rust", threads = 32, wall_s = 14.7, sctransform_s = 5.4, pca_s = 1.5, neighbors_s = 1.0, cluster_s = 1.0, silhouette_s = 0.21, purity_s = 0.102, peak_rss_gib = 1.44 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "Rust", threads = 1, wall_s = 39.6, sctransform_s = 21.3, pca_s = 7.1, neighbors_s = 2.6, cluster_s = 1.1, silhouette_s = 0.21, purity_s = 1.870, peak_rss_gib = 1.44 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "Rust", threads = 32, wall_s = 14.7, sctransform_s = 5.3, pca_s = 1.5, neighbors_s = 1.0, cluster_s = 1.1, silhouette_s = 0.20, purity_s = 0.110, peak_rss_gib = 1.44 },
+  { object = "soupx_emptydrops_4500871lane", side = "Rust", threads = 1, wall_s = 86.2, sctransform_s = 41.6, pca_s = 17.4, neighbors_s = 7.0, cluster_s = 4.6, silhouette_s = 0.69, purity_s = 9.231, peak_rss_gib = 1.48 },
+  { object = "soupx_emptydrops_4500871lane", side = "Rust", threads = 32, wall_s = 25.1, sctransform_s = 8.4, pca_s = 3.4, neighbors_s = 2.3, cluster_s = 4.2, silhouette_s = 0.68, purity_s = 0.368, peak_rss_gib = 1.48 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 1, wall_s = 314.4, sctransform_s = 124.6, pca_s = 54.8, neighbors_s = 23.7, cluster_s = 16.6, silhouette_s = 2.41, purity_s = 83.460, peak_rss_gib = 3.15 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 32, wall_s = 66.9, sctransform_s = 19.9, pca_s = 10.0, neighbors_s = 6.5, cluster_s = 17.1, silhouette_s = 2.42, purity_s = 2.273, peak_rss_gib = 3.19 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 1, wall_s = 297.9, sctransform_s = 116.1, pca_s = 49.0, neighbors_s = 22.0, cluster_s = 18.9, silhouette_s = 2.43, purity_s = 80.664, peak_rss_gib = 3.15 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 32, wall_s = 67.3, sctransform_s = 19.8, pca_s = 9.7, neighbors_s = 6.6, cluster_s = 17.1, silhouette_s = 2.43, purity_s = 2.807, peak_rss_gib = 3.19 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, wall_s = 305.9, sctransform_s = 185.0, pca_s = 41.0, neighbors_s = 15.2, cluster_s = 10.1, silhouette_s = 1.11, purity_s = 43.641, peak_rss_gib = 2.65 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, wall_s = 57.4, sctransform_s = 22.3, pca_s = 7.9, neighbors_s = 4.8, cluster_s = 9.9, silhouette_s = 1.09, purity_s = 1.566, peak_rss_gib = 2.69 },
 ]

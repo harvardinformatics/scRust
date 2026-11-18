@@ -35,7 +35,7 @@ The steps:
 - **M6b:** the singlets' counts as a new 10x directory, `singlets/` ([doubletfinder.md](docs/validation/doubletfinder.md#m6b-the-singlets-counts)).
 - **M7:** the full panel, all 150 production objects against their saved workflow outputs ([doubletfinder_m7.md](docs/validation/doubletfinder_m7.md)).
 
-**Step 2, the clustering chain** ([docs/PLAN.md](docs/PLAN.md) A7b and Part C), is under way: M8 (the R reference data), M9 (Annoy and the SNN graph), M10 (FindClusters) and M11 (the chain end to end) are done. `scrust cluster --counts <10x dir> --preset workflow` runs the workflow's chain, SCTransform, RunPCA, FindNeighbors, FindClusters and the silhouette widths, and reproduces R bit for bit under R's OpenBLAS kernel on all 27 test and 7 production objects ([docs/validation/clustering.md](docs/validation/clustering.md)). Neighbourhood purity (M12), the export of the normalised data (M13) and its loaders (M14) come next. Substituting `scrust` into the preprocessing workflow is a separate, later change.
+**Step 2, the clustering chain** ([docs/PLAN.md](docs/PLAN.md) A7b and Part C), is under way: M8 (the R reference data), M9 (Annoy and the SNN graph), M10 (FindClusters), M11 (the chain end to end) and M12 (neighbourhood purity) are done. `scrust cluster --counts <10x dir> --preset workflow` runs the workflow's chain, SCTransform, RunPCA, FindNeighbors, FindClusters, the silhouette widths and the neighbourhood purities, and reproduces R bit for bit under R's OpenBLAS kernel on all 27 test and 7 production objects ([docs/validation/clustering.md](docs/validation/clustering.md)). Purity's search is exhaustive; where R's KMKNN search could treat a pair differently (on an object with an odd number of cells, the median cell and its 50th neighbour, which lie on the radius), the pair is reported. The export of the normalised data (M13) and its loaders (M14) come next. Substituting `scrust` into the preprocessing workflow is a separate, later change.
 
 - Plan and validation framework: [docs/PLAN.md](docs/PLAN.md)
 - License: GPL-3.0 ([LICENSE](LICENSE)). Acknowledgements and upstream licenses: [NOTICE](NOTICE)
@@ -67,8 +67,8 @@ source env.sh
 target/release/scrust cluster --counts <10x dir> --preset workflow --out <dir> --threads 8
 ```
 
-- **What it runs:** the workflow's `SCTransform(seed.use = 12345)`, its PCA guard, `RunPCA(seed.use = 12345)`, `FindNeighbors(dims = 1:30)`, `FindClusters(random.seed = 12345)` and bluster's `approxSilhouette`, as Seurat 5.5.1 does. Without `--preset workflow`, Seurat's defaults.
-- **Outputs:** `seurat_clusters.tsv` (the layout `scrust doubletfinder --clusters` reads) with its levels, `clusters.tsv`, `metadata.tsv` (the counts' columns, the labels, `silhouette_width`, `silhouette_other`), `pca/`, `neighbors/` (the kNN lists and both graphs) and `summary.json`.
+- **What it runs:** the workflow's `SCTransform(seed.use = 12345)`, its PCA guard, `RunPCA(seed.use = 12345)`, `FindNeighbors(dims = 1:30)`, `FindClusters(random.seed = 12345)` and bluster's `approxSilhouette` and `neighborPurity`, as Seurat 5.5.1 and bluster 1.20.0 do. Without `--preset workflow`, Seurat's defaults.
+- **Outputs:** `seurat_clusters.tsv` (the layout `scrust doubletfinder --clusters` reads) with its levels, `clusters.tsv`, `metadata.tsv` (the counts' columns, the labels, `silhouette_width`, `silhouette_other`, `neighborhood_purity`, `purity_maximum`), `pca/`, `neighbors/` (the kNN lists and both graphs) and `summary.json` (with purity's radius and certificate).
 - **Parameters:** every Seurat argument of the chain has a flag, and a TOML file (`--params`) can hold them; `scrust cluster --help` lists them.
 - **Staged:** `scrust sctransform`, `scrust pca`, `scrust neighbors`, then `scrust cluster --sct`, `--pca` or `--snn` give the same files, so a sweep over k or the resolution reuses one SCTransform and PCA.
 
