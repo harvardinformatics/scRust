@@ -47,6 +47,13 @@ fn doubletfinder_runs_every_stage_from_the_counts() {
     let want = std::fs::read_to_string(f.join("reference/summary.json")).unwrap();
     let digest = |s: &str| s.lines().find(|l| l.contains("\"rng_end_sha256\"")).map(str::trim).map(String::from);
     assert_eq!(digest(&summary), digest(&want), "the final .Random.seed differs from R's");
+    // the manifest (M13): every file, singlets/ as raw counts, the stage dumps
+    let m = manifest_ok(&dir);
+    for (path, role) in [("cells.tsv", "doublet_calls"), ("singlets/matrix.mtx.gz", "raw_counts"), ("singlets/barcodes.tsv.gz", "raw_counts_cells"), ("stages/stages.json", "stage_scalars")] {
+        assert_eq!(m.entry(path).map(|e| e.role.as_str()), Some(role), "{path}");
+    }
+    assert_eq!(m.command, "doubletfinder");
+    assert_eq!(m.provenance.inputs.iter().map(|i| i.option.as_str()).collect::<Vec<_>>(), ["counts", "clusters", "cluster-levels"]);
     let report = dir.join("validate.json");
     let v = scrust(&[
         "validate", "doubletfinder", "--reference", &f.join("reference").display().to_string(),
@@ -101,6 +108,16 @@ fn doubletfinder_runs_every_stage_from_the_counts() {
 
 fn fixture(object: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/doubletfinder").join(object)
+}
+
+/// The output directory's manifest (M13) describes it: `scrust validate manifest` passes, and the
+/// library's own check finds nothing.
+fn manifest_ok(dir: &Path) -> scio::manifest::Manifest {
+    let v = scrust(&["validate", "manifest", "--dir", &dir.display().to_string()]);
+    assert!(v.status.success(), "{}: {}", dir.display(), String::from_utf8_lossy(&v.stderr));
+    let m = scio::manifest::Manifest::read(dir).unwrap();
+    assert!(m.check(dir, true).unwrap().is_empty());
+    m
 }
 
 fn tmp(name: &str) -> PathBuf {
@@ -221,6 +238,8 @@ fn sctransform_matches_r_byte_for_byte() {
     let digest = std::fs::read_to_string(reference.join("scale_data.npy.sha256")).unwrap();
     assert_eq!(sha256_hex(&std::fs::read(out.join("scale_data.npy")).unwrap()), digest.trim(), "scale_data.npy differs from R's");
     assert!(out.join("summary.json").is_file());
+    let m = manifest_ok(&out);
+    assert_eq!(m.entry("scale_data.npy").map(|e| e.scale.as_str()), Some("residuals"));
 }
 
 /// `scrust pca` on `scrust sctransform`'s output for a tier-T object gives R's RunPCA() outputs
@@ -248,6 +267,8 @@ fn pca_matches_r_byte_for_byte() {
             assert_eq!(sha256_hex(&std::fs::read(out.join(f)).unwrap()), digest.trim(), "{f} differs from R's ({threads} threads)");
         }
         assert!(out.join("summary.json").is_file());
+        let m = manifest_ok(&out);
+        assert_eq!(m.entry("embeddings.tsv").map(|e| e.scale.as_str()), Some("pca_embeddings"));
     }
 }
 
@@ -265,6 +286,8 @@ fn neighbors_match_r_and_validate() {
             "--dims", "1:30", "--annoy", "yes", "--threads", threads,
         ]);
         assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
+        let m = manifest_ok(&out);
+        assert_eq!(m.entry("snn.mtx.gz").and_then(|e| e.nnz), Some(scio::mtx::read_entries(&out.join("snn.mtx.gz")).unwrap().vals.len()));
         let report = out.join("validate.json");
         let v = scrust(&[
             "validate", "neighbors", "--reference", &reference.display().to_string(), "--candidate", &out.display().to_string(),
@@ -377,7 +400,7 @@ fn cluster_matches_r_and_validates() {
     };
     refused(&["--algorithm", "4"], "Leiden");
     refused(&["--counts", "x"], "give one starting point");
-    refused(&["--export", "yes"], "milestone M13");
+    refused(&["--export"], "--export needs --counts");
     refused(&["--resolution", "0.8,0.8"], "overwrite");
     refused(&["--modularity", "2", "--resolution", "1.5"], "resolution<1 for alternative modularity");
     refused(&["--starts", "0"], "Have to have at least one start");
@@ -457,7 +480,7 @@ fn cluster_routes_agree_byte_for_byte() {
     // the stages each route made itself are recorded too
     assert!(r1.get("rng_after_sha256").and_then(|x| x.get("RunPCA")).and_then(|x| x.as_str()).is_some());
     // the run record's phases, in order, on one clock
-    for (d, want) in [(&one, "load sctransform pca neighbors cluster silhouette purity write"), (&from_sct, "load pca neighbors cluster silhouette purity write"), (&from_pca, "load neighbors cluster silhouette purity write"), (&from_snn, "load cluster silhouette purity write")] {
+    for (d, want) in [(&one, "load sctransform pca neighbors cluster silhouette purity write manifest"), (&from_sct, "load pca neighbors cluster silhouette purity write manifest"), (&from_pca, "load neighbors cluster silhouette purity write manifest"), (&from_snn, "load cluster silhouette purity write manifest")] {
         let s = scio::Json::parse(&std::fs::read_to_string(d.join("summary.json")).unwrap()).unwrap();
         let Some(scio::Json::Object(phases)) = s.get("run").and_then(|r| r.get("phases")) else { panic!("{}: no run.phases", d.display()) };
         let names: Vec<&str> = phases.iter().map(|(k, _)| k.as_str()).collect();

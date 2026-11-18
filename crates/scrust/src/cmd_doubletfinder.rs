@@ -19,6 +19,7 @@ use doubletfinder::record::{DumpLevel, Recorder};
 use doubletfinder::run::{run, Params, PkChoice};
 use doubletfinder::singlets::{write_singlets, DIR as SINGLETS};
 use doubletfinder::stages::{stage_dumps, StageSource};
+use scio::manifest::{Entry, Ids, Input, Manifest, Provenance};
 use scio::Json;
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -204,8 +205,52 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         ("peak_rss_kib", cli::peak_rss_kib().map(|v| Json::Int(v as i64)).unwrap_or(Json::Null)),
         ("fingerprint", fingerprint),
     ]);
+    // the manifest (docs/PLAN.md C3f, M13): every file, its role, and how the output was made
+    let mut inputs = vec![Input::digest("counts", &counts, &scio::tenx::input_files(&counts).map_err(|e| e.to_string())?.iter().map(|p| p.as_path()).collect::<Vec<_>>()).map_err(|e| e.to_string())?];
+    inputs.push(Input::digest("clusters", clusters_path.parent().unwrap_or(Path::new("")), &[clusters_path.as_path()]).map_err(|e| e.to_string())?);
+    let levels_file = match args.get("cluster-levels") {
+        Some(l) => Some(PathBuf::from(l)),
+        None => clusters_path.parent().map(|d| d.join("seurat_clusters_levels.txt")).filter(|p| p.is_file()),
+    };
+    if let Some(l) = &levels_file {
+        inputs.push(Input::digest("cluster-levels", l.parent().unwrap_or(Path::new("")), &[l.as_path()]).map_err(|e| e.to_string())?);
+    }
+    if let Some(d) = &stages {
+        inputs.push(Input { option: "from-stages".into(), path: d.display().to_string(), files: Vec::new() });
+    }
+    let mut m = Manifest::new(
+        "doubletfinder",
+        Provenance {
+            scrust_version: env!("CARGO_PKG_VERSION").into(),
+            command_line: crate::cli::command_line("doubletfinder", argv),
+            command: scio::manifest::canonical_command("doubletfinder", argv, &["out", "threads", "dump-stages"], &[]),
+            inputs,
+            reproduces: vec![doubletfinder::REFERENCE.into(), sctransform::REFERENCE.into(), pca::REFERENCE.into()],
+            parameters: run_info.get("parameters").cloned().unwrap_or(Json::Null),
+            seeds: Json::obj(vec![
+                ("set.seed before paramSweep and doubletFinder", Json::Int(params.seed as i64)),
+                ("SCTransform seed.use", Json::Int(1448145)),
+                ("RunPCA seed.use", Json::Int(42)),
+            ]),
+        },
+    );
+    m.push(Manifest::summary_entry());
+    let cells = |f: &str| Ids::named("cells", f, "barcode");
+    m.push(Entry::new("cells.tsv", "doublet_calls", "none", "tsv", "every input cell: barcode, pANN, classification (Singlet or Doublet), as doubletFinder computes them").header(true).rows(cells("cells.tsv")));
+    for (f, role, what) in [("sweep_stats.tsv", "doublet_sweep_stats", "summarizeSweep's table: pN, pK, BCreal"), ("bcmvn.tsv", "doublet_bcmvn", "find.pK's table: pK and its BCmetric")] {
+        if out.join(f).is_file() {
+            m.push(Entry::new(f, role, "none", "tsv", what).header(true));
+        }
+    }
+    let (mf, bf, ff) = (format!("{SINGLETS}/matrix.mtx.gz"), format!("{SINGLETS}/barcodes.tsv.gz"), format!("{SINGLETS}/features.tsv.gz"));
+    m.push(Entry::new(&mf, "raw_counts", "raw_counts", "matrix_market", "the singlets' counts: the input counts without the doublets, every kept column exactly as stored (a new 10x directory, Cell Ranger's layout)").shape(&[singlets.nrow, singlets.ncol]).nnz(singlets.nnz).rows(Ids::numbered("features", &ff, 2)).columns(Ids::numbered("cells", &bf, 1)));
+    m.push(Entry::new(&bf, "raw_counts_cells", "none", "tsv", "the singlets' barcodes, one per line, in input order").header(false));
+    m.push(Entry::new(&ff, "raw_counts_features", "none", "tsv", "the input's feature lines: id, name, type").header(false));
+    m.entries.extend(scio::manifest::stage_entries(&out, "stages").map_err(|e| e.to_string())?);
+    m.fill_shapes(&out).map_err(|e| e.to_string())?;
+    let files = crate::cli::finish_manifest(&out, &mut m, threads)?;
     let digest = rng_end.as_deref().map(rng_digest);
-    let summary = Json::obj(vec![("result", output.result_json(digest)), ("run", run_info)]);
+    let summary = Json::obj(vec![("result", output.result_json(digest)), ("run", run_info), ("files", files)]);
     std::fs::write(out.join("summary.json"), scio::json::to_file_text(&summary)).map_err(|e| e.to_string())?;
     eprintln!(
         "scrust doubletfinder: pK {} (BCmetric row {}), nExp {}, {} doublets of {} cells; {}/: {} singlets, {} entries; {:.1} s, {} threads, peak RSS {:.2} GiB",

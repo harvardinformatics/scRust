@@ -440,6 +440,21 @@ K9_totals = { cells_differing = 22, objects = 11, max_abs = 1.8e-2, max_scaled =
 K9_neighbors = { cells_differing = 12, objects = 6, note = "the 28 objects with lists; each differing list gains or loses one cell" }
 purity_radius = { max_abs = 1.2e-12, max_scaled = 6.3e-14 }
 purity_mean_neighbors = { max_abs = 2.3e-2, max_scaled = 5.2e-4, objects = 11 }
+# M13 records K10, the corrected counts, from M8's measurement: identical across the Haswell and
+# SapphireRapids kernels in all 34 objects (docs/validation/clustering_m8.md, "Different kernels,
+# same CPU type": the corrected counts, their log1p, nCount_SCT and nFeature_SCT, and K10_genes;
+# M11's measurement with the grader's statistics, job 60798602: K10_genes and correct()'s scalars,
+# the median log_umi and the residuals beyond the clip range among them, 0 of 34 objects
+# differing). The residuals correct() reads differ in their last bits on tier P (S2d), but no
+# corrected value crosses a rounding boundary. The bounds are zero, so in tolerance mode these
+# checks stay exact.
+K10_corrected_counts = { values_differing = 0, cells_differing = 0, objects = 34, note = "every entry of the SCT counts layer, and its digest" }
+K10_log1p_data = { values_differing = 0, cells_differing = 0, objects = 34, note = "the SCT data layer, in full on tier T, as R's digest on tier P" }
+K10_nCount_SCT = { values_differing = 0, cells_differing = 0, objects = 34 }
+K10_nFeature_SCT = { values_differing = 0, cells_differing = 0, objects = 34 }
+K10_genes = { values_differing = 0, objects = 34 }
+correct_residuals_beyond_clip = { values_differing = 0, objects = 34 }
+vst_umi_corrected_nnz = { values_differing = 0, objects = 34 }
 
 # Kernel-gated grading (M11; docs/PLAN.md A5b mechanism 3): `scrust validate cluster` grades every
 # check exactly when the reference's and the candidate's recorded OpenBLAS kernels match;
@@ -462,8 +477,8 @@ exact_when = "the reference's and the candidate's recorded OpenBLAS kernels matc
 otherwise = "tolerance: BLAS-free checks exact; BLAS-dependent checks within [clustering.floor.kernel], exact where it lists nothing"
 no_kernel_recorded = "tolerance (never exact)"
 saved_object_kernel = "SapphireRapids"
-blas_free = ["FindClusters' settings", "barcodes", "nCount_RNA", "nFeature_RNA", "S2a", "SCTransform's RNG states", "RunPCA's entry and irlba's entry states", "approxSilhouette teacher-forced on R's embeddings and labels", "neighborPurity teacher-forced on R's embeddings and labels (M12)", "the purity certificate (a property of the search)", "every check of a run started from R's embeddings or SNN graph"]
-blas_dependent = ["S2b", "S2c", "S2d", "scale.data's digest", "S3", "irlba's exit state", "K3", "K4", "K5", "K6", "K7", "K8", "K9 (M12)", "the result section's numbers", "the saved object's labels, silhouette widths and purities"]
+blas_free = ["FindClusters' settings", "barcodes", "nCount_RNA", "nFeature_RNA", "S2a", "SCTransform's RNG states", "RunPCA's entry and irlba's entry states", "approxSilhouette teacher-forced on R's embeddings and labels", "neighborPurity teacher-forced on R's embeddings and labels (M12)", "the purity certificate (a property of the search)", "every check of a run started from R's embeddings or SNN graph", "K10_genes, correct()'s settings, its median log_umi and RNG state at its entry, sct_features and sct_cells (M13)", "the output manifest (M13)"]
+blas_dependent = ["S2b", "S2c", "S2d", "scale.data's digest", "S3", "irlba's exit state", "K3", "K4", "K5", "K6", "K7", "K8", "K9 (M12)", "K10: the corrected counts, their log1p, nCount_SCT, nFeature_SCT, the residuals beyond the clip range (M13)", "K10 teacher-forced (correct()'s mu is a dgemm; graded under the validator's own kernel against R's)", "the result section's numbers", "the saved object's labels, silhouette widths, purities, nCount_SCT, nFeature_SCT and SCT layers"]
 floor = "clustering.floor.kernel"
 
 # K0, Kiss64Random (M9): RcppAnnoy 0.0.23's kissrandom.h, compiled with the R env's compiler and
@@ -557,8 +572,10 @@ blas_dependent = true
 compare = ["K3", "K4", "K5", "K6", "K7", "K8_silhouette_width", "K8_silhouette_other", "K8_centroids", "K8_cluster_var", "metadata.tsv", "levels", "cluster_ids.txt", "nclusters.txt", "pca/", "graphs", "result", "saved labels and levels", "saved silhouette widths (production profile)"]
 otherwise = { criterion = "floor", floor = "clustering.floor.kernel" }
 teacher_forced_silhouette = "exact on any machine"
-not_compared = ["nCount_SCT, nFeature_SCT (M13)", "K10 arrays", ".Random.seed after RunUMAP"]
-# (M11 also left out neighborhood_purity and the K9 arrays; M12 compares them, under [clustering.K9].)
+not_compared = [".Random.seed after RunUMAP"]
+# (M11 also left out neighborhood_purity and the K9 arrays, which M12 compares under
+# [clustering.K9], and nCount_SCT, nFeature_SCT and the K10 arrays, which M13 compares under
+# [clustering.K10].)
 
 # K9, neighbourhood purity (M12; docs/PLAN.md C3e, C5): bluster 1.20.0's neighborPurity as the
 # workflow calls it (k = 50, weighted, BiocNeighbors 2.4.0's default index, KMKNN), searched
@@ -616,6 +633,48 @@ certificate_decision = "2026-11-17: keep the exhaustive result; report the flagg
 # Every check M11's 290 reports held keeps its status and counts (31,269).
 settled = { comparisons = 222, k9_identical = 1831, teacher_forced_identical = 1033, certificates_reported = 102, saved_within_floor_portable = 28, m11_checks_unchanged = 31269 }
 
+# K10, the corrected counts (M13; docs/PLAN.md C3f, C5): sctransform 0.4.3's correct(), which vst()
+# calls on its own residuals before clipping them (return_corrected_umi = TRUE, Seurat's
+# do.correct.umi): the residuals floored at min_variance and not clipped; the regressors
+# [1, median(log_umi)] (R's median); per bin of 500 genes, mu = exp(tcrossprod(model_pars_fit[, -1],
+# regressors)) through R's dgemm call and shapes; the variance mu + mu^2 / theta, not floored; the
+# value mu + residual * sqrt(variance); round(x, 0) (nearbyint: half to even), negatives to 0,
+# zeros dropped (make.sparse); the SCT data layer log1p of it (glibc's); nCount_SCT and
+# nFeature_SCT its column sums and nonzero counts (crates/sctransform/src/correct.rs). Made in
+# S2d's pass, one bin's products at a time (the product at the median depth in the free product
+# buffer, kept as its runs of equal values), never as a dense genes x cells matrix.
+# Compared, with scrust cluster --export (scrust validate cluster): from the stage dumps,
+# K10_genes, correct()'s scalars (the median log_umi, the residuals beyond the clip range, the
+# number of entries, its settings) and .Random.seed at its entry; the files against every R run
+# of the profile on their data lines (R's comment lines name R's script): sct/corrected_counts.mtx.gz
+# always, sct/log1p_corrected_counts.mtx.gz where R kept it (level full: tier T), else R's digest of
+# the log1p data's values (raw_sha256(data@x), standard and light levels: tier P); R's digest of the
+# counts' values; sct_features.tsv.gz and sct_cells.tsv.gz; the counts' summary (features, entries,
+# minimum, explicit zeros); metadata.tsv's nCount_SCT and nFeature_SCT; the same against the saved
+# object (under its kernel, SapphireRapids). Teacher-forced: correct() on R's model_pars_fit, cell
+# attributes (stages/vst/), K10_genes and the counts, against R's layers, digests, columns and
+# scalars. mu is a BLAS product, so every K10 check but K10_genes, the settings and the median is
+# BLAS-dependent, teacher-forced too (graded under the validator's own kernel against R's): exact
+# under the reference's kernel; otherwise against [clustering.floor.kernel], whose K10 entries are
+# zero (M8: identical across kernels).
+[clustering.K10]
+criterion = "exact"
+blas_dependent = "from the counts and teacher-forced (correct()'s mu is a dgemm); K10_genes, correct()'s settings and median log_umi are BLAS-free"
+compare = ["K10_genes", "correct_median_log_umi", "correct_residuals_beyond_clip", "vst_umi_corrected_nnz", "correct()'s settings", "RNG correct_entry", "sct/corrected_counts.mtx.gz (data lines)", "sct/log1p_corrected_counts.mtx.gz (data lines, or R's digest of the values)", "sct_counts_x_sha256", "sct_features.tsv.gz", "sct_cells.tsv.gz", "metadata.tsv nCount_SCT", "metadata.tsv nFeature_SCT", "saved nCount_SCT, nFeature_SCT, SCT counts and data layers"]
+otherwise = { criterion = "floor", floor = "clustering.floor.kernel" }
+teacher_forced = "exact under the validator's own kernel when it is R's; otherwise the floor (identical)"
+# Settled (M13; label m13-9ce0adb, validation/slurm/m13_cluster.sbatch, jobs 61798838, 61798839,
+# 61798840, 61798841): 222 comparisons of scrust cluster --counts --export with every R run of its
+# profile (the 27 tier-T and 7 tier-P objects, both profiles), all in exact mode and passing: 4,200
+# K10 checks identical (the stage dumps, the files on their data lines or by R's digests, the genes
+# and cells, nCount_SCT and nFeature_SCT), none differing or missing; against the saved objects,
+# 2,632 K10 checks identical in both profiles on all 34 objects; teacher-forced on R's model, 964
+# checks identical in the 98 comparisons with instrumented runs. On the other kernel (the 68
+# mismatched pairs, tolerance mode) K10 is identical: 1,890 checks, and 666 teacher-forced. Of the
+# 37,015 checks of M12's 290 reports, 36,337 keep their status and counts, and M12's 678
+# placeholders for M13 are compared, identical (validation/slurm/m13_unchanged.sh).
+settled = { comparisons = 222, k10_identical = 4200, saved_k10_identical = 2632, teacher_forced_identical = 964, mismatched_k10_identical = 1890, mismatched_teacher_forced_identical = 666, m12_checks_unchanged = 36337, m12_placeholders_compared = 678 }
+
 # Kernel-gated grading shown on deliberately mismatched pairs (M11): each Rust run against the
 # other profile's instrumented R run on Sapphire Rapids, 68 pairs of the 34 objects in both
 # directions: all in tolerance mode, every BLAS-free check identical, 1,028 BLAS-dependent checks
@@ -632,6 +691,10 @@ checks_within_floor = 1028
 # mean neighbour count, and the counts, lists, sums, totals and purities of the median pairs);
 # teacher-forced K9 identical (713 checks).
 m12 = { pairs = 68, passed = 68, checks_within_floor = 1304, k9_within_floor = 276 }
+# M13 (label m13-9ce0adb): the same 68 pairs with K10, all in tolerance mode and passing, with the
+# same 1,304 checks within [clustering.floor.kernel]: K10 identical (1,890 checks from the counts,
+# 666 teacher-forced), none within the floor.
+m13 = { pairs = 68, passed = 68, checks_within_floor = 1304, k10_within_floor = 0, k10_identical = 1890, k10_teacher_forced_identical = 666 }
 
 # Threads (M9, scrust neighbors): 1 and 32 threads on both 79,409-cell objects give byte-identical
 # knn_index.tsv, knn_distance.tsv, nn.mtx.gz, snn.mtx.gz and annoy.ann (job 60383132,
@@ -754,6 +817,18 @@ compared_m12 = [
   { tier = "P", profile = "portable", objects = 7, threads = [8, 1], files = "63-68", differing = 0 },
   { tier = "P", profile = "production", objects = 7, threads = [1, 32, 8], files = 17, differing = 0 },
 ]
+# M13 (label m13-9ce0adb; m13_cluster.sbatch's second run on tier T, the one-thread tier-P run job
+# 61798842 and m13_threads.sh, the benchmark job 61798843), with --export: every file byte-identical,
+# the export (counts/, sct/ with both layers, metadata.tsv, README.txt) and the K10 dumps included,
+# and summary.json's result section and manifest entries; the one-thread tier-P runs' 17 reports
+# equal the 8-thread runs' check by check. cargo test compares 1 and 3 threads, with and without
+# the stage dumps.
+compared_m13 = [
+  { tier = "T", profile = "portable", objects = 27, threads = [8, 1], files = "80 or 85", differing = 0 },
+  { tier = "T", profile = "production", objects = 27, threads = [8, 1], files = "80 or 85", differing = 0 },
+  { tier = "P", profile = "portable", objects = 7, threads = [8, 1], files = "78-83", differing = 0 },
+  { tier = "P", profile = "production", objects = 7, threads = [1, 32, 8], files = 31, differing = 0 },
+]
 
 # Performance (M11), the chain: scrust cluster --counts --preset workflow on the seven tier-P
 # objects, without stage dumps, at 1 and 32 threads, one Sapphire Rapids node (Xeon Platinum 8480CL,
@@ -826,4 +901,46 @@ measured_m12 = [
   { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 32, wall_s = 67.3, sctransform_s = 19.8, pca_s = 9.7, neighbors_s = 6.6, cluster_s = 17.1, silhouette_s = 2.43, purity_s = 2.807, peak_rss_gib = 3.19 },
   { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, wall_s = 305.9, sctransform_s = 185.0, pca_s = 41.0, neighbors_s = 15.2, cluster_s = 10.1, silhouette_s = 1.11, purity_s = 43.641, peak_rss_gib = 2.65 },
   { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, wall_s = 57.4, sctransform_s = 22.3, pca_s = 7.9, neighbors_s = 4.8, cluster_s = 9.9, silhouette_s = 1.09, purity_s = 1.566, peak_rss_gib = 2.69 },
+]
+# M13 (label m13-9ce0adb; job 61798843, validation/slurm/m13_benchmark.sbatch, holy8a24301, Xeon
+# Platinum 8480CL, test partition, 32 CPUs reserved): the same runs with --export (counts/, sct/ with
+# the corrected counts and their log1p, nCount_SCT and nFeature_SCT, README.txt) and without it,
+# against the same R runs (measured_m11's R rows: R's direct run computes the whole SCT assay and
+# writes its files, write_s). Settled (M13): met. With --export, Rust at one thread takes 2.0-3.3
+# times less time than R's whole run, at 32 threads 8.6-15.3 times less; peaks at 0.16-3.41 GiB
+# against R's 2.50-104.13 GiB; 3.34-3.35 GiB (1 thread) and 3.41 GiB (32) on the 79,409-cell
+# objects. The export adds 3.3-87.2 s at one thread (24-30% of the run; 107-108% on the two
+# 11,831-cell objects, whose corrected counts are the densest) and 0.5-15.8 s at 32 (16-36%), nearly
+# all in SCTransform's stage (correct() and writing sct/); counts_copy_s is the copy of the input
+# with its checksums (in the load phase), manifest_s every file's SHA-256. The export raises the
+# peak RSS by at most 0.41 GiB (1 thread) and 0.71 GiB (32).
+measured_m13 = [
+  { object = "soupx_tenx_SRR18256555", side = "Rust", threads = 1, export = true, wall_s = 14.4, sctransform_s = 9.6, pca_s = 3.1, neighbors_s = 0.6, cluster_s = 0.2, silhouette_s = 0.04, purity_s = 0.145, manifest_s = 0.13, counts_copy_s = 0.19, peak_rss_gib = 0.16 },
+  { object = "soupx_tenx_SRR18256555", side = "Rust", threads = 32, export = true, wall_s = 3.1, sctransform_s = 1.4, pca_s = 0.7, neighbors_s = 0.3, cluster_s = 0.2, silhouette_s = 0.04, purity_s = 0.010, manifest_s = 0.09, counts_copy_s = 0.05, peak_rss_gib = 0.28 },
+  { object = "soupx_tenx_SRR18256555", side = "Rust", threads = 1, export = false, wall_s = 11.1, sctransform_s = 6.6, pca_s = 3.1, neighbors_s = 0.6, cluster_s = 0.2, silhouette_s = 0.04, purity_s = 0.171, manifest_s = 0.02, peak_rss_gib = 0.15 },
+  { object = "soupx_tenx_SRR18256555", side = "Rust", threads = 32, export = false, wall_s = 2.6, sctransform_s = 0.9, pca_s = 0.7, neighbors_s = 0.3, cluster_s = 0.2, silhouette_s = 0.04, purity_s = 0.010, manifest_s = 0.01, peak_rss_gib = 0.18 },
+  { object = "soupx_tenx_10xmousebrain", side = "Rust", threads = 1, export = true, wall_s = 77.6, sctransform_s = 59.3, pca_s = 6.5, neighbors_s = 2.5, cluster_s = 1.0, silhouette_s = 0.21, purity_s = 1.844, manifest_s = 0.67, counts_copy_s = 0.40, peak_rss_gib = 1.44 },
+  { object = "soupx_tenx_10xmousebrain", side = "Rust", threads = 32, export = true, wall_s = 16.9, sctransform_s = 7.8, pca_s = 1.1, neighbors_s = 0.9, cluster_s = 1.0, silhouette_s = 0.21, purity_s = 0.065, manifest_s = 0.28, counts_copy_s = 0.38, peak_rss_gib = 1.75 },
+  { object = "soupx_tenx_10xmousebrain", side = "Rust", threads = 1, export = false, wall_s = 37.4, sctransform_s = 19.9, pca_s = 6.6, neighbors_s = 2.5, cluster_s = 1.0, silhouette_s = 0.21, purity_s = 1.882, manifest_s = 0.05, peak_rss_gib = 1.44 },
+  { object = "soupx_tenx_10xmousebrain", side = "Rust", threads = 32, export = false, wall_s = 12.6, sctransform_s = 3.8, pca_s = 1.1, neighbors_s = 1.1, cluster_s = 1.0, silhouette_s = 0.20, purity_s = 0.065, manifest_s = 0.04, peak_rss_gib = 1.44 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "Rust", threads = 1, export = true, wall_s = 78.1, sctransform_s = 59.9, pca_s = 6.5, neighbors_s = 2.5, cluster_s = 1.1, silhouette_s = 0.20, purity_s = 1.518, manifest_s = 0.66, counts_copy_s = 0.38, peak_rss_gib = 1.44 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "Rust", threads = 32, export = true, wall_s = 17.1, sctransform_s = 7.9, pca_s = 1.1, neighbors_s = 0.9, cluster_s = 1.1, silhouette_s = 0.20, purity_s = 0.063, manifest_s = 0.27, counts_copy_s = 0.34, peak_rss_gib = 1.76 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "Rust", threads = 1, export = false, wall_s = 37.6, sctransform_s = 20.0, pca_s = 6.6, neighbors_s = 2.5, cluster_s = 1.1, silhouette_s = 0.21, purity_s = 1.859, manifest_s = 0.05, peak_rss_gib = 1.44 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "Rust", threads = 32, export = false, wall_s = 12.6, sctransform_s = 3.8, pca_s = 1.1, neighbors_s = 0.9, cluster_s = 1.1, silhouette_s = 0.20, purity_s = 0.064, manifest_s = 0.04, peak_rss_gib = 1.44 },
+  { object = "soupx_emptydrops_4500871lane", side = "Rust", threads = 1, export = true, wall_s = 102.0, sctransform_s = 58.8, pca_s = 16.1, neighbors_s = 6.7, cluster_s = 4.0, silhouette_s = 0.68, purity_s = 9.102, manifest_s = 0.81, counts_copy_s = 0.37, peak_rss_gib = 1.48 },
+  { object = "soupx_emptydrops_4500871lane", side = "Rust", threads = 32, export = true, wall_s = 23.7, sctransform_s = 8.1, pca_s = 2.5, neighbors_s = 1.9, cluster_s = 3.9, silhouette_s = 0.67, purity_s = 0.293, manifest_s = 0.60, counts_copy_s = 0.35, peak_rss_gib = 1.56 },
+  { object = "soupx_emptydrops_4500871lane", side = "Rust", threads = 1, export = false, wall_s = 81.2, sctransform_s = 39.3, pca_s = 15.9, neighbors_s = 6.6, cluster_s = 4.0, silhouette_s = 0.68, purity_s = 9.053, manifest_s = 0.09, peak_rss_gib = 1.48 },
+  { object = "soupx_emptydrops_4500871lane", side = "Rust", threads = 32, export = false, wall_s = 20.4, sctransform_s = 5.1, pca_s = 2.4, neighbors_s = 2.3, cluster_s = 4.0, silhouette_s = 0.68, purity_s = 0.296, manifest_s = 0.06, peak_rss_gib = 1.48 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 1, export = true, wall_s = 335.3, sctransform_s = 163.7, pca_s = 49.3, neighbors_s = 21.2, cluster_s = 14.8, silhouette_s = 2.38, purity_s = 72.728, manifest_s = 2.22, counts_copy_s = 0.56, peak_rss_gib = 3.34 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 32, export = true, wall_s = 60.9, sctransform_s = 19.1, pca_s = 6.7, neighbors_s = 5.6, cluster_s = 14.3, silhouette_s = 2.37, purity_s = 2.191, manifest_s = 1.74, counts_copy_s = 0.54, peak_rss_gib = 3.41 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 1, export = false, wall_s = 266.6, sctransform_s = 102.4, pca_s = 51.0, neighbors_s = 20.7, cluster_s = 15.0, silhouette_s = 2.36, purity_s = 66.338, manifest_s = 0.26, peak_rss_gib = 3.15 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 32, export = false, wall_s = 51.6, sctransform_s = 10.6, pca_s = 6.6, neighbors_s = 6.4, cluster_s = 14.7, silhouette_s = 2.36, purity_s = 2.247, manifest_s = 0.18, peak_rss_gib = 3.19 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 1, export = true, wall_s = 329.6, sctransform_s = 158.5, pca_s = 49.6, neighbors_s = 20.0, cluster_s = 14.8, silhouette_s = 2.44, purity_s = 72.972, manifest_s = 2.26, counts_copy_s = 0.56, peak_rss_gib = 3.35 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 32, export = true, wall_s = 61.3, sctransform_s = 19.0, pca_s = 6.5, neighbors_s = 5.7, cluster_s = 14.9, silhouette_s = 2.43, purity_s = 2.177, manifest_s = 1.75, counts_copy_s = 0.49, peak_rss_gib = 3.41 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 1, export = false, wall_s = 264.9, sctransform_s = 101.7, pca_s = 50.6, neighbors_s = 20.1, cluster_s = 15.7, silhouette_s = 2.43, purity_s = 65.665, manifest_s = 0.26, peak_rss_gib = 3.15 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 32, export = false, wall_s = 51.0, sctransform_s = 10.6, pca_s = 6.4, neighbors_s = 5.7, cluster_s = 15.0, silhouette_s = 2.43, purity_s = 2.208, manifest_s = 0.18, peak_rss_gib = 3.19 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, export = true, wall_s = 373.9, sctransform_s = 254.2, pca_s = 40.4, neighbors_s = 13.8, cluster_s = 9.5, silhouette_s = 1.09, purity_s = 42.799, manifest_s = 1.99, counts_copy_s = 0.67, peak_rss_gib = 3.06 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, export = true, wall_s = 59.8, sctransform_s = 27.3, pca_s = 5.3, neighbors_s = 4.4, cluster_s = 9.2, silhouette_s = 1.09, purity_s = 1.275, manifest_s = 1.32, counts_copy_s = 0.56, peak_rss_gib = 3.40 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, export = false, wall_s = 286.7, sctransform_s = 174.2, pca_s = 40.2, neighbors_s = 13.8, cluster_s = 9.4, silhouette_s = 1.09, purity_s = 38.422, manifest_s = 0.19, peak_rss_gib = 2.65 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, export = false, wall_s = 44.0, sctransform_s = 13.3, pca_s = 5.3, neighbors_s = 4.1, cluster_s = 9.3, silhouette_s = 1.09, purity_s = 1.290, manifest_s = 0.14, peak_rss_gib = 2.69 },
 ]

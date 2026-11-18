@@ -7,11 +7,12 @@
 //! that owns a large input (DoubletFinder's counts with their artificial doublets) can free it
 //! in between. The results are the same either way.
 
+use crate::correct::Corrected;
 use crate::fit::{fit, FitInput, Fits};
 use crate::matrix::GeneRows;
 use crate::params::SctParams;
 use crate::reg::{mean_cell_sum, regularize, Reg, RegInput};
-use crate::residuals::{residuals, ResidualInput, Residuals};
+use crate::residuals::{residuals, residuals_corrected, ResidualInput, Residuals};
 use crate::setup::{setup, Setup};
 use crate::SctError;
 use rcompat::RRng;
@@ -25,6 +26,8 @@ pub struct Sct {
     pub mean_cell_sum: f64,
     pub reg: Reg,
     pub residuals: Residuals,
+    /// `correct()`'s corrected counts, when asked for ([`finish_with`]; M13)
+    pub corrected: Option<Corrected>,
     /// `.Random.seed` when `vst` starts, after `SCTransform`'s `set.seed` calls (R's checkpoint
     /// "vst_entry")
     pub rng_entry: Vec<i32>,
@@ -66,6 +69,13 @@ pub fn start(counts: &scio::CscMatrix, params: &SctParams, rng: &mut RRng) -> Re
 /// The rest of [`sctransform`] after [`start`]: the fits (S2b), the regularisation (S2c), the
 /// residuals, the variable features and `scale.data` (S2d).
 pub fn finish(started: Started, params: &SctParams, rng: &mut RRng, keep_y: bool, threads: usize) -> Result<Sct, SctError> {
+    finish_with(started, params, rng, keep_y, false, threads)
+}
+
+/// [`finish`], and with `correct` also the corrected counts of `correct()`, which `vst()` makes
+/// from its residuals before clipping them (`do.correct.umi = TRUE`, Seurat's default; M13). They
+/// change nothing else: `correct()` draws no random number and its result feeds no later stage.
+pub fn finish_with(started: Started, params: &SctParams, rng: &mut RRng, keep_y: bool, correct: bool, threads: usize) -> Result<Sct, SctError> {
     let Started { setup, rows, rng_entry } = started;
     let fits = fit(&rows, &FitInput::from_setup(&setup), params, rng, threads)?;
     let mcs = mean_cell_sum(&rows);
@@ -81,7 +91,13 @@ pub fn finish(started: Started, params: &SctParams, rng: &mut RRng, keep_y: bool
         },
         params,
     )?;
-    let residuals = residuals(&rows, &ResidualInput { model_pars_fit: &reg.model_pars_fit, log_umi: &setup.cell_attr.log_umi }, params, keep_y, threads)?;
+    let input = ResidualInput { model_pars_fit: &reg.model_pars_fit, log_umi: &setup.cell_attr.log_umi };
+    let (residuals, corrected) = if correct {
+        let (r, c) = residuals_corrected(&rows, &input, params, keep_y, threads)?;
+        (r, Some(c))
+    } else {
+        (residuals(&rows, &input, params, keep_y, threads)?, None)
+    };
     let rng_exit = rng.random_seed();
-    Ok(Sct { setup, rows, fits, mean_cell_sum: mcs, reg, residuals, rng_entry, rng_exit })
+    Ok(Sct { setup, rows, fits, mean_cell_sum: mcs, reg, residuals, corrected, rng_entry, rng_exit })
 }

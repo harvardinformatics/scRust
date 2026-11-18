@@ -1,10 +1,30 @@
-# Clustering in Rust (Step 2; milestones M11 and M12)
+# Clustering in Rust (Step 2; milestones M11, M12 and M13)
 
 M11 runs the workflow's clustering chain end to end in Rust, from the counts to the labels and the silhouette widths (docs/PLAN.md C1, C3, C5, C6): SCTransform at seed 12345, the workflow's PCA guard, RunPCA with 50 PCs, FindNeighbors (Annoy, k = 20, dims 1:30), FindClusters (Louvain, resolution 0.8, seed 12345, singletons grouped) and bluster's `approxSilhouette`. It chains the `sctransform` and `pca` crates of Step 1 with M9's `neighbors` and M10's `cluster`, and adds the silhouette widths, `scrust cluster --counts` with its staged starts, parameters, preset and TOML file, and `scrust validate cluster` for the whole chain. It also adds kernel-gated grading (A5b mechanism 3) to both validators and a kernel check to the fixture tests.
 
-M12 adds the workflow's second score, neighbourhood purity: bluster's `neighborPurity`, with its search done exhaustively with knncolle's arithmetic and a certificate of where KMKNN, the algorithm R uses, could differ. Its outcome comes first ([M12 outcome](#m12-outcome)), its details after M11's ([M12: neighbourhood purity](#m12-neighbourhood-purity)).
+M12 adds the workflow's second score, neighbourhood purity: bluster's `neighborPurity`, with its search done exhaustively with knncolle's arithmetic and a certificate of where KMKNN, the algorithm R uses, could differ. Its outcome comes after M13's ([M12 outcome](#m12-outcome)), its details after M11's ([M12: neighbourhood purity](#m12-neighbourhood-purity)).
+
+M13 adds the rest of the SCT assay, the corrected counts of sctransform's `correct()`, and the export: the input counts, SCTransform's normalised data and the per-cell metadata as plain files that no 10x reader takes for raw counts, with a manifest of every file in every command's `summary.json`. Its outcome comes first ([M13 outcome](#m13-outcome)), its details last ([M13: the corrected counts and the export](#m13-the-corrected-counts-and-the-export)).
 
 This is Step 2's main report, as [doubletfinder.md](doubletfinder.md) is Step 1's; M13 to M17 extend it. The milestones before it have their own: [clustering_m8.md](clustering_m8.md) (the R reference data and the R-vs-R floor), [clustering_m9.md](clustering_m9.md) (Annoy and the SNN graph), [clustering_m10.md](clustering_m10.md) (FindClusters).
+
+## M13 outcome
+
+| Done when (plan C6's M13 row, and the brief) | Result |
+|---|---|
+| K10 on T and P in both profiles | **Exact.** 222 comparisons of `scrust cluster --counts --export` with every R run of its profile (the 27 tier-T and 7 tier-P objects; instrumented runs, direct runs with and without RunUMAP, the v5 runs; R on Sapphire Rapids and on Cascade Lake), all in exact mode, all passing: 4,200 K10 checks identical, none differing or missing (the corrected counts and their log1p on their data lines, or by R's digest where R kept no copy; R's digest of the counts; the genes and cells; `nCount_SCT` and `nFeature_SCT`; the K10 stage dumps: `correct()`'s genes, median log_umi, residuals beyond the clip range, entries, settings and `.Random.seed` at its entry) ([M13 results](#m13-results)). |
+| K10 teacher-forced, under the reference's kernel | **Exact.** `correct()` on R's own model parameters, cell attributes and genes and the counts, in the 98 comparisons with instrumented runs: 964 checks identical (every corrected count and log1p value against R's files, or R's digests; `nCount_SCT`, `nFeature_SCT`; the median log_umi, the residuals beyond the clip range, the entries). |
+| The files against the direct runs; the saved objects (`nCount_SCT`, `nFeature_SCT`) | **Identical.** Every direct run's corrected counts on their data lines (and log1p data, where R kept them), with and without RunUMAP; against the saved objects, 2,632 K10 checks identical, none differing, in both profiles on all 34 objects: `nCount_SCT`, `nFeature_SCT`, the corrected counts on their data lines, the genes and cells, R's digests of both layers (graded under the saved objects' kernel: M8 found the corrected counts identical across kernels). |
+| The mismatched-kernel pairs pass in tolerance mode; K10's floor recorded | **Yes.** The 68 pairs (each Rust run against the other profile's instrumented R run) are in tolerance mode and pass, K10 identical in every one, teacher-forced too (1,890 and 666 checks): `[clustering.floor.kernel]` records K10 from M8's measurement, identical, with zero bounds. |
+| Everything M11 and M12 checked keeps its status | **Yes.** Of the 37,015 checks of M12's 290 reports, 36,337 keep their status and counts in M13's (the labels and levels, the silhouette widths, the purities and certificates, the files, K1 to K9) and the other 678, M12's placeholders for M13 (`nCount_SCT`, `nFeature_SCT`, the K10 arrays), are now compared and identical; none changed. M13's validator re-grading M12's own runs gives the same (290 passing, 36,337 unchanged) ([M13 results](#m13-results)). Without `--export`, M13's `scrust cluster` writes M12's files byte for byte: all 34 objects' validation runs made again, 2,388 files, none differing ([M13 deviations and notes](#m13-deviations-and-notes)). |
+| Every file the manifest lists present and described | **Yes.** Every command writes `summary.json`'s `files` section (schema `scrust-files` 1, [`docs/output_manifest.md`](../output_manifest.md)) and checks it before writing it: every file listed once with its role, scale, format, shape, identifiers, size and SHA-256, every listed file present, the naming rules. `scrust validate manifest` passes on all 75 validation runs' exports (the 68 at 8 threads and the 7 at one thread: 6,090 files, 34.6 GB, every checksum recomputed) and on the 45 DoubletFinder runs of Step 1's check; cargo test checks the manifests of `scrust sctransform`, `pca`, `neighbors`, `cluster` and `doubletfinder`. |
+| `Read10X` and `read_10x_mtx` fail on the export as designed | **Yes** ([The guard tests](#the-guard-tests)). On three exports (two tier-T objects and the small tier-P object) and on `scrust sctransform --corrected-counts`' outputs, Seurat 5.5.1's `Read10X` fails on every directory but `counts/`, which it reads identical to the input (18 directories, all as required); scanpy 1.13.0's `read_10x_mtx`, with no prefix and with every beginning of every file's path as `prefix=` (2,889 attempts), reads only `counts/` (the directory, and the top directory with `prefix="counts/"`), identical to the input. |
+| The export's memory and time measured; C5's target | **Met** ([M13 benchmark](#m13-benchmark)). With `--export`, Rust at one thread takes 2.0 to 3.3 times less time than R's whole run (which makes the same SCT assay and writes its files), at 32 threads 8.6 to 15.3 times less, and peaks at 0.16 to 3.41 GiB against R's 2.50 to 104.13 GiB: 3.34 and 3.35 GiB at one thread and 3.41 GiB at 32 on the 79,409-cell objects (bound: 10 GiB). The export's share: 3.3 to 87.2 s at one thread (24 to 30% of the run; 107% on the two 11,831-cell objects, whose corrected counts are the densest) and 0.5 to 15.8 s at 32 (16 to 36%), nearly all `correct()` and writing `sct/`; copying `counts/` takes 0.2 to 0.7 s and the manifest's checksums 0.1 to 2.0 s. It raises the peak by at most 0.41 GiB at one thread and 0.71 GiB at 32. |
+| Independent of the thread count, the export included | **Yes** ([M13 threads](#m13-threads)). 8 and 1 threads on all 34 objects in the portable profile and on the 27 tier-T objects in the production profile, 1, 8 and 32 threads on the 7 tier-P objects in the production profile: every file byte-identical, the export (`counts/`, both SCT layers, `metadata.tsv`, the README) and the K10 dumps included, and `summary.json`'s result section and manifest entries; the 17 one-thread tier-P reports equal the 8-thread runs' check by check. |
+| Step 1 unchanged | **Yes** ([Step 1 unchanged](#step-1-unchanged)). `scrust doubletfinder` with M13's binary gives M6b's files byte for byte on M6's ten objects in both profiles (cells.tsv, the sweep tables, `singlets/`, the stage dumps; `summary.json`'s result section), and M7's on all 30 objects M11 re-graded (cells.tsv, the sweep tables, `singlets/`); each of the 45 runs' manifests passes. Step 1's 119 earlier reports re-graded with M13's validator: 15,995 + 140 + 270 checks with matching kernels and 11,896 in tolerance mode, none changing status, as in M11's re-grading. |
+| The guard tests' env | `envs/loaders-py.yml` (scanpy 1.13.0, anndata 0.13.4, Python 3.13.18), its solve in `envs/loaders-py.linux-64.pin.txt`, created in `.envs/loaders-py` and used with `PYTHONNOUSERSITE=1` and `python -I`; M14 extends it. |
+| Documentation | This report; [`docs/output_manifest.md`](../output_manifest.md), the manifest's schema; `[clustering.K10]`, K10's entries in `[clustering.floor.kernel]` and M13's measurements in `validation/tolerances.toml`; M13's section of `validation/manifest.toml`; sctransform's `correct()` and Seurat's SCT assay in `NOTICE`; the plan's corrections ([M13 corrections](#m13-corrections-to-the-plan)). |
+| `cargo test --workspace` passes, debug and release, no warnings | **Yes**: 281 tests, 14 of them new ([M13 tests](#m13-tests)). Under the SapphireRapids kernel, the 17 tests that compare a BLAS-dependent result with a portable fixture stop at the kernel check, and the other 264 pass. |
 
 ## M12 outcome
 
@@ -45,6 +65,7 @@ This is Step 2's main report, as [doubletfinder.md](doubletfinder.md) is Step 1'
 | M10 | `crates/cluster`: Seurat's modularity optimizer, GroupSingletons, FindClusters' columns and levels, exact on R's own SNN graphs | [clustering_m10.md](clustering_m10.md) |
 | M11 | the chain from the counts, `approxSilhouette`, `scrust cluster --counts` and its staged starts, kernel-gated grading in both validators, the benchmark | this report |
 | M12 | `neighborPurity`: the exhaustive search with knncolle's arithmetic and its certificate, the weights and sums, purity in `scrust cluster` and its validation; at the decision point the user chose to keep the exhaustive result and report the flagged pairs (the median pair of every odd-sized object) | this report |
+| M13 | sctransform's `correct()` (the corrected counts, their log1p, `nCount_SCT`, `nFeature_SCT`), `scrust sctransform --corrected-counts` and `scrust cluster --export`, the guards against reading normalised data as raw counts, the output manifest of every command (`docs/output_manifest.md`) | this report |
 
 ## What was built
 
@@ -734,3 +755,332 @@ bash validation/slurm/m12_report.sh m12-4231635 bench > docs/validation/clusteri
 ```
 
 One run by hand, on a committed fixture (seconds, under env.sh's Haswell kernel): as for M11 ([Reproducing](#reproducing)); `summary.json`'s `result.purity` holds the radius and the certificate, and on `filtered_seurat_emptydrops_test` (267 cells) the certificate flags its median pair, cells 106 and 136, both ways.
+
+## M13: the corrected counts and the export
+
+M13 adds SCTransform's corrected counts, the last part of the SCT assay the workflow's objects hold, and the export: the input counts, SCTransform's normalised data and the per-cell metadata, as plain files that cannot be taken for raw counts (docs/PLAN.md C3f). It also gives every scrust command's `summary.json` a manifest of the files it wrote, in one versioned schema that M14's loaders read ([`docs/output_manifest.md`](../output_manifest.md)).
+
+### What M13 built
+
+| Where | M13 contents |
+|---|---|
+| `crates/sctransform/src/correct.rs` (new), `residuals.rs`, `vst.rs` | sctransform 0.4.3's `correct()`, made in S2d's pass (`residuals_corrected`, `finish_with`): the corrected counts kept sparse per gene and transposed into compressed columns; their `log1p`, `nCount_SCT`, `nFeature_SCT`, R's digests of the values; the SCT layers written as Matrix Market with their comment lines |
+| `crates/sctransform/src/output.rs` | the SCT files' comment lines, the manifest's entries for `scrust sctransform`'s layout, the corrected counts' summary in `result` |
+| `crates/scio/src/manifest.rs` (new) | the output manifest: its schema (`scrust-files` 1), the entries and provenance, the digests (parallel over files), the check of a directory against its manifest, the naming rules, the README's file list |
+| `crates/scio/src/copy.rs` (new), `sha256.rs`, `mtx.rs`, `npy.rs`, `tenx.rs` | copying files with their checksums; SHA-256 of files, on the SHA extensions where the CPU has them; Matrix Market written from computed values, and compared on data lines; `.npy` shapes from the header |
+| `crates/cluster/src/chain.rs`, `chain_output.rs`, `validate.rs` | `correct` in the chain's options; `sct/` with the corrected counts, `nCount_SCT` and `nFeature_SCT` in `metadata.tsv`, the K10 stage dumps in R's layout; the manifest's entries of every file the run wrote; K10 in `scrust validate cluster` (stage dumps, files, digests, the saved object, teacher-forced) and the manifest check |
+| `crates/pca`, `crates/neighbors` (`output.rs`) | the manifest's entries of their layouts |
+| `crates/scrust` | `scrust sctransform --corrected-counts`; `scrust cluster --export` (from `--counts` only); the manifest in `scrust sctransform`, `pca`, `neighbors`, `cluster` and `doubletfinder`; `scrust validate cluster --counts`; `scrust validate manifest` |
+| `envs/loaders-py.yml`, `.linux-64.pin.txt` (new) | the hermetic Python env of the guard test (scanpy 1.13.0), which M14 extends for the Python loader |
+| `validation/R/guard_read10x.R`, `validation/python/guard_read10x.py` (new) | the guard tests: Seurat's `Read10X`, scanpy's `read_10x_mtx` with every prefix |
+| `validation/slurm` | `m13_cluster.sbatch`, `m13_benchmark.sbatch`, `m13_doubletfinder.sbatch`, `m13_guard.sbatch`, `m13_kernel_tests.sbatch`, `m13_regrade.sbatch`, `m13_noexport.sbatch`, `m13_threads.sh`, `m13_unchanged.sh`, `m13_step1_shared.sh`, `m13_report.sh`, `m13_manifest.sh`, `fixtures_m13.sh` |
+| `docs/output_manifest.md` (new) | the manifest's schema, for M14's loaders |
+
+The workspace still uses only the Rust standard library and the conda env's OpenBLAS (the SHA extensions through `std::arch`).
+
+### The corrected counts
+
+Seurat's SCT assay holds, as its `counts` layer, the corrected counts of sctransform 0.4.3's `correct()`, which `vst()` itself calls on its own residuals when Seurat passes `return_corrected_umi = TRUE` (`do.correct.umi`, the default), before it clips them (M8). The port follows `correct()` operation by operation:
+
+1. **The residuals** are vst's own: the Pearson residuals of every model gene (detected in at least 5 cells) and every cell, `(y − μ)/√max(μ + μ²/θ, min_variance)`, as S2d computes them, read before vst clips them at ±√N.
+2. **The regressors** are each cell's `[1, log_umi]` with `log_umi` replaced by R's `median()` of it over all cells (`apply(..., 2, function(x) rep(median(x), length(x)))`).
+3. **For each bin of 500 genes**, in the counts' order (vst's bins): μ = `exp(tcrossprod(model_pars_fit[genes_bin, -1], regressor_data))`, the OpenBLAS `dgemm` R calls, with R's arguments and shapes; the variance `μ + μ²/θ` (μ where θ = ∞; `μ²` is `μ * μ`, as R computes `x^2`), not floored; the corrected value `μ + residual * sqrt(variance)`.
+4. **`round(x, 0)`**, which R 4.5.3's `fround` turns into `nearbyint()`: half to even. Negatives become 0, and `make.sparse()` drops the zeros: positive integers, stored sparse.
+5. **The rest of the assay:** `data` is their `log1p` (glibc's, through `rcompat::libm`); adding the assay computes `nCount_SCT` (`colSums`, exact for integers) and `nFeature_SCT` (the entries above 0, every stored entry).
+
+**In S2d's pass, bin by bin.** R holds vst's residual matrix and `correct()`'s output, genes × cells, both dense: 104.1 GiB on cellbender_fromraw_ghirsutum2 (M8). The port makes the corrected counts in the same pass as the residuals, from each residual before it is clipped. For each bin the thread that makes the products first runs R's `dgemm` at the median depth into the free product buffer, keeps it as runs of equal values per gene, and then makes the bin's own product in the same buffer: no second buffer. (Every cell has the same regressors, so in exact arithmetic each gene's row holds one value; the kernel's blocks of columns may differ in their last bits, and the runs keep R's bits wherever they change. Each run's `exp`, variance and square root are computed once.) Each gene's corrected counts are kept as (cell, count) pairs of 32-bit integers, and transposed into compressed columns, Seurat's `dgCMatrix` layout, once every bin is done. No dense genes × cells matrix is made, and the result is placed by gene, never by the order the threads finish, so it does not depend on the thread count. A value that is not a count the port stores (not finite, or above 2³² − 1) stops the run with the gene and the cell named; R would keep it, and its own writer would refuse it.
+
+**Only when asked for.** Clustering does not need them, so they are made only by `scrust cluster --export` and `scrust sctransform --corrected-counts`; every other run, DoubletFinder's included, runs S2d as before.
+
+### The export
+
+`scrust cluster --counts <dir> --export` writes, besides `scrust cluster`'s own files:
+
+```
+<out>/
+  README.txt                       what each file holds and how to load it with standard readers
+  summary.json                     result, run and files: the manifest (docs/output_manifest.md)
+  metadata.tsv                     + nCount_SCT and nFeature_SCT, after nFeature_RNA (Seurat's order)
+  counts/                          the input's matrix, barcodes and features, copied byte for byte with their
+                                   checksums: the export's only 10x directory, and its only raw counts
+  sct/                             scrust sctransform's layout (cell_attr.tsv, gene_attr.tsv, model_pars.tsv,
+                                   model_pars_fit.tsv, variable_features.tsv, scale_data.npy), and
+    corrected_counts.mtx.gz        Seurat's SCT counts layer (integer Matrix Market)
+    log1p_corrected_counts.mtx.gz  Seurat's SCT data layer (real Matrix Market)
+    sct_features.tsv.gz            the model genes, one name per line, in the counts' order (both layers' rows)
+    sct_cells.tsv.gz               the cells, one barcode per line (their columns)
+  pca/, neighbors/, the labels' files, optimizer_ids.tsv   as without --export
+```
+
+The two layers are written as R's reference runs wrote theirs (`mtx_write_plain`): entries in stored (column-major) order, values as `%.17g` writes them, the field `integer` or `real`. `scrust sctransform --corrected-counts` writes the SCT part alone: its usual files, the four above and `README.txt`.
+
+**Which routes export.** Only a run from the counts. The export copies the input counts, and the corrected counts need vst's residuals of every model gene before clipping, which only SCTransform's own pass has: `scrust sctransform` keeps the variable features' clipped residuals (`scale_data.npy`), and the later stages keep nothing of SCTransform. So `scrust cluster --sct`, `--pca` and `--snn` refuse `--export`, with that reason; `scrust sctransform --corrected-counts` writes the SCT part alone, and a sweep over k or the resolution reuses one SCTransform as before.
+
+### The guards
+
+1. **No 10x names for normalised data.** Only `counts/` holds files named as a 10x reader looks for (`matrix.mtx`, `barcodes.tsv`, `features.tsv`, `genes.tsv`, gzipped or not), and it holds only those; no other file's name ends in `matrix.mtx(.gz)`. The manifest's check (below) enforces both rules on every command's output before `summary.json` is written.
+2. **Each normalised matrix says what it is.** Right after the Matrix Market banner:
+
+   ```
+   %%MatrixMarket matrix coordinate integer general
+   % scrust: SCTransform's CORRECTED counts (Seurat's SCT assay, counts layer). NOT raw counts: do not use them as raw UMI counts.
+   % They are sctransform 0.4.3's correct() as Seurat 5.5.1's SCTransform() makes them: every cell's counts corrected to the median sequencing depth (log10 UMIs 2.737986600594553) and rounded.
+   % Rows: the model genes, sct_features.tsv.gz; columns: the cells, sct_cells.tsv.gz. The raw counts are elsewhere (an export's counts/).
+   % Made by scrust 0.1.0: scrust cluster --counts data/clustering/soupx_tenx_test/input --preset workflow --export
+   % Input sha256: 4b8be3ff...  data/clustering/soupx_tenx_test/input/matrix.mtx.gz
+   % Input sha256: 53ca5d7a...  data/clustering/soupx_tenx_test/input/barcodes.tsv.gz
+   % Input sha256: 9c62c608...  data/clustering/soupx_tenx_test/input/features.tsv.gz
+   % Described in summary.json (files) and README.txt.
+   ```
+
+   The command leaves out the options that change no value of the file (`--out`, `--threads`, and for `scrust cluster` `--keep-stages`, `--dump-stages`, `--purity-lists`, `--annoy`, `--metadata`), so that the files are the same bytes at any thread count and in any output directory; the manifest keeps the command line as given.
+3. **The manifest gives every file a role and a scale**, and the loaders (M14) put a matrix only into a slot meant for its scale.
+
+### The manifest
+
+Every command that writes `summary.json` (`scrust sctransform`, `pca`, `neighbors`, `cluster`, `doubletfinder`) adds its `files` section, the manifest: schema `scrust-files`, version 1, documented in [`docs/output_manifest.md`](../output_manifest.md) for M14's loaders.
+
+- **Per file:** its path, role, scale, format (and whether it is gzipped and has a header), shape (and stored entries), where its row and column identifiers are (a file and its column), a description, its size and its SHA-256. `summary.json` itself is listed without size or checksum.
+- **Provenance:** scrust's version, the command line as given, the command as the comment lines give it, each input (the option, the path, every file read with its size and SHA-256), the R functions and packages reproduced, the parameters and the seeds.
+- **Completeness:** every file of the output directory, in any subdirectory, is listed once; every listed file exists with its size and checksum; every identifier file is listed; the roles, scales and formats are known; the naming rules hold. Each command checks this before it writes `summary.json`, and fails if anything is off; `scrust validate manifest --dir <dir>` checks any output again, its checksums included.
+
+The checksums of a large export cost seconds: the files are digested in parallel, largest first, and on the SHA extensions where the CPU has them (Sapphire Rapids; not Cascade Lake).
+
+### M13 results
+
+Label `m13-9ce0adb`: binary `data/clustering/bin/scrust-m13-9ce0adb` (sha256 `6eb5c58c...`, built from commit 9ce0adb), [`m13_cluster.sbatch`](../../validation/slurm/m13_cluster.sbatch), 8 threads, M12's design with `--export`: each Rust run from the counts writes the export and dumps its stages at the level of M8's instrumented runs (full on tier T, standard or light on tier P), its manifest is checked (`scrust validate manifest`), and it is compared with every R run of its profile, the instrumented optimizer, the saved object and, on tier P, the workflow job's logged numbers; then with the other profile's instrumented run, a deliberately mismatched pair of kernels. The portable profile ran with `OPENBLAS_CORETYPE=Haswell` on Cascade Lake nodes (`shared`; jobs 61798840 and 61798841, and 61798842 at one thread), the production profile with the kernel detected, SapphireRapids, on Sapphire Rapids (`test`; jobs 61798838 and 61798839). Each validator's teacher-forced K10 runs under the job's kernel. One row per comparison: [`clustering_m13.tsv`](clustering_m13.tsv); one row per object and profile for K10: [`clustering_m13_k10.tsv`](clustering_m13_k10.tsv) ([`m13_report.sh`](../../validation/slurm/m13_report.sh)).
+
+| tier | profile | comparison | comparisons | passed | mode | checks identical | within floor | differing | missing | K10 identical | K10 teacher-forced identical | certificates flagged, reported |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| T | portable | the profile's R runs | 108 | 108 | exact | 16,224 | 132 | 0 | 0 | 2,160 | 540 | 54 |
+| T | production | the profile's R runs | 82 | 82 | exact | 10,423 | 0 | 0 | 0 | 1,432 | 280 | 36 |
+| P | portable | the profile's R runs | 10 | 10 | exact | 1,960 | 14 | 0 | 0 | 238 | 72 | 8 |
+| P | production | the profile's R runs | 22 | 22 | exact | 2,852 | 0 | 0 | 0 | 370 | 72 | 4 |
+| T | portable | the other kernel's instrumented run | 27 | 27 | tolerance | 5,157 | 492 | 0 | 0 | 756 | 270 | 18 |
+| T | production | the other kernel's instrumented run | 27 | 27 | tolerance | 5,157 | 492 | 0 | 0 | 756 | 270 | 18 |
+| P | portable | the other kernel's instrumented run | 7 | 7 | tolerance | 1,297 | 160 | 0 | 0 | 189 | 63 | 5 |
+| P | production | the other kernel's instrumented run | 7 | 7 | tolerance | 1,297 | 160 | 0 | 0 | 189 | 63 | 5 |
+
+*K10 identical*: the checks of stage K10, from the counts (the stage dumps, the files, the columns, R's digests); the saved objects' are in the K10 table below. *K10 teacher-forced*: `correct()` on R's own model, against instrumented runs only. *Certificates*: M12's (`result.purity.certificate`), unchanged.
+
+**290 comparisons, all passing.** The 222 with the profile's own R runs are in exact mode: 31,459 checks identical, none differing or missing. The only checks within the floor are M12's 146, against the saved objects in the portable profile, graded under the saved objects' kernel: the 118 silhouette widths M11 found and the 28 purities M12 found. The 68 mismatched pairs are in tolerance mode and pass, with M12's 1,304 checks within `[clustering.floor.kernel]`, none beyond it: K10 adds no check within the floor.
+
+**K10.** Over the 222 comparisons, 4,200 K10 checks are identical, none differing or missing: from the stage dumps (`correct()`'s genes, its median log_umi, the residuals beyond the clip range, the entries, its settings, `.Random.seed` at its entry), the files (`sct/corrected_counts.mtx.gz` on its data lines against every R run; `sct/log1p_corrected_counts.mtx.gz` on its data lines where R kept it, tier T, else R's digest of the values; R's digest of the counts' values; `sct_features.tsv.gz`, `sct_cells.tsv.gz`; the layers' summary) and `metadata.tsv`'s `nCount_SCT` and `nFeature_SCT`, against the instrumented runs, the direct runs with and without RunUMAP and the v5 runs. **Against the saved objects**, 2,632 K10 checks identical, none differing, in both profiles on all 34 objects: `nCount_SCT`, `nFeature_SCT`, the corrected counts on their data lines, the genes and cells, R's digests of both SCT layers and the layers' summary (graded under the saved objects' kernel, as M8 found the corrected counts identical across kernels). **Teacher-forced**, in the 98 comparisons with instrumented runs: 964 checks identical (every corrected count and log1p value against R's files or digests, `nCount_SCT`, `nFeature_SCT`, the median, the residuals beyond the clip range, the entries), under the job's kernel, R's. **On the other kernel**, in the 68 mismatched pairs: 1,890 K10 checks identical, and 666 teacher-forced, graded in tolerance mode (the validator's kernel is not R's) and identical: C7's claim that the corrected counts do not depend on the kernel holds on all 34 objects in both directions.
+
+**Everything M12 checked keeps its status.** Every M12 report of these 290 comparisons was compared with M13's, check by check ([`m13_unchanged.sh`](../../validation/slurm/m13_unchanged.sh), `data/clustering/compare/m13_unchanged_m13-9ce0adb.tsv`): of the 37,015 checks M12 graded, 36,337 have the same status and counts in M13's report (the labels and levels, the silhouette widths, the purities and certificates, the files, K1 to K9), and the other 678 are the placeholders M12 left for M13 (`nCount_SCT`, `nFeature_SCT` and the K10 arrays, "not compared"), now compared and identical; none changed, none went missing. **M13's validator grades M12's runs as M12's did.** [`m13_regrade.sbatch`](../../validation/slurm/m13_regrade.sbatch) (job 61799048) graded M12's 290 runs again with M13's binary (`data/clustering/compare/m13_regrade_m13-9ce0adb.tsv`): all 290 pass, the same 36,337 checks unchanged, none changed or missing. M12's runs wrote no corrected counts, so their K10 checks from the counts are n/a (K10 is compared when the run made it: `--export`); K10 teacher-forced, which needs only R's model and the counts, is identical there too (1,630 checks, as in M13's own runs).
+
+#### K10, object by object
+
+The Rust runs from the counts (8 threads); the size of the corrected counts, the median and the residuals beyond the clip range are the same in both profiles, and R's. *R runs*: the comparisons with the profile's R runs and their K10 checks; *teacher-forced*: the K10 checks of `correct()` on R's model, in the comparisons with the profile's instrumented runs (two where the profile has two: on Sapphire Rapids and Cascade Lake in the portable profile, on tier T and soupx_tenx_SRR18256555; with and without the v5 path in the production profile, on filtered_seurat_emptydrops_test and filtered_seurat_emptydrops_sscovelli); *saved object*: the K10 checks against it; *mismatched kernels*: each profile's run against the other's instrumented run, both directions together.
+
+| object | tier | cells | model genes | corrected entries | median log_umi | residuals beyond the clip range | portable: K10 identical (R runs; teacher-forced) | production: K10 identical (R runs; teacher-forced) | saved object: K10 identical (portable, production) | mismatched kernels: K10 identical (teacher-forced), both directions |
+|---|---|---|---|---|---|---|---|---|---|---|
+| posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test | T | 80 | 694 | 21,613 | 2.8211580513463046 | 91 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test | T | 87 | 702 | 23,375 | 2.8109042806687006 | 88 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test | T | 92 | 718 | 25,027 | 2.8463366714932414 | 87 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test | T | 112 | 738 | 30,280 | 2.8331452389810172 | 95 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| posthocfilt_threshold_doubletfinder_cellbender_fromraw_test | T | 135 | 756 | 36,181 | 2.8943160626844384 | 88 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| posthocfilt_threshold_doubletfinder_soupx_emptydrops_test | T | 137 | 766 | 36,607 | 2.909020854211156 | 83 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| posthocfilt_threshold_doubletfinder_soupx_tenx_test | T | 142 | 768 | 36,789 | 2.8890140914225233 | 87 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| posthocfilt_threshold_scdblfinder_soupx_tenx_test | T | 154 | 776 | 40,437 | 2.8978948373479394 | 95 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| posthocfilt_threshold_scdblfinder_soupx_emptydrops_test | T | 161 | 787 | 43,211 | 2.9057958803678687 | 96 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| posthocfilt_threshold_scdblfinder_cellbender_fromraw_test | T | 163 | 793 | 44,270 | 2.904715545278681 | 94 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| doubletfinder_decontx_raw_emptydrops_test | T | 237 | 786 | 47,488 | 2.6263403673750423 | 83 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| doubletfinder_soupx_emptydrops_test | T | 237 | 799 | 52,325 | 2.767897616018091 | 92 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| doubletfinder_cellbender_fromraw_test | T | 247 | 796 | 53,357 | 2.747411807886423 | 77 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| scdblfinder_decontx_raw_emptydrops_test | T | 262 | 791 | 53,634 | 2.641463923211238 | 88 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| scdblfinder_soupx_emptydrops_test | T | 264 | 818 | 59,847 | 2.79098790652668 | 90 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| decontx_raw_emptydrops_test | T | 267 | 794 | 54,219 | 2.6314437690131722 | 87 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| filtered_seurat_emptydrops_test | T | 267 | 821 | 61,367 | 2.8000293592441343 | 89 | 4 runs: 80; 20 | 4 runs: 80; 20 | 48, 48 | 56 (20) |
+| soupx_emptydrops_test | T | 267 | 818 | 60,659 | 2.795184589682424 | 89 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| doubletfinder_decontx_raw_tenx_test | T | 273 | 776 | 51,301 | 2.5877109650189114 | 70 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| doubletfinder_soupx_tenx_test | T | 276 | 802 | 56,694 | 2.7205709510981366 | 79 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| cellbender_fromraw_test | T | 278 | 821 | 62,493 | 2.7792354816302822 | 82 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| scdblfinder_cellbender_fromraw_test | T | 278 | 821 | 62,493 | 2.7792354816302822 | 82 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| scdblfinder_soupx_tenx_test | T | 292 | 812 | 61,303 | 2.737986600594553 | 88 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| scdblfinder_decontx_raw_tenx_test | T | 296 | 781 | 55,821 | 2.5860240170901276 | 75 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| decontx_raw_tenx_test | T | 300 | 782 | 56,279 | 2.5814911852927165 | 70 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| filtered_seurat_tenx_test | T | 300 | 821 | 65,546 | 2.760799148289472 | 90 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| soupx_tenx_test | T | 300 | 815 | 62,883 | 2.737986600594553 | 87 | 4 runs: 80; 20 | 3 runs: 52; 10 | 48, 36 | 56 (20) |
+| soupx_tenx_SRR18256555 | P | 3,108 | 15,256 | 2,229,910 | 3.175076696935747 | 644 | 4 runs: 76; 18 | 3 runs: 49; 9 | 44, 33 | 54 (18) |
+| filtered_seurat_tenx_10xmousebrain | P | 11,831 | 20,948 | 41,522,923 | 3.987487506133093 | 3,068 | 1 run: 27; 9 | 3 runs: 49; 9 | 11, 33 | 54 (18) |
+| soupx_tenx_10xmousebrain | P | 11,831 | 20,926 | 41,030,052 | 3.9824521513849898 | 3,120 | 1 run: 27; 9 | 3 runs: 49; 9 | 11, 33 | 54 (18) |
+| soupx_emptydrops_4500871lane | P | 26,598 | 22,831 | 7,373,505 | 2.5728716022004803 | 229 | 1 run: 27; 9 | 3 runs: 49; 9 | 11, 33 | 54 (18) |
+| cellbender_fromraw_ghirsutum2 | P | 59,323 | 56,106 | 56,742,959 | 3.0916669575956846 | 50 | 1 run: 27; 9 | 3 runs: 49; 9 | 11, 33 | 54 (18) |
+| filtered_seurat_emptydrops_sscovelli | P | 79,409 | 22,025 | 28,919,769 | 2.718501688867274 | 1,067 | 1 run: 27; 9 | 4 runs: 76; 18 | 11, 44 | 54 (18) |
+| soupx_emptydrops_sscovelli | P | 79,409 | 22,014 | 27,565,772 | 2.6972293427597176 | 5,455 | 1 run: 27; 9 | 3 runs: 49; 9 | 11, 33 | 54 (18) |
+
+*Residuals beyond the clip range*: residuals vst clips at ±√N that `correct()` uses unclipped; the port reads them before clipping, as R does. The corrected counts hold 21,613 to 56,742,959 entries (206.7 million over the 34 objects).
+
+### The guard tests
+
+[`m13_guard.sbatch`](../../validation/slurm/m13_guard.sbatch) (job 61799098, a Cascade Lake node of `shared`) tried the readers people use on three exports of the validation runs (production profile: filtered_seurat_tenx_test, filtered_seurat_emptydrops_test, soupx_tenx_SRR18256555) and, for each object, on a `scrust sctransform --seed 12345 --corrected-counts` output made in the job:
+
+- **Seurat 5.5.1's `Read10X()`**, in the production R env ([`guard_read10x.R`](../../validation/R/guard_read10x.R); no `.rds` read), on every directory of each output (stage dumps aside): it must fail everywhere but the export's `counts/`, and read `counts/` identical to the input read the same way (dimensions, names, every entry and value).
+- **scanpy 1.13.0's `read_10x_mtx()`** (anndata 0.13.4, Python 3.13.18), in `.envs/loaders-py` with `PYTHONNOUSERSITE=1` and `python -I` ([`guard_read10x.py`](../../validation/python/guard_read10x.py)), on the same directories, without `prefix=` and with every beginning of every file's path below the directory as `prefix=`. `read_10x_mtx(path, prefix=p)` reads `<p>matrix.mtx.gz` (or the legacy names), so a prefix can name a file only if it begins that file's path: the attempts are exhaustive.
+
+| export | `Read10X`: directories as required | read | `read_10x_mtx`: attempts | read | as required |
+|---|---|---|---|---|---|
+| filtered_seurat_tenx_test | 6 of 6 | `counts/` only, identical to the input | 963 | 2: `counts/`, and the top directory with `prefix="counts/"`, both identical to the input | 963 |
+| filtered_seurat_emptydrops_test | 6 of 6 | `counts/` only, identical to the input | 963 | 2, as above | 963 |
+| soupx_tenx_SRR18256555 | 6 of 6 | `counts/` only, identical to the input | 963 | 2, as above | 963 |
+
+The six directories are the export's top directory, `counts/`, `sct/`, `pca/` and `neighbors/`, and the top directory of `scrust sctransform --corrected-counts`' output. Every other attempt fails: `Read10X` with "Barcode file missing", `read_10x_mtx` with "Did not find file .../matrix.mtx.gz". Per directory and prefix: `data/clustering/<object>/rust/m13-9ce0adb/guard/read10x_seurat.tsv` and `read10x_scanpy.tsv`. cargo test checks the same rules on every committed object's export without either reader: the naming rules, and both readers' file lookup with every prefix ([M13 tests](#m13-tests)).
+
+### Step 1 unchanged
+
+M13 changed code `scrust doubletfinder` runs: SCTransform's residual pass, which now also serves `correct()`, and the manifest every command writes. So [`m13_doubletfinder.sbatch`](../../validation/slurm/m13_doubletfinder.sbatch) ran it again with M13's binary, with the options of the run it is compared with, and compared every file with that run's byte for byte (`summary.json` by its result section; the run section records the run, and M13 adds the files section):
+
+| runs | objects | profile | compared with | files per run | files differing | result sections differing | manifests passing | jobs |
+|---|---|---|---|---|---|---|---|---|
+| M6's options (stage dumps at the R run's level) | 10 (5 tier T, 5 tier P) | portable and production | M6b's runs (`m6b-13592a6`): cells.tsv, sweep_stats.tsv, bcmvn.tsv, `singlets/`, `stages/` | 42 to 60 | 0 | 0 | 20 of 20 | 61798844 |
+| M7's options (no dumps) | 25 of M7's 30 (6 samples × 5 arms) | production | M7's runs (`m7-b8c8a8c`): cells.tsv, sweep_stats.tsv, bcmvn.tsv, `singlets/` | 6 | 0 | 0 | 25 of 25 | 61798931 |
+| M6's options, compared with M7's runs as well | the other 5 of M7's 30, in M6's set too | production | M7's runs: every file they have | 6 | 0 | 0 | (above) | [`m13_step1_shared.sh`](../../validation/slurm/m13_step1_shared.sh) |
+
+One row per run: `data/doubletfinder/compare/m13_step1_m13-9ce0adb.tsv`, and `m13_step1_shared_m13-9ce0adb.tsv` for the five objects of both sets (soupx_tenx_SRR18256555, soupx_tenx_10xmousebrain, soupx_emptydrops_4500871lane, soupx_emptydrops_sscovelli, cellbender_fromraw_ghirsutum2): the script runs an object and profile once per label, so these ran with M6's options, and their files and result sections are compared with M7's runs too, every file M7's run has (the stage dumps are the extra files of M6's options). The production runs ran on Sapphire Rapids (`test`), with OpenBLAS's SapphireRapids kernel checked before each.
+
+**Earlier reports re-grade unchanged.** [`m11_doubletfinder.sbatch`](../../validation/slurm/m11_doubletfinder.sbatch) with M13's binary (job 61798855) re-graded the same 119 reports as M11, Step 1's own runs against every R run, the saved outputs and the other kernel's instrumented runs, each check against M6's and M7's reports:
+
+| runs | comparisons | mode | verdicts | checks | checks whose status changed |
+|---|---|---|---|---|---|
+| M6 (`m6-bc1b48e`), every R run of the run's profile, 10 objects | 49 | exact | 49 pass | 15,995 | 0 |
+| M6, the saved outputs | 20 | (not gated) | 20 pass | 140 | 0 |
+| M7 (`m7-b8c8a8c`), the saved outputs, 30 objects | 30 | (not gated) | 30 pass | 270 | 0 |
+| M6, the other kernel's instrumented run | 20 | tolerance | 20 pass, 674 checks within `[doubletfinder.floor.kernel]` | 11,896 | (no earlier report) |
+
+These are M11's numbers exactly (`data/doubletfinder/compare/m11_verdicts_m13-9ce0adb.tsv`).
+
+### M13 threads
+
+Every output is byte-identical at one thread and at many, the export included:
+
+| tier | profile | runs | threads | files compared per run | differing |
+|---|---|---|---|---|---|
+| T | portable | 27 | 8 and 1 (`m13_cluster.sbatch`'s second run) | 80, or 85 where a pair is flagged (the export: `counts/`, `sct/` with both layers, `metadata.tsv`; every start's partition; the stage dumps with K10 and the certificate's arrays) | 0 |
+| T | production | 27 | 8 and 1 | 80 or 85 | 0 |
+| P | portable | 7 | 8 (label m13-9ce0adb) and 1 (m13-9ce0adb-t1, job 61798842), [`m13_threads.sh`](../../validation/slurm/m13_threads.sh) | 78 to 83: the export and the stage dumps | 0 |
+| P | production | 7 | 1 and 32 (the benchmark, job 61798843), and 8 (the validation run) | 31: the export (no stage dumps); the 8-thread run's files less its dumps | 0 |
+
+`summary.json` is compared by its `result` section and its manifest's entries: every file's path, role, scale, shape, size and SHA-256 (the manifest's provenance holds the command line, whose `--threads` and `--out` differ). The tier-P portable runs at one thread were validated as the 8-thread runs were, and their 17 reports equal the 8-thread runs' check by check, details included. cargo test compares 1 and 3 threads, with and without the stage dumps ([M13 tests](#m13-tests)). The corrected counts are placed by gene and cell, never in the order the threads finish, and the files are written from them in a fixed order; each matrix's gzip stream is cut into pieces of whole columns (about 131,072 entries each, fixed by the matrix alone), each compressed on its own and written in order.
+
+### M13 benchmark
+
+[`m13_benchmark.sbatch`](../../validation/slurm/m13_benchmark.sbatch) (job 61798843) ran `scrust cluster --counts <object>/input --preset workflow --export`, and the same without `--export`, without stage dumps, on each tier-P object at 1 thread and at 32, in the production profile on one Sapphire Rapids node (holy8a24301, Xeon Platinum 8480CL, partition `test`, 32 CPUs and 96 GiB reserved), with the validation runs' binary, against M8's direct production R runs on the same inputs (R with OpenBLAS at one thread, the same CPU type). Time and peak RSS are the whole process's (`/usr/bin/time -v`), each stage's time comes from `summary.json` (`run.phases`). One row per run: [`clustering_m13_bench.tsv`](clustering_m13_bench.tsv) (`m13_report.sh <label> bench`).
+
+**Whole runs with the export, against R's.** R's direct run computes the whole SCT assay, the corrected counts included (`do.correct.umi`), and writes its files in the export's layout (*R's writing*, part of its time): R's like for like with `--export`. *R ÷ Rust*: R's run without RunUMAP against Rust's with `--export`.
+
+| object | cells | R without RunUMAP: time, peak RSS | R's writing | Rust with `--export`, 1 thread: time, peak RSS | Rust with `--export`, 32 threads: time, peak RSS | R ÷ Rust, time: 1 thread; 32 threads | R ÷ Rust, memory: 1 thread; 32 threads |
+|---|---|---|---|---|---|---|---|
+| soupx_tenx_SRR18256555 | 3,108 | 47.1 s, 2.50 GiB | 8.1 s | **14.4 s, 0.16 GiB** | **3.1 s, 0.28 GiB** | 3.3×; 15.3× | 15×; 9× |
+| soupx_tenx_10xmousebrain | 11,831 | 215.0 s, 12.02 GiB | 113.6 s | **77.6 s, 1.44 GiB** | **16.9 s, 1.75 GiB** | 2.8×; 12.7× | 8×; 7× |
+| filtered_seurat_tenx_10xmousebrain | 11,831 | 211.5 s, 12.08 GiB | 115.3 s | **78.1 s, 1.44 GiB** | **17.1 s, 1.76 GiB** | 2.7×; 12.3× | 8×; 7× |
+| soupx_emptydrops_4500871lane | 26,598 | 204.8 s, 23.36 GiB | 33.5 s | **102.0 s, 1.48 GiB** | **23.7 s, 1.56 GiB** | 2.0×; 8.6× | 16×; 15× |
+| soupx_emptydrops_sscovelli | 79,409 | 808.4 s, 62.13 GiB | 131.9 s | **335.3 s, 3.34 GiB** | **60.9 s, 3.41 GiB** | 2.4×; 13.3× | 19×; 18× |
+| filtered_seurat_emptydrops_sscovelli | 79,409 | 778.0 s, 57.52 GiB | 130.7 s | **329.6 s, 3.35 GiB** | **61.3 s, 3.41 GiB** | 2.4×; 12.7× | 17×; 17× |
+| cellbender_fromraw_ghirsutum2 | 59,323 | 905.9 s, 104.13 GiB | 202.8 s | **373.9 s, 3.06 GiB** | **59.8 s, 3.40 GiB** | 2.4×; 15.1× | 34×; 31× |
+
+**The export's share**, each run with `--export` against the same run without it, on the same node. *SCTransform's stage* gains `correct()`, made in S2d's pass, and writing `sct/` (without `--export` or `--keep-stages` the chain writes no `sct/`): the model's tables, `scale_data.npy` and both layers; *`counts/`*: copying the input with its checksums; *the manifest*: the SHA-256 of the export's files (every command digests every file it writes; the export adds `counts/` and `sct/`).
+
+| object | the export: Rust's output, size | 1 thread: without `--export`, with it (difference) | the difference: SCTransform's stage (`correct()`, `sct/`), `counts/`, the manifest | 32 threads: without, with (difference) | the difference: SCTransform's stage, `counts/`, the manifest | peak RSS without, with: 1 thread; 32 threads |
+|---|---|---|---|---|---|---|
+| soupx_tenx_SRR18256555 | 0.11 GB | 11.1 s, 14.4 s (+3.3 s, 30%) | 3.0 s, 0.2 s, 0.1 s | 2.6 s, 3.1 s (+0.5 s, 20%) | 0.4 s, 0.1 s, 0.1 s | 0.15, 0.16 GiB; 0.18, 0.28 GiB |
+| soupx_tenx_10xmousebrain | 0.72 GB | 37.4 s, 77.6 s (+40.2 s, 107%) | 39.4 s, 0.4 s, 0.6 s | 12.6 s, 16.9 s (+4.3 s, 34%) | 4.0 s, 0.4 s, 0.2 s | 1.44, 1.44 GiB; 1.44, 1.75 GiB |
+| filtered_seurat_tenx_10xmousebrain | 0.72 GB | 37.6 s, 78.1 s (+40.5 s, 108%) | 39.9 s, 0.4 s, 0.6 s | 12.6 s, 17.1 s (+4.5 s, 36%) | 4.1 s, 0.3 s, 0.2 s | 1.44, 1.44 GiB; 1.44, 1.76 GiB |
+| soupx_emptydrops_4500871lane | 0.89 GB | 81.2 s, 102.0 s (+20.9 s, 26%) | 19.5 s, 0.4 s, 0.7 s | 20.4 s, 23.7 s (+3.3 s, 16%) | 3.0 s, 0.3 s, 0.5 s | 1.48, 1.48 GiB; 1.48, 1.56 GiB |
+| soupx_emptydrops_sscovelli | 2.47 GB | 266.6 s, 335.3 s (+68.7 s, 26%) | 61.3 s, 0.6 s, 2.0 s | 51.6 s, 60.9 s (+9.3 s, 18%) | 8.5 s, 0.5 s, 1.6 s | 3.15, 3.34 GiB; 3.19, 3.41 GiB |
+| filtered_seurat_emptydrops_sscovelli | 2.48 GB | 264.9 s, 329.6 s (+64.6 s, 24%) | 56.8 s, 0.6 s, 2.0 s | 51.0 s, 61.3 s (+10.3 s, 20%) | 8.4 s, 0.5 s, 1.6 s | 3.15, 3.35 GiB; 3.19, 3.41 GiB |
+| cellbender_fromraw_ghirsutum2 | 2.18 GB | 286.7 s, 373.9 s (+87.2 s, 30%) | 80.1 s, 0.7 s, 1.8 s | 44.0 s, 59.8 s (+15.8 s, 36%) | 14.0 s, 0.6 s, 1.2 s | 2.65, 3.06 GiB; 2.69, 3.40 GiB |
+
+- **C5's target is met.** With the export, Rust at one thread takes 2.0 to 3.3 times less time than R's whole run, at 32 threads 8.6 to 15.3 times less, and peaks at 0.16 to 3.41 GiB against R's 2.50 to 104.13 GiB (7 to 34 times less); on the two 79,409-cell objects at 3.34 and 3.35 GiB at one thread and 3.41 GiB at 32, under the 10 GiB bound.
+- **The export's cost is SCTransform's stage:** `correct()` in S2d's pass and writing `sct/` (its `scale_data.npy`, 0.07 to 1.9 GB, is written only with `--export` or `--keep-stages`): 3.0 to 80.1 s at one thread, 0.4 to 14.0 s at 32. Copying `counts/` with its checksums takes 0.2 to 0.7 s, the manifest's digests 0.1 to 2.0 s more. At one thread the export adds 24 to 30% to the run, and 107% on the two 11,831-cell objects, whose corrected counts are the densest: 41 million entries, 17% of the model genes × cells (1.2 to 4.7% on the others), written as 270 MB of gzipped text. At 32 threads it adds 16 to 36%. The rest of each difference (at most 7 s at one thread, on the large objects) is the other stages' variation between runs, mostly purity's. At one thread the whole export, the corrected counts included, takes less time than R's writing of its files alone (3.3 to 87.2 s against 8.1 to 202.8 s).
+- **Memory.** The export raises the peak by at most 0.41 GiB at one thread and 0.71 GiB at 32, on cellbender_fromraw_ghirsutum2 (56.7 million corrected entries): the corrected counts are held as 32-bit (cell, count) pairs per gene and transposed once into compressed columns, and each writer holds a batch of compressed pieces per thread; `scale_data.npy` is written from the rows already in memory. At one thread on the 11,831- and 26,598-cell objects the peak does not move: another stage sets it.
+- **The same files.** On all seven objects the benchmark's 31 output files are byte-identical at 1 and 32 threads, and identical to the validation runs' (8 threads, with stage dumps) ([M13 threads](#m13-threads)).
+- **Without `--export`** the run is M12's chain, byte for byte ([M13 deviations and notes](#m13-deviations-and-notes)); it took 0.85 to 0.98 times M12's benchmark time at one thread and 0.76 to 0.86 times at 32 (another node of the same type).
+
+### M13 tests
+
+`cargo test --workspace` passes in debug and in release: 281 tests in 41 suites, none failing or ignored, with no compiler warnings, under env.sh's kernel (Haswell). 14 are new in M13:
+
+- `crates/scio` (7): `copy::copies_byte_for_byte_through_a_link` (a 9 MiB file and a symbolic link copied byte for byte with their checksums, an existing target refused); `manifest::the_naming_rules` (a normalised matrix under a 10x name, beside one, or ending in `matrix.mtx.gz`, and a 10x name on another file, each caught); `manifest::round_trip_and_checks` (the manifest written and read back, the digests at 1 and 3 threads, an unlisted, a missing and a changed file each caught); `manifest::the_canonical_command`; `mtx::computed_values_and_data_lines` (the writer from computed values gives the same data lines as from a matrix, the comparison on data lines); `sha256::the_sha_extensions_give_the_scalar_digest` (every length from 0 to 300 bytes and up to 1 MiB, the SHA-extension path against the scalar one where the CPU has it); `sha256::a_file_s_digest`;
+- `crates/sctransform` (2): `correct::transposition_and_column_statistics` (the transposition, `nCount_SCT`, `nFeature_SCT`, R's digests, `log1p`'s table); `residuals::corrected_counts_match_the_plain_computation_for_any_number_of_threads` (the fused pass against `correct()` written out literally, the full residual matrix and the full product at the median depth element by element, for an odd and an even number of cells, θ = ∞ genes, a one-gene bin, at 1, 2, 3 and 7 threads and three gene groupings; the residuals unchanged);
+- `crates/cluster/tests/m13_correct.rs` (1): `correct()` teacher-forced on R's model, cell attributes and genes for the two base objects, against R's corrected counts and log1p data (the SHA-256 of their data lines, formatted independently of the writer), R's digests, `nCount_SCT`, `nFeature_SCT`, the median log_umi, the residuals beyond the clip range and the entries, at 1 and 3 threads;
+- `crates/scrust/tests/export.rs` (4): `the_export_reproduces_r_s_corrected_counts` (`scrust cluster --export` on the seven committed objects: K10 against M8's portable runs, `nCount_SCT` and `nFeature_SCT` against R's `metadata.tsv` and in Seurat's column order, `counts/` the input byte for byte with the manifest's checksums equal to the inputs', the manifest valid, the README, the naming rules and the 10x readers' own file lookup: Seurat's `Read10X` and scanpy's `read_10x_mtx` with every prefix of every file's path, only `counts/` readable); `the_export_does_not_depend_on_the_thread_count` (1 and 3 threads, and with the stage dumps: every file byte-identical but the README with the dumps, which lists them; the manifest's entries and the command identical; K10 in the stage dumps, `correct_entry` between `fits_exit` and `vst_exit` as R records it); `only_a_run_from_the_counts_exports`; `sctransform_writes_the_sct_part` (`--corrected-counts` at seed 12345 against R's K10, the files shared with a run without it byte-identical, `--from-stages` refused).
+
+Extended: `cli.rs`' DoubletFinder, `scrust sctransform`, `pca` and `neighbors` tests check each output's manifest (`scrust validate manifest`, and the library's own check with the checksums); the routes test records the new `manifest` phase; the cluster refusals test refuses `--export` from `--snn`. The release suite's first run under M13 found two of M12's tests out of date in that way (the phases; R's graphs copied by `--snn` without `knn_index.tsv`, whose cells the graphs' entries now name from `metadata.tsv`), both fixed before the validation binary was built.
+
+**Under another kernel** ([`m13_kernel_tests.sbatch`](../../validation/slurm/m13_kernel_tests.sbatch) `auto`, job 61798854, commit 9ce0adb, a Sapphire Rapids node, OpenBLAS's SapphireRapids kernel): 264 passes and 17 failures, each a kernel check naming both kernels: M12's 14 and M13's three that compare a BLAS-dependent result with a portable fixture (`scrust cluster --export` and `scrust sctransform --corrected-counts` against R's K10, and `correct()` teacher-forced: its μ is a `dgemm`). The thread test, the refusal and every BLAS-free test pass under any kernel (`data/clustering/m13_kernel_tests/SapphireRapids/`).
+
+### M13 corrections to the plan
+
+Corrected in [docs/PLAN.md](../PLAN.md) on this branch:
+
+- **A2, the loaders' Python env:** M13 created `envs/loaders-py.yml` (scanpy 1.13.0, for the guard test), with its solve in `envs/loaders-py.linux-64.pin.txt` as `rust-dev`'s; M14 extends it.
+- **A3:** `summary.json` lists every output file with its role and scale, in the schema of `docs/output_manifest.md`.
+- **C3, components (`scio`):** the Matrix Market writers compute values as they write them (the `log1p` layer needs no second matrix); the manifest is `scio::manifest`, with the naming rules; `counts/` copies the input's three 10x files with their checksums, not a whole directory (M8's input directories also hold `assay.txt` and `export.json`).
+- **C3f, the corrected counts:** computed only when asked for (`--export`, `--corrected-counts`), in S2d's pass, bin by bin, the product at the median depth in the free product buffer and kept as its runs of equal values; no dense genes × cells matrix and no third product buffer.
+- **C3f, the guards:** the comment lines' command leaves out the options that change no value of the file, so that the files are the same at any thread count and in any output directory; the scale of the `data` layer is `log1p_corrected_counts` (the plan wrote `log1p`), and the vocabulary is the schema document's.
+- **C3f, the manifest:** versioned (`scrust-files` 1), documented in `docs/output_manifest.md`, checked by each command before it writes it and by `scrust validate manifest`.
+- **C3f, which routes export (new):** only a run from the counts, and why; `scrust sctransform --corrected-counts` writes the SCT part alone.
+- **C3g:** the loaders read the manifest's schema, `docs/output_manifest.md`.
+- **C5, K10:** the checks (the K10 stage values, R's digests where R kept no copy, the saved objects) and the criterion of K10 teacher-forced: graded under the validator's own kernel against R's.
+- **C7, corrected counts near .5, and the export's size:** their outcomes.
+
+### M13 deviations and notes
+
+- **The validation binary.** Every M13 run used `scrust-m13-9ce0adb`, built from commit 9ce0adb. The commits after it add this report, the manifest's section, the plan's corrections and, in `validation/tolerances.toml`, which the binary embeds, M13's measurements (`[clustering.K10]`'s `settled`, `[clustering.kernel_gating_shown]`'s `m13`, `measured_m13`, `compared_m13`); the floor's entries the grading reads are the binary's. The Python guard script's version line changed after the binary (it reads scanpy's version through `importlib.metadata`, scanpy 1.13 deprecating `__version__`); it is not part of the binary.
+- **No new R runs.** M13 compares with M8's runs; the guard test runs Seurat's `Read10X` on the exports, in the production R env, through sbatch, and reads no `.rds`.
+- **Values R would keep and the port does not.** R's `correct()` keeps any value its arithmetic gives; a corrected value that is not finite or exceeds 2³² − 1 stops the port with the gene and cell named (R's own writer refuses non-finite values too). None occurs in the 34 objects.
+- **`sct_features.tsv.gz` holds the genes' names**, as R's reference runs write it and as Seurat names the SCT assay's rows; the ids are in `gene_attr.tsv`, row for row.
+- **The README lists the directory's files,** so it is the export's only file that differs between runs with and without stage dumps; the comparisons of such runs leave it out, and every other file is the same bytes.
+- **Without `--export`, `scrust cluster` writes M12's files.** `metadata.tsv` gains `nCount_SCT` and `nFeature_SCT` after `nFeature_RNA` only with `--export`. [`m13_noexport.sbatch`](../../validation/slurm/m13_noexport.sbatch) (job 61802055) made M12's validation run of each of the 34 objects again with M13's binary and M12's options, in the portable profile: every file byte-identical to M12's run (2,388 files: 70 or 75 per tier-T object, 62 to 67 per tier-P object, the stage dumps included), `summary.json`'s result section identical, each manifest passing (`data/clustering/compare/m13_noexport_m13-9ce0adb.tsv`).
+- **`scrust sctransform --corrected-counts`** refuses `--from-stages` (DoubletFinder's validation contexts, whose corrected counts no reference holds).
+- **K10 teacher-forced in the validator** reads the counts from `--counts`, else from the R run's `run.input`, else from the candidate's `counts/`; it needs the R run's `stages/vst/` (instrumented runs).
+- **The hermetic env** was created with conda's package cache on lab storage and `CONDA_REGISTER_ENVS=false`, so nothing was written under the home directory (checked after the creation).
+- **Rust's validation outputs** (`data/clustering/<object>/rust/m13-9ce0adb/`, `m13-9ce0adb-t1/`, `m13-9ce0adb-noexport/`, `data/doubletfinder/<object>/rust/m13-9ce0adb/`) are not listed in the manifest, as in M9 to M12; `clustering_m13.tsv`, `clustering_m13_k10.tsv` and `clustering_m13_bench.tsv` summarise them.
+
+### Reproducing M13
+
+From the repository's top directory, after `source env.sh` and `cargo build --release -p scrust` (copy the binary to a file of its own, here `data/clustering/bin/scrust-m13-9ce0adb`), and, once, the guard test's Python env from its pinned solve (with conda's package cache off the home directory, as `envs/loaders-py.yml` says):
+
+```bash
+module load python
+```
+
+```bash
+CONDA_REGISTER_ENVS=false conda create -p .envs/loaders-py --file envs/loaders-py.linux-64.pin.txt
+```
+
+```bash
+export SCRUST_BIN=data/clustering/bin/scrust-m13-9ce0adb
+sbatch --partition=shared --cpus-per-task=8 --mem=24G validation/slurm/m13_cluster.sbatch m13-9ce0adb portable <tier-T objects>
+sbatch --partition=shared --cpus-per-task=8 --mem=64G validation/slurm/m13_cluster.sbatch m13-9ce0adb portable <tier-P objects>
+sbatch --partition=test --cpus-per-task=8 --mem=24G validation/slurm/m13_cluster.sbatch m13-9ce0adb production <tier-T objects>
+sbatch --partition=test --cpus-per-task=8 --mem=64G validation/slurm/m13_cluster.sbatch m13-9ce0adb production <tier-P objects>
+sbatch --partition=shared --cpus-per-task=1 --mem=48G validation/slurm/m13_cluster.sbatch m13-9ce0adb-t1 portable <tier-P objects>
+bash validation/slurm/m13_threads.sh m13-9ce0adb m13-9ce0adb-t1 portable <tier-P objects>
+VALIDATION_LABEL=m13-9ce0adb sbatch validation/slurm/m13_benchmark.sbatch m13-9ce0adb <tier-P objects>
+sbatch validation/slurm/m13_guard.sbatch m13-9ce0adb production filtered_seurat_tenx_test filtered_seurat_emptydrops_test soupx_tenx_SRR18256555
+sbatch --partition=test validation/slurm/m13_kernel_tests.sbatch auto
+sbatch --partition=test validation/slurm/m13_doubletfinder.sbatch m13-9ce0adb m6 <M6's ten objects>
+sbatch --partition=test validation/slurm/m13_doubletfinder.sbatch m13-9ce0adb m7 <M7's 30 objects>
+sbatch --partition=shared validation/slurm/m11_doubletfinder.sbatch m13-9ce0adb <M11's objects>
+sbatch validation/slurm/m13_regrade.sbatch m13-9ce0adb <the 34 objects>
+sbatch validation/slurm/m13_noexport.sbatch m13-9ce0adb <the 34 objects>
+bash validation/slurm/m13_step1_shared.sh m13-9ce0adb > data/doubletfinder/compare/m13_step1_shared_m13-9ce0adb.tsv
+bash validation/slurm/m13_unchanged.sh m12-4231635 m13-9ce0adb > data/clustering/compare/m13_unchanged_m13-9ce0adb.tsv
+bash validation/slurm/m13_unchanged.sh m12-4231635 m13-9ce0adb regrade > data/clustering/compare/m13_regrade_m13-9ce0adb.tsv
+bash validation/slurm/m13_report.sh m13-9ce0adb > docs/validation/clustering_m13.tsv
+bash validation/slurm/m13_report.sh m13-9ce0adb k10 > docs/validation/clustering_m13_k10.tsv
+bash validation/slurm/m13_report.sh m13-9ce0adb bench > docs/validation/clustering_m13_bench.tsv
+```
+
+The committed fixtures K10's tests read come from M8's portable instrumented runs: `bash validation/slurm/fixtures_m13.sh`.
+
+One run by hand, on a committed fixture (seconds, under env.sh's Haswell kernel):
+
+```bash
+target/release/scrust cluster --counts tests/fixtures/clustering/soupx_tenx_test/input --preset workflow --export --out /tmp/soupx_tenx_test_export
+target/release/scrust validate manifest --dir /tmp/soupx_tenx_test_export
+```
+
+`README.txt` lists every file and how to read it; `sct/corrected_counts.mtx.gz`'s comment lines say what it is; `summary.json`'s `files` section is the manifest.

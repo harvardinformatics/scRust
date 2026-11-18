@@ -86,3 +86,22 @@ pub fn result_json(p: &Pca, n_features: usize) -> Json {
         ("total_variance", Json::Num(p.total_variance)),
     ])
 }
+
+/// The manifest's entries for this layout (docs/PLAN.md C3f, M13), in the directory `dir`
+/// relative to the output directory (`""` or `"pca"`); their shapes are read from the files.
+pub fn manifest_entries(dir: &str) -> Vec<scio::manifest::Entry> {
+    use scio::manifest::{Entry, Ids};
+    vec![
+        Entry::new("embeddings.tsv", "pca_embeddings", "pca_embeddings", "tsv", "RunPCA's cell embeddings (u %*% diag(d)): barcode, then PC_1, PC_2, ...; Seurat's pca reduction")
+            .header(true)
+            .rows(Ids::named("cells", "embeddings.tsv", "barcode")),
+        Entry::new("loadings.tsv", "pca_loadings", "pca_loadings", "tsv", "RunPCA's feature loadings: id, name, then PC_1, PC_2, ...; the rows are the PCA's input features (the variable features, in VariableFeatures() order)")
+            .header(true)
+            .rows(Ids::named("variable_features", "loadings.tsv", "name")),
+        Entry::new("stdev.tsv", "pca_stdev", "pca_stdev", "tsv", "RunPCA's standard deviations (d / sqrt(cells - 1)): pc, stdev").header(true).rows(Ids::named("components", "stdev.tsv", "pc")),
+        Entry::new("random_seed.txt", "rng_state", "none", "text", "R's .Random.seed after RunPCA, one integer per line"),
+    ]
+    .into_iter()
+    .map(|e| e.under(dir))
+    .collect()
+}

@@ -13,6 +13,15 @@
 //! 5. `scale.data`: their residuals clipped to `+-sqrt(ncells / 30)`, then centred by
 //!    `ScaleData` (`FastRowScale`: `mat - rowMeans2(mat, na.rm = TRUE)`).
 //!
+//! With `correct` ([`residuals_corrected`], milestone M13), the same pass also makes the
+//! corrected counts of sctransform 0.4.3's `correct()`, which `vst()` calls on these residuals
+//! before it clips them (`return_corrected_umi = TRUE`, Seurat's `do.correct.umi`): for each bin,
+//! `mu = exp(tcrossprod(model_pars_fit[genes_bin, -1], regressor_data))` with every cell's
+//! `log_umi` replaced by R's `median()` of it (the same `dgemm` call and shapes as R's), the
+//! variance `mu + mu^2 / theta` (not floored), the corrected value `mu + residual * sqrt(variance)`
+//! from the residual before clipping, then `round(x, 0)` (half to even), negatives set to 0, zeros
+//! dropped (`make.sparse`): see [`crate::correct`].
+//!
 //! R holds the full residual matrix (genes x cells). Here the bins' products are made one at a
 //! time, each by one `tcrossprod` with R's arguments into one of two reused buffers, and each bin's
 //! genes are shared among the threads (eight at a time, or one at a time above 16,384 cells:
@@ -23,6 +32,7 @@
 //! the kept rows, and a residual and a counts row per thread. Results do not depend on the number
 //! of threads.
 
+use crate::correct::Corrected;
 use crate::matrix::GeneRows;
 use crate::params::{MinVariance, SctParams};
 use crate::setup::bins;
@@ -38,6 +48,21 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
 /// Bins' products held at once: the bin being turned into residuals, and the next one.
 const PRODUCT_BUFFERS: usize = 2;
+
+/// `correct()`'s product at the median depth, in a gene's row: the cells from `start` on (until
+/// the next run) share the product's value, whose `exp` is `mu` and whose variance's square root
+/// is `sd`. In exact arithmetic every cell has the same regressors, so a row has one value; the
+/// kernel's arithmetic may differ between blocks of columns, so the runs keep R's bits wherever
+/// they change.
+#[derive(Debug, Clone, Copy)]
+struct MedRun {
+    start: u32,
+    mu: f64,
+    sd: f64,
+}
+
+/// One bin's runs ([`MedRun`]), per gene of the bin.
+type MedRuns = Vec<Vec<MedRun>>;
 
 /// Genes a thread takes at once, for `ncells` cells. A product is column-major, so eight
 /// consecutive genes share their cache lines (64 bytes, two lines per cell where the eight
@@ -139,6 +164,8 @@ impl Ord for Cand {
 struct ActiveBin {
     bin: usize,
     eta: Arc<Vec<f64>>,
+    /// `correct()`'s product at the median depth (when correcting)
+    med: Option<Arc<MedRuns>>,
     /// next gene to hand out, genes finished (positions in the bin)
     next: usize,
     done: usize,
@@ -162,6 +189,11 @@ struct State<'s> {
     failed: bool,
     residual_mean: Vec<f64>,
     residual_variance: Vec<f64>,
+    /// `correct()` (when correcting): each gene's corrected counts (cell, count), and how many
+    /// residuals lie beyond vst's clip range; the first error (a value that cannot be stored)
+    corrected: Vec<Vec<(u32, u32)>>,
+    beyond_clip: u64,
+    error: Option<String>,
     /// the best candidates so far (worst on top) and their residual rows, slots of one buffer;
     /// the slots that hold no kept row and no thread's working row
     heap: BinaryHeap<Cand>,
@@ -176,6 +208,8 @@ struct Run<'a, 's> {
     model_pars_fit: &'a [[f64; 3]],
     /// `model.matrix(~ log_umi, cell_attr)`: (Intercept), log_umi; column-major ncells x 2
     xreg: Vec<f64>,
+    /// `correct()`'s regressors (when correcting): (Intercept), and log_umi replaced by its median
+    xreg_med: Option<Vec<f64>>,
     bins: Vec<Range<usize>>,
     /// genes a thread takes at once ([`gene_group`])
     group: usize,
@@ -229,6 +263,8 @@ impl<'s> Run<'_, 's> {
         let _stop = StopOnPanic(self);
         let nc = self.rows.ncol;
         let mut counts = vec![0.0f64; nc];
+        // one gene's corrected counts (cell, count), when correcting
+        let mut corr: Vec<(u32, u32)> = Vec::new();
         let mut st = self.lock();
         // the working row: a slot of its own (there is one per thread beyond the kept rows)
         let mut row: Slot<'s> = st.free_slots.pop().expect("a slot per thread");
@@ -248,27 +284,46 @@ impl<'s> Run<'_, 's> {
                     }
                 };
                 drop(st);
-                self.product(b, &mut eta);
+                let med = self.product(b, &mut eta);
                 st = self.lock();
                 st.producing = false;
-                st.active.push_back(ActiveBin { bin: b, eta: Arc::new(eta), next: 0, done: 0 });
+                st.active.push_back(ActiveBin { bin: b, eta: Arc::new(eta), med: med.map(Arc::new), next: 0, done: 0 });
                 self.cv.notify_all();
                 continue;
             }
             let job = st.active.iter_mut().find(|a| a.next < self.bins[a.bin].len()).map(|a| {
                 let first = a.next;
                 a.next = (first + self.group).min(self.bins[a.bin].len());
-                (a.bin, first..a.next, Arc::clone(&a.eta))
+                (a.bin, first..a.next, Arc::clone(&a.eta), a.med.clone())
             });
-            if let Some((b, genes, eta)) = job {
+            if let Some((b, genes, eta, med)) = job {
                 drop(st);
                 let nb = self.bins[b].len();
                 for r in genes.clone() {
                     let g = self.bins[b].start + r;
-                    let (mean, var) = self.gene(&eta, nb, r, g, &mut counts, row.1);
-                    self.record(&mut self.lock(), g, mean, var, &mut row);
+                    let runs = med.as_ref().map(|m| m[r].as_slice());
+                    let (mean, var, beyond) = self.gene(&eta, nb, r, g, &mut counts, row.1, runs, &mut corr);
+                    let mut st = self.lock();
+                    if runs.is_some() {
+                        match beyond {
+                            Ok(n) => {
+                                st.beyond_clip += n;
+                                // an exact-size copy: the thread's buffer is reused
+                                st.corrected[g] = corr.clone();
+                            }
+                            Err(e) => {
+                                if st.error.is_none() {
+                                    st.error = Some(e);
+                                }
+                                st.failed = true;
+                                self.cv.notify_all();
+                            }
+                        }
+                    }
+                    self.record(&mut st, g, mean, var, &mut row);
                 }
                 drop(eta);
+                drop(med);
                 st = self.lock();
                 let i = st.active.iter().position(|a| a.bin == b).expect("the genes' bin is active");
                 st.active[i].done += genes.len();
@@ -291,28 +346,59 @@ impl<'s> Run<'_, 's> {
     }
 
     /// The product of bin `b`, `tcrossprod(model_pars_fit[genes_bin, -1], model.matrix(~ log_umi))`:
-    /// genes x cells, column-major, into `eta`.
-    fn product(&self, b: usize, eta: &mut Vec<f64>) {
+    /// genes x cells, column-major, into `eta`. When correcting, first `correct()`'s product of the
+    /// same genes at the median depth (R's call, with R's shapes), in the same buffer, kept as its
+    /// runs of equal values ([`MedRun`]): no second buffer is needed.
+    fn product(&self, b: usize, eta: &mut Vec<f64>) -> Option<MedRuns> {
         let genes = self.bins[b].clone();
         let nb = genes.len();
         let nc = self.rows.ncol;
         // model_pars_final[genes_bin, -1]: (Intercept) and log_umi, column-major nb x 2
         let mut p = vec![0.0f64; nb * 2];
-        for (r, g) in genes.enumerate() {
+        for (r, g) in genes.clone().enumerate() {
             p[r] = self.model_pars_fit[g][1];
             p[r + nb] = self.model_pars_fit[g][2];
         }
         eta.resize(nb * nc, 0.0);
+        let med = self.xreg_med.as_ref().map(|xm| {
+            // correct(): coefs <- model_pars_fit[genes_bin, -1]; mu <- exp(tcrossprod(coefs,
+            // regressor_data)); variance <- mu + mu^2 / theta (mu^2 is mu * mu)
+            tcrossprod_into(&p, nb, 2, xm, nc, 2, eta);
+            let mut runs: MedRuns = vec![Vec::new(); nb];
+            let theta: Vec<f64> = genes.clone().map(|g| self.model_pars_fit[g][0]).collect();
+            let mut last = vec![0u64; nb];
+            for c in 0..nc {
+                for r in 0..nb {
+                    let e = eta[r + c * nb];
+                    if c == 0 || e.to_bits() != last[r] {
+                        let mu = exp(e);
+                        let variance = mu + mu * mu / theta[r];
+                        runs[r].push(MedRun { start: c as u32, mu, sd: variance.sqrt() });
+                        last[r] = e.to_bits();
+                    }
+                }
+            }
+            runs
+        });
         tcrossprod_into(&p, nb, 2, &self.xreg, nc, 2, eta);
+        med
     }
 
     /// The clipped residuals of gene `g`, row `r` of its bin's product `eta` (`nb` rows), into
-    /// `row`; returns their `rowMeans` and `rowVars`.
-    fn gene(&self, eta: &[f64], nb: usize, r: usize, g: usize, counts: &mut [f64], row: &mut [f64]) -> (f64, f64) {
+    /// `row`; returns their `rowMeans` and `rowVars`. With `med` (correcting: the gene's runs of
+    /// `correct()`'s product at the median depth), also the gene's corrected counts into `corr`
+    /// (cell, count; the cells whose rounded value is positive), and how many of its residuals
+    /// lie beyond vst's clip range, or why a corrected value cannot be stored.
+    #[allow(clippy::too_many_arguments)]
+    fn gene(&self, eta: &[f64], nb: usize, r: usize, g: usize, counts: &mut [f64], row: &mut [f64], med: Option<&[MedRun]>, corr: &mut Vec<(u32, u32)>) -> (f64, f64, Result<u64, String>) {
         let nc = self.rows.ncol;
         let (min_var, clip) = (self.min_var, self.res_clip);
         self.rows.dense_row(g, counts);
         let theta = self.model_pars_fit[g][0];
+        corr.clear();
+        let mut beyond = 0u64;
+        let mut bad: Option<String> = None;
+        let mut k = 0usize;
         for c in 0..nc {
             let mu = exp(eta[r + c * nb]);
             // pearson_residual(): model_var <- mu + mu^2 / theta; floored at min_var
@@ -321,6 +407,24 @@ impl<'s> Run<'_, 's> {
                 model_var = min_var;
             }
             let mut v = (counts[c] - mu) / model_var.sqrt();
+            if let Some(runs) = med {
+                // correct() reads the residual before vst clips it
+                if v < clip.0 || v > clip.1 {
+                    beyond += 1;
+                }
+                while k + 1 < runs.len() && runs[k + 1].start as usize <= c {
+                    k += 1;
+                }
+                let m = runs[k];
+                // corrected_data <- mu + pearson_residual * sqrt(variance); round(x, 0), which is
+                // nearbyint(): half to even; negatives to 0; make.sparse() drops the zeros
+                let x = (m.mu + v * m.sd).round_ties_even();
+                if x > 0.0 && x <= u32::MAX as f64 {
+                    corr.push((c as u32, x as u32));
+                } else if !(x <= 0.0) && bad.is_none() {
+                    bad = Some(format!("correct(): gene {} (kept gene {}), cell {}: the corrected value {} is not a count this port stores (finite, at most {})", g + 1, g + 1, c + 1, scio::fmt17(x), u32::MAX));
+                }
+            }
             // clip_matrix_values(y, res_clip_range)
             if v < clip.0 {
                 v = clip.0;
@@ -335,7 +439,10 @@ impl<'s> Run<'_, 's> {
         for &v in row.iter() {
             s = s.add_f64(v);
         }
-        ((s / F80::from_u64(nc as u64)).to_f64(), var_refined(row))
+        ((s / F80::from_u64(nc as u64)).to_f64(), var_refined(row), match bad {
+            Some(e) => Err(e),
+            None => Ok(beyond),
+        })
     }
 
     /// Stores gene `g`'s statistics, and its row if it is among the best so far: the row's slot
@@ -367,11 +474,19 @@ impl<'s> Run<'_, 's> {
 
 /// Stage S2d. `rows` are the kept genes' counts, `threads` the threads sharing each bin's genes.
 pub fn residuals(rows: &GeneRows, input: &ResidualInput, params: &SctParams, keep_y: bool, threads: usize) -> Result<Residuals, SctError> {
-    residuals_in_groups(rows, input, params, keep_y, threads, gene_group(rows.ncol))
+    residuals_in_groups(rows, input, params, keep_y, threads, gene_group(rows.ncol), false).map(|r| r.0)
 }
 
-/// [`residuals`], the threads taking `group` genes at a time.
-fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParams, keep_y: bool, threads: usize, group: usize) -> Result<Residuals, SctError> {
+/// Stage S2d with `correct()` in the same pass (M13): the residuals as [`residuals`] makes them,
+/// and the corrected counts of every kept gene and cell (`do.correct.umi = TRUE`).
+pub fn residuals_corrected(rows: &GeneRows, input: &ResidualInput, params: &SctParams, keep_y: bool, threads: usize) -> Result<(Residuals, Corrected), SctError> {
+    let (r, c) = residuals_in_groups(rows, input, params, keep_y, threads, gene_group(rows.ncol), true)?;
+    Ok((r, c.expect("corrected counts when correcting")))
+}
+
+/// [`residuals`], the threads taking `group` genes at a time; with `correct`, `correct()` too.
+#[allow(clippy::too_many_arguments)]
+fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParams, keep_y: bool, threads: usize, group: usize, correct: bool) -> Result<(Residuals, Option<Corrected>), SctError> {
     let ng = rows.nrow();
     let nc = rows.ncol;
     if input.model_pars_fit.len() != ng || input.log_umi.len() != nc {
@@ -383,6 +498,13 @@ fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParam
     // model.matrix(~ log_umi, cell_attr): (Intercept), log_umi; column-major ncells x 2
     let mut xreg = vec![1.0f64; nc * 2];
     xreg[nc..].copy_from_slice(input.log_umi);
+    // correct(): cell_attr[, latent_var] <- apply(..., 2, function(x) rep(median(x), length(x)))
+    let median_log_umi = if correct && nc > 0 { rcompat::quantile::median(input.log_umi) } else { f64::NAN };
+    let xreg_med = correct.then(|| {
+        let mut x = vec![1.0f64; nc * 2];
+        x[nc..].fill(median_log_umi);
+        x
+    });
     // variable.features.n, or every gene at or above variable.features.rv.th
     let (k_top, threshold) = match params.variable_features_n {
         Some(n) => (n.min(ng), f64::NEG_INFINITY),
@@ -394,7 +516,7 @@ fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParam
     // row per thread. Its pages are touched as rows are written; it becomes scale.data in place.
     let n_slots = k_top.min(ng) + threads;
     let mut slab = vec![0.0f64; n_slots * nc];
-    let (residual_mean, residual_variance, top_features, slot_of_top, all_y) = {
+    let (residual_mean, residual_variance, top_features, slot_of_top, all_y, corr_parts) = {
         let mut slots: Vec<Slot> = Vec::with_capacity(n_slots);
         let mut rest: &mut [f64] = &mut slab;
         for i in 0..n_slots {
@@ -408,6 +530,7 @@ fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParam
             rows,
             model_pars_fit: input.model_pars_fit,
             xreg,
+            xreg_med,
             bins: bins(ng, params.bin_size),
             group: group.max(1),
             min_var,
@@ -424,6 +547,9 @@ fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParam
                 failed: false,
                 residual_mean: vec![0.0f64; ng],
                 residual_variance: vec![0.0f64; ng],
+                corrected: if correct { vec![Vec::new(); ng] } else { Vec::new() },
+                beyond_clip: 0,
+                error: None,
                 heap: BinaryHeap::with_capacity(k_top.min(ng) + 1),
                 kept: HashMap::with_capacity(k_top.min(ng) + 1),
                 free_slots: slots,
@@ -438,13 +564,17 @@ fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParam
             run.work();
         });
         // (a thread's panic has been propagated by the scope)
-        let State { residual_mean, residual_variance, heap, kept, all_y, .. } = run.state.into_inner().unwrap_or_else(|e| e.into_inner());
+        let State { residual_mean, residual_variance, heap, kept, all_y, corrected, beyond_clip, error, .. } = run.state.into_inner().unwrap_or_else(|e| e.into_inner());
+        if let Some(e) = error {
+            return Err(SctError::Input(e));
+        }
+        let corr_parts = (corrected, beyond_clip);
         // the variable features in R's order, and the slot of each one's row
         let mut top: Vec<Cand> = heap.into_vec();
         top.sort_by(|a, b| b.better(a));
         let top_features: Vec<usize> = top.iter().map(|c| c.gene).collect();
         let slot_of_top: Vec<usize> = top_features.iter().map(|g| kept.get(g).expect("a kept row per variable feature").0).collect();
-        (residual_mean, residual_variance, top_features, slot_of_top, all_y)
+        (residual_mean, residual_variance, top_features, slot_of_top, all_y, corr_parts)
     };
     // scale.data in place: the kept rows in R's order, then clipped to +-sqrt(ncells / 30) and
     // (do.center) centred by rowMeans2(na.rm = TRUE), as ScaleData does
@@ -471,7 +601,8 @@ fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParam
             }
         }
     }
-    Ok(Residuals { ncells: nc, min_var, res_clip, clip, residual_mean, residual_variance, top_features, scale_data, y: all_y })
+    let corrected = correct.then(|| Corrected::from_genes(corr_parts.0, nc, median_log_umi, res_clip, corr_parts.1));
+    Ok((Residuals { ncells: nc, min_var, res_clip, clip, residual_mean, residual_variance, top_features, scale_data, y: all_y }, corrected))
 }
 
 /// Reorders the rows of `m` (each `nc` long) in place so that row `k` holds what row `src[k]`
@@ -673,7 +804,7 @@ mod tests {
                 let got = if group == 0 {
                     residuals(&rows, &input, params, keep_y, threads).unwrap()
                 } else {
-                    residuals_in_groups(&rows, &input, params, keep_y, threads, group).unwrap()
+                    residuals_in_groups(&rows, &input, params, keep_y, threads, group, false).unwrap().0
                 };
                 let what = format!("{params:?}, {threads} threads, keep_y {keep_y}, group {group}");
                 assert!(same(&got.residual_mean, &want.residual_mean), "residual_mean: {what}");
@@ -687,6 +818,77 @@ mod tests {
                     _ => panic!("y kept when not asked, or not kept when asked: {what}"),
                 }
             }
+        }
+    }
+
+    /// `correct()` as R writes it: the full unclipped residual matrix, then bin by bin the full
+    /// product at the median depth, every element, then round, negatives to 0, zeros dropped.
+    /// Returns each gene's (cell, count) list, the residuals beyond the clip range and the median.
+    fn reference_corrected(rows: &GeneRows, input: &ResidualInput, params: &SctParams) -> (Vec<Vec<(u32, u32)>>, u64, f64) {
+        let (ng, nc) = (rows.nrow(), rows.ncol);
+        let min_var = min_var(rows, params);
+        let clip = params.res_clip(nc);
+        let mut xreg = vec![1.0f64; nc * 2];
+        xreg[nc..].copy_from_slice(input.log_umi);
+        let med = rcompat::quantile::median(input.log_umi);
+        let mut xmed = vec![1.0f64; nc * 2];
+        xmed[nc..].fill(med);
+        let mut out = vec![Vec::new(); ng];
+        let mut beyond = 0u64;
+        let mut counts = vec![0.0f64; nc];
+        for bin in bins(ng, params.bin_size) {
+            let nb = bin.len();
+            let mut p = vec![0.0f64; nb * 2];
+            for (r, g) in bin.clone().enumerate() {
+                p[r] = input.model_pars_fit[g][1];
+                p[r + nb] = input.model_pars_fit[g][2];
+            }
+            let eta = tcrossprod(&p, nb, 2, &xreg, nc, 2);
+            let eta_med = tcrossprod(&p, nb, 2, &xmed, nc, 2);
+            for (r, g) in bin.enumerate() {
+                rows.dense_row(g, &mut counts);
+                let theta = input.model_pars_fit[g][0];
+                for c in 0..nc {
+                    let mu = exp(eta[r + c * nb]);
+                    let y = (counts[c] - mu) / (mu + mu * mu / theta).max(min_var).sqrt();
+                    beyond += (y < clip.0 || y > clip.1) as u64;
+                    let m = exp(eta_med[r + c * nb]);
+                    let variance = m + m * m / theta;
+                    let mut x = (m + y * variance.sqrt()).round_ties_even();
+                    if x < 0.0 {
+                        x = 0.0;
+                    }
+                    if x != 0.0 {
+                        out[g].push((c as u32, x as u32));
+                    }
+                }
+            }
+        }
+        (out, beyond, med)
+    }
+
+    #[test]
+    fn corrected_counts_match_the_plain_computation_for_any_number_of_threads() {
+        // 43 genes in bins of 4 (a one-gene bin last: R's dgemv route); theta = Inf now and then;
+        // an odd and an even number of cells (R's median: the middle value, or the mean of two)
+        for nc in [61usize, 60] {
+            let (rows, pars, log_umi) = data(43, nc, (5, 29), 11);
+            let input = ResidualInput { model_pars_fit: &pars, log_umi: &log_umi };
+            let params = SctParams { bin_size: 4, variable_features_n: Some(9), ..SctParams::default() };
+            let (want, beyond, med) = reference_corrected(&rows, &input, &params);
+            let want_c = Corrected::from_genes(want.clone(), nc, med, params.res_clip(nc), beyond);
+            assert!(want_c.nnz() > 100 && beyond > 0, "the case exercises corrected counts and residuals beyond the clip range");
+            let plain = residuals(&rows, &input, &params, false, 1).unwrap();
+            for (threads, group) in [1, 2, 3, 7].into_iter().flat_map(|t| [1, 3, 8].map(|g| (t, g))) {
+                let (r, c) = residuals_in_groups(&rows, &input, &params, false, threads, group, true).unwrap();
+                let c = c.unwrap();
+                assert_eq!(c, want_c, "{nc} cells, {threads} threads, group {group}");
+                assert_eq!(c.median_log_umi.to_bits(), med.to_bits());
+                // and the residuals are those of the run without correct()
+                assert!(same(&r.residual_variance, &plain.residual_variance) && same(&r.scale_data, &plain.scale_data) && r.top_features == plain.top_features);
+            }
+            let (_, c) = residuals_corrected(&rows, &input, &params, false, 4).unwrap();
+            assert_eq!(c, want_c);
         }
     }
 

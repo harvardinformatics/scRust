@@ -31,6 +31,13 @@ For the two base objects, `reference/` also holds the stage references M9 and M1
 - `stages/K8_*.npy.gz`: approxSilhouette's width, nearest other cluster, centroids and within-cluster variances;
 - `stages/K9_*.npy.gz`: neighborPurity's per-cell 50th distance, neighbour counts and lists (CSR: `neighbors_ptr`, 1-based `neighbors_idx`), weights, totals, purity and maximum.
 
+Milestone M13 (the corrected counts, K10) adds, from the same portable runs, by [`validation/slurm/fixtures_m13.sh`](../../../validation/slurm/fixtures_m13.sh), what cargo test needs without committing the matrices:
+
+- `reference/k10.tsv`, for all seven objects: the SHA-256 of R's `sct/corrected_counts.mtx.gz` and `sct/log1p_corrected_counts.mtx.gz` data lines (decompressed: the banner, the size line and the entries, each ending in a newline; R's comment lines left out), of `sct_features.tsv.gz` and `sct_cells.tsv.gz` (decompressed), R's own digests of the values (`sct_counts_x_sha256`, `sct_data_x_sha256`), the features and entries, and correct()'s median log_umi and residuals beyond the clip range. `nCount_SCT` and `nFeature_SCT` are in `reference/metadata.tsv.gz`;
+- for the two base objects, R's model for K10 teacher-forced: `reference/stages/vst/model_pars_fit.tsv.gz` and `cell_attr.tsv.gz` (SCTransform.default's result in `scrust sctransform`'s layout) and `reference/stages/K10_genes.npy.gz` (the genes correct() corrects, rows of the counts, 0-based).
+
+`crates/scrust/tests/export.rs` and `crates/cluster/tests/m13_correct.rs` read them, under the runs' kernel (Haswell).
+
 Index conventions are in [`validation/R/lib/clustering_hooks.R`](../../../validation/R/lib/clustering_hooks.R). `.npy` files are NumPy format 1.0, little-endian, Fortran order for matrices; read the `.gz` ones through `scio::gz`.
 
 ## edge/: constructed edge cases for the cluster crate (milestone M10)

@@ -2,6 +2,7 @@
 //! milestone M9): the Annoy forest, every cell's neighbours, `SCT_nn` and `SCT_snn`.
 
 use crate::cli::{self, Args, Phases};
+use scio::manifest::{Input, Manifest, Provenance};
 use neighbors::{parse_dims, parse_number, Metric, NeighborParams};
 use scio::{parse17, Json, Npy, Table};
 use std::path::{Path, PathBuf};
@@ -149,6 +150,31 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     cluster::metadata::carry(&pca, &out).map_err(|e| e.to_string())?;
     phases.mark("write");
 
+    // the manifest (docs/PLAN.md C3f, M13)
+    let mut read: Vec<std::path::PathBuf> = vec![emb.source.clone()];
+    if pca.join(cluster::metadata::FILE).is_file() {
+        read.push(pca.join(cluster::metadata::FILE));
+    }
+    let mut m = Manifest::new(
+        "neighbors",
+        Provenance {
+            scrust_version: env!("CARGO_PKG_VERSION").into(),
+            command_line: cli::command_line("neighbors", argv),
+            command: scio::manifest::canonical_command("neighbors", argv, &["out", "threads", "annoy"], &[]),
+            inputs: vec![Input::digest("pca", &pca, &read.iter().map(|p| p.as_path()).collect::<Vec<_>>()).map_err(|e| e.to_string())?],
+            reproduces: vec![neighbors::REFERENCE.into()],
+            parameters: neighbors::output::params_json(&params),
+            seeds: Json::obj(vec![("Annoy", Json::Str("Kiss64Random's default seed, 1234567890987654321 (Seurat never calls setSeed)".into()))]),
+        },
+    );
+    m.push(Manifest::summary_entry());
+    m.entries.extend(neighbors::output::manifest_entries("", r.n, Some((r.nn.nnz(), r.snn.nnz())), write_annoy, None));
+    if out.join(cluster::metadata::FILE).is_file() {
+        m.push(crate::cmd_sctransform::rna_entry(cluster::metadata::FILE, r.n));
+    }
+    m.fill_shapes(&out).map_err(|e| e.to_string())?;
+    let files = cli::finish_manifest(&out, &mut m, threads)?;
+
     let fingerprint = Json::parse(&crate::fingerprint::json()).unwrap_or(Json::Null);
     let int = |v: usize| Json::Int(v as i64);
     let summary = Json::obj(vec![
@@ -174,6 +200,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
                 ("fingerprint", fingerprint),
             ]),
         ),
+        ("files", files),
     ]);
     write(&out.join("summary.json"), &scio::json::to_file_text(&summary))?;
     eprintln!(

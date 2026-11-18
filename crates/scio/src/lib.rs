@@ -17,12 +17,17 @@
 //! - [`sha256`]: SHA-256, the digest the R scripts record (`digest::digest`);
 //! - [`grade`]: kernel-gated grading, exact or against the R-vs-R floor (M11);
 //! - [`stages`]: stage dumps in the instrumented R runs' layout, read and written (M6, M11);
-//! - [`toml`]: a small TOML reader, for parameter files and the repository's TOML files (M11).
+//! - [`toml`]: a small TOML reader, for parameter files and the repository's TOML files (M11);
+//! - [`manifest`]: the output manifest, `summary.json`'s `files` section, and the naming rules
+//!   that keep normalised data from being read as raw counts (M13);
+//! - [`copy`]: copying files with their checksums (the export's `counts/`, M13).
 
+pub mod copy;
 pub mod deflate;
 pub mod grade;
 pub mod gz;
 pub mod json;
+pub mod manifest;
 pub mod mtx;
 pub mod npy;
 pub mod sha256;

@@ -149,3 +149,28 @@ impl Phases {
 pub fn env_json(name: &str) -> scio::Json {
     std::env::var(name).map(scio::Json::Str).unwrap_or(scio::Json::Null)
 }
+
+/// The command line as given: `scrust`, the subcommand and its arguments.
+pub fn command_line(cmd: &str, argv: &[String]) -> Vec<String> {
+    let mut v = vec!["scrust".to_string(), cmd.to_string()];
+    v.extend(argv.iter().cloned());
+    v
+}
+
+/// The input files' checksums as the normalised matrices' comment lines give them: (SHA-256, the
+/// file's path).
+pub fn input_checksums(inputs: &[scio::manifest::Input]) -> Vec<(String, String)> {
+    inputs.iter().flat_map(|i| i.files.iter().map(move |f| (f.sha256.clone(), std::path::Path::new(&i.path).join(&f.name).display().to_string()))).collect()
+}
+
+/// Fills the manifest's sizes and checksums from the files in `out` and checks that it describes
+/// them (every file listed, every listed file present, the naming rules): `summary.json`'s
+/// `files` section. A problem is a bug, so the command fails.
+pub fn finish_manifest(out: &std::path::Path, m: &mut scio::manifest::Manifest, threads: usize) -> Result<scio::Json, String> {
+    m.fill_digests(out, threads).map_err(|e| e.to_string())?;
+    let problems = m.check(out, false).map_err(|e| e.to_string())?;
+    if !problems.is_empty() {
+        return Err(format!("the output manifest does not describe {}: {}", out.display(), problems.join("; ")));
+    }
+    Ok(m.to_json())
+}

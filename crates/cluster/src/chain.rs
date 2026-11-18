@@ -121,13 +121,15 @@ pub struct NoObserver;
 impl Observer for NoObserver {}
 
 /// What a run keeps beyond the result: every random start's partition (FindClusters), the full
-/// residual matrix (for the `full` stage dumps; small inputs only), and purity's neighbour lists
-/// (for the `standard` and `full` stage dumps).
+/// residual matrix (for the `full` stage dumps; small inputs only), purity's neighbour lists (for
+/// the `standard` and `full` stage dumps), and SCTransform's corrected counts (`correct()`, for
+/// the export; M13), which the observer sees with SCTransform's result.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Options {
     pub keep_partitions: bool,
     pub keep_residuals: bool,
     pub keep_purity_lists: bool,
+    pub correct: bool,
 }
 
 /// Wall-clock seconds of each stage the run made (0 for stages it started after).
@@ -165,7 +167,7 @@ pub fn from_counts(counts: CscMatrix, params: &ChainParams, threads: usize, opts
     let mut rng = RRng::new(params.sct.seed_use.expect("checked"));
     let started = sctransform::start(&counts, &params.sct, &mut rng).map_err(ChainError::Sct)?;
     drop(counts);
-    let mut sct = sctransform::finish(started, &params.sct, &mut rng, opts.keep_residuals, threads).map_err(ChainError::Sct)?;
+    let mut sct = sctransform::finish_with(started, &params.sct, &mut rng, opts.keep_residuals, opts.correct, threads).map_err(ChainError::Sct)?;
     obs.sct(&sct)?;
     let sct_s = t0.elapsed().as_secs_f64();
     obs.phase("sctransform");
