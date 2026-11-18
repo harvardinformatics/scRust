@@ -8,7 +8,7 @@ The implementation is `crates/scio/src/manifest.rs`; `scrust validate manifest -
 
 ## Layout
 
-`summary.json` is one JSON object with three sections: `result` (what was computed; deterministic), `run` (how the run went: timings, memory, the environment fingerprint), and `files`:
+`summary.json` is one JSON object. Every command writes `result` (what was computed; deterministic), `run` (how the run went: timings, memory, the environment fingerprint) and, last, `files`, the manifest; `scrust sctransform`, `pca`, `neighbors` and `cluster` also write `tool`, `reference` and `scrust_version` at the top, and all but `cluster` (whose parameters are in `run`) `parameters`. A reader takes the manifest from `files` and ignores the other members:
 
 ```json
 "files": {
@@ -145,7 +145,7 @@ The scale tells a loader which slot a matrix may go into. Only `raw_counts` is r
 | `pca_stdev` | `pca/stdev.tsv`: pc, stdev | tsv, `pca_stdev` | components (`pc`) |
 | `rng_state` | `pca/random_seed.txt`: R's `.Random.seed` after RunPCA | text | |
 | `knn_index`, `knn_distance` | `neighbors/knn_index.tsv`, `knn_distance.tsv`: barcode, nn_1, ..., nn_k | tsv, `neighbour_indices`, `neighbour_distances` | cells (`barcode`) |
-| `graph_nn`, `graph_snn` | `neighbors/nn.mtx.gz`, `snn.mtx.gz` | matrix_market, `graph_nn`, `graph_snn` | cells (`knn_index.tsv`, `barcode`), both |
+| `graph_nn`, `graph_snn` | `neighbors/nn.mtx.gz`, `snn.mtx.gz` | matrix_market, `graph_nn`, `graph_snn` | cells, both: `metadata.tsv`'s `barcode` in `scrust cluster`'s output (whose `neighbors/` may hold R's graphs without `knn_index.tsv`), `knn_index.tsv`'s in `scrust neighbors`' |
 | `annoy_index` | `neighbors/annoy.ann` (`--annoy yes`) | annoy | |
 | `doublet_calls` | `cells.tsv` (`doubletfinder`): barcode, pANN, classification | tsv | cells (`barcode`) |
 | `doublet_sweep_stats`, `doublet_bcmvn` | `sweep_stats.tsv`, `bcmvn.tsv` (`doubletfinder`) | tsv | |

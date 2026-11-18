@@ -32,7 +32,16 @@ cat <<'EOF'
 #               scanpy's read_10x_mtx in envs/loaders-py.yml), one row per directory (and prefix)
 #   data/doubletfinder/compare/m13_step1_<label>.tsv   scrust doubletfinder with M13's binary
 #               against M6b's and M7's runs, every file byte for byte
-#               (validation/slurm/m13_doubletfinder.sbatch)
+#               (validation/slurm/m13_doubletfinder.sbatch); m13_step1_shared_<label>.tsv: the
+#               objects of both sets, run with M6's options, against M7's runs as well
+#               (validation/slurm/m13_step1_shared.sh)
+#   data/doubletfinder/compare/m11_verdicts_<label>.tsv   Step 1's reports re-graded with M13's
+#               binary (validation/slurm/m11_doubletfinder.sbatch)
+#   data/clustering/compare/m13_unchanged_<label>.tsv, m13_regrade_<label>.tsv   every check of
+#               M12's reports against M13's, M13's own runs and M12's runs re-graded with M13's
+#               binary (validation/slurm/m13_unchanged.sh, m13_regrade.sbatch)
+#   data/clustering/compare/m13_noexport_<label>.tsv   M12's validation runs made again with M13's
+#               binary without --export, every file against M12's (validation/slurm/m13_noexport.sbatch)
 #   data/clustering/m13_kernel_tests/<kernel>/   cargo test under another kernel than the fixtures'
 #               (validation/slurm/m13_kernel_tests.sbatch): cargo_test.txt, results.tsv
 
@@ -62,8 +71,15 @@ for f in data/clustering/*/rust/"$label"/guard/read10x_seurat.tsv data/clusterin
 done
 f=data/doubletfinder/compare/m13_step1_$step1.tsv
 [ -f "$f" ] && entry "$f" check "scrust doubletfinder with M13's binary against M6b's and M7's runs, every file byte for byte"
+f=data/doubletfinder/compare/m13_step1_shared_$step1.tsv
+[ -f "$f" ] && entry "$f" check "scrust doubletfinder with M13's binary on the objects of M6's and M7's sets (run with M6's options) against M7's runs, every file M7's run has byte for byte"
 f=data/doubletfinder/compare/m11_verdicts_$label.tsv
 [ -f "$f" ] && entry "$f" check "Step 1's validation reports re-graded with M13's binary (validation/slurm/m11_doubletfinder.sbatch), check by check"
+for f in data/clustering/compare/m13_unchanged_$label.tsv data/clustering/compare/m13_regrade_$label.tsv; do
+    [ -f "$f" ] && entry "$f" check "every check of M12's scrust validate cluster reports against M13's: $(case $f in *regrade*) echo "M12's runs re-graded with M13's binary" ;; *) echo "M13's own runs" ;; esac), check by check"
+done
+f=data/clustering/compare/m13_noexport_$label.tsv
+[ -f "$f" ] && entry "$f" check "M12's validation runs (portable profile) made again with M13's binary without --export: every file against M12's run byte for byte"
 for f in data/clustering/m13_kernel_tests/*/cargo_test.txt data/clustering/m13_kernel_tests/*/results.tsv; do
     [ -f "$f" ] && entry "$f" check "cargo test --workspace --release under kernel $(basename "$(dirname "$f")")" "$kernel_job"
 done

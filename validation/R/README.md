@@ -100,3 +100,7 @@ The R side of M10's checks of `scrust cluster` (docs/PLAN.md C4, C5 K7, C7; resu
 - [`report_clustering_m10.R`](report_clustering_m10.R) and [`manifest_cluster.R`](manifest_cluster.R): the report's tables (and `docs/validation/clustering_m10.tsv`) and the manifest's FindClusters section (with a `SHA256SUMS` in each reference directory), from plain files.
 
 The C++ programs, in [`../cpp/`](../cpp/): `ModularityOptimizer.patch` (prints each random start's iterations, modularity as `%.17g` and partition; nothing else changes), `javarandom_vectors.cpp` (the optimizer's `JavaRandom`, from Seurat's unmodified source) and `kiss64_vectors.cpp` (RcppAnnoy's `Kiss64Random`, from its installed header). `build.sh` compiles them with the R env's compiler and `R CMD config` flags into `data/clustering/bin/` (gitignored), recording compiler, flags and checksums in `build.json`; nothing is written to the R env.
+
+## The export's guard (milestone M13)
+
+- [`guard_read10x.R`](guard_read10x.R) `<out.tsv> <export dir> <input counts dir> [<sct dir>...]`: Seurat 5.5.1's `Read10X()` on every directory of a `scrust cluster --export` output and of `scrust sctransform --corrected-counts` outputs: it must fail everywhere but the export's `counts/`, which it must read as the input. Reads only plain files; run it through [`../slurm/m13_guard.sbatch`](../slurm/m13_guard.sbatch) in the production R env. Its Python counterpart, scanpy's `read_10x_mtx` with every prefix, is [`../python/guard_read10x.py`](../python/guard_read10x.py), run in `envs/loaders-py.yml`'s env.

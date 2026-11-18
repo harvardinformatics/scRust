@@ -74,7 +74,8 @@ def main():
         f.write("output\tdir\tprefix\texpected\tread\tas_required\tdetail\n")
         for r in rows:
             f.write("\t".join(str(x).replace("\t", " ") for x in r) + "\n")
-    print(f"scanpy {sc.__version__} read_10x_mtx: {'all as required' if ok_all else 'NOT as required'}")
+    from importlib.metadata import version
+    print(f"scanpy {version('scanpy')} (anndata {version('anndata')}) read_10x_mtx: {'all as required' if ok_all else 'NOT as required'}")
     sys.exit(0 if ok_all else 1)
 
 

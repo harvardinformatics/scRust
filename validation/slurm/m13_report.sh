@@ -6,6 +6,7 @@
 # and teacher-forced) and the export. From the repository's top directory:
 #   bash validation/slurm/m13_report.sh <label> > docs/validation/clustering_m13.tsv
 #   bash validation/slurm/m13_report.sh <label> bench > docs/validation/clustering_m13_bench.tsv
+#   bash validation/slurm/m13_report.sh <label> k10 > docs/validation/clustering_m13_k10.tsv
 # The comparisons: one row per comparison: object, tier, profile, reference run, kind (same: the
 # run's own profile; other: the deliberately mismatched kernel), pass, mode, and the checks per
 # status (identical, within floor, differing, missing, n/a, flagged and reported), overall and
@@ -19,6 +20,59 @@
 # (run.phases: the time since the previous phase; R's chain_end and Rust's missing stages empty).
 set -euo pipefail
 label=${1:?label}
+if [ "${2:-}" = k10 ]; then
+    # K10 object by object: one row per object and profile, from the run's summary.json and its
+    # reports: the corrected counts' size, correct()'s median log_umi and residuals beyond the
+    # clip range, and the K10 checks (from the counts, against the saved object, teacher-forced)
+    # by status, in the profile's own comparisons and in the mismatched pair
+    python3 -I - "$label" <<'PY'
+import glob, json, sys
+label = sys.argv[1]
+tiers = {l.split("\t")[0]: l.split("\t")[1] for l in open("validation/clustering_datasets.tsv").read().splitlines()[1:]}
+cols = ["object", "tier", "profile", "cells", "model_genes", "entries", "median_log_umi", "residuals_beyond_clip",
+        "comparisons", "k10_identical", "k10_other", "saved_k10_identical", "saved_k10_other", "teacher_identical", "teacher_other",
+        "mismatched_mode", "mismatched_k10_identical", "mismatched_k10_other", "mismatched_teacher_identical", "mismatched_teacher_mode"]
+print("\t".join(cols))
+for run in sorted(glob.glob(f"data/clustering/*/rust/{label}/*/run/summary.json")):
+    parts = run.split("/")
+    obj, profile = parts[2], parts[5]
+    r = json.load(open(run))["result"]["sctransform"]["corrected"]
+    d = "/".join(parts[:6])
+    same = [f for f in glob.glob(f"{d}/vs_*.json") if "/vs_other_" not in f]
+    other = glob.glob(f"{d}/vs_other_*.json")
+    def count(files, stages, want):
+        n = 0
+        for f in files:
+            for c in json.load(open(f))["checks"]:
+                if c["stage"] in stages and (c["status"] == want) == (want != "other") and (want != "other" or c["status"] != "identical"):
+                    n += 1
+        return n
+    # the saved object's K10 checks: nCount_SCT, nFeature_SCT and the SCT layers (not its labels,
+    # whose column is named SCT_snn_res.*)
+    def k10_saved(files, identical):
+        n = 0
+        for f in files:
+            for c in json.load(open(f))["checks"]:
+                k10 = c["name"] in ("metadata.tsv: nCount_SCT", "metadata.tsv: nFeature_SCT") or \
+                    c["name"].startswith(("sct/", "the corrected counts", "the log1p data", "corrected counts:"))
+                if c["stage"] == "saved" and k10 and (c["status"] == "identical") == identical:
+                    n += 1
+        return n
+    def teacher_mode(files):
+        for f in files:
+            for c in json.load(open(f))["checks"]:
+                if c["stage"] == "K10 teacher" and "kernel" in c["detail"]:
+                    return c["detail"].split("kernel ")[-1]
+        return "-"
+    om = json.load(open(other[0]))["grading"]["mode"] if other else "-"
+    row = [obj, tiers.get(obj, "?"), profile, r["n_cells"], r["n_features"], r["nnz"], r["median_log_umi"], r["residuals_beyond_clip"],
+           len(same), count(same, {"K10"}, "identical"), count(same, {"K10"}, "other"), k10_saved(same, True), k10_saved(same, False),
+           count(same, {"K10 teacher"}, "identical"), count(same, {"K10 teacher"}, "other"),
+           om, count(other, {"K10"}, "identical"), count(other, {"K10"}, "other"), count(other, {"K10 teacher"}, "identical"), teacher_mode(other)]
+    print("\t".join(str(x) for x in row))
+PY
+    exit 0
+fi
 if [ "${2:-}" = bench ]; then
     # run.phases of a summary.json, as name=seconds since the previous phase, in order
     phases() {

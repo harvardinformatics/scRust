@@ -1061,10 +1061,12 @@ M9 and M10 come before M11 for the reason M3 came first in Step 1: the new code 
   - Fallback: the KMKNN port (C6, "Can follow").
 - **Corrected counts near .5:** μ's last bits depend on the OpenBLAS kernel, and rounding can then move a count by one.
   - Mitigation: exact checks under the reference's kernel (A5b) and K10 teacher-forced; the floor (M8) measures how often kernels disagree.
+  - Outcome (M13): K10 identical under the reference's kernel in every comparison of the 34 objects, from the counts and teacher-forced; across kernels too (the mismatched pairs, as M8's floor found): no corrected value crossed a rounding boundary between the Haswell and SapphireRapids kernels.
 - **The loaders follow Seurat's internals** (`SCTAssay`, `SCTModel`), which change between versions.
   - Mitigation: built and tested against Seurat 5.5.1 and SeuratObject 5.4.0 (the pinned env); version checks; comparisons with the saved objects (K11).
 - **The export's size:** the residuals are dense, 1.9 GB as `.npy` for 3,000 × 79,409 doubles.
   - Mitigation: written only with `--export` or `--keep-stages`.
+  - Outcome (M13): an export of a 79,409-cell object takes 2.5 GB: `scale_data.npy` 1.9 GB, the two gzipped layers 88 to 105 MB each, `counts/` 207 to 210 MB. `scale_data.npy` is streamed from the rows in memory, so writing it adds no memory; the export raises the peak RSS by 0.2 GiB on those objects (3.35 GiB at one thread, 3.41 GiB at 32).
 - **Not reproduced:** UMAP (A7b).
 
 ---
