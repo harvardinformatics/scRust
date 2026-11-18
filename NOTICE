@@ -178,6 +178,23 @@ anndata 0.13.4 and scanpy 1.13.0 (BSD-3-Clause: uns["log1p"],
 uns[<key>]["connectivities_key"], var_names_make_unique); no code of theirs is
 copied.
 
+scrust doubletfinder's re-clustering of the singlets (milestone M15,
+crates/scrust/src/cmd_doubletfinder.rs) follows the workflow's doubletfinder.R
+(scRNAseq-preprocessing, workflow/scripts/): after DoubletFinder it clusters the
+singlets with the workflow's chain, and its PCA guard gives the message of
+require_min_cells_for_pca(context = "doubletfinder") (silhouette_utils.R),
+in crates/cluster/src/chain.rs.
+
+The benchmark's harness, validation/benchmark/ (moved there from
+data/benchmarks/scripts/ in milestone M15), runs copies of the workflow's
+tenx2seuratrds.R, soupx.R, emptydrops.R, cellbender2seurat.R, doubletfinder.R
+and silhouette_utils.R (scRNAseq-preprocessing, workflow/scripts/ at ea053fa),
+each with phase-marker lines added and nothing else changed:
+validation/benchmark/workflow/scripts/. make_workflow_copies.py checks that
+removing the markers gives back each source byte for byte, and
+validation/benchmark/workflow/SOURCES.tsv records each source's git blob and
+SHA-256.
+
 Planned, with licensing to be handled when the work starts
 ----------------------------------------------------------
 SoupX 1.6.2                            GPL-2 only. This is incompatible with

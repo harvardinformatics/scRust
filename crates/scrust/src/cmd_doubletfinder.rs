@@ -326,6 +326,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
             metadata: None,
             stats_note: Vec::new(),
         };
+        phases.borrow_mut().mark("clustering: digest");
         std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         let mut w = Writer::new(&dir, c.cells.clone(), threads);
         w.write_stages = false;
@@ -409,7 +410,13 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         };
         let mut p = Phases::new();
         p.mark("load");
-        re_done = Some(cmd_cluster::run_counts(singlets, &rdir, &s, rec, p, Some("doubletfinder")).map_err(|e| format!("re-clustering the singlets: {e}"))?);
+        let d = cmd_cluster::run_counts(singlets, &rdir, &s, rec, p, Some("doubletfinder")).map_err(|e| format!("re-clustering the singlets: {e}"))?;
+        // the re-clustering's own phases, on this command's clock
+        let offset = d.started.saturating_duration_since(phases.started()).as_secs_f64();
+        for (name, t, rss) in &d.phases {
+            phases.marks.push((format!("recluster: {name}"), t + offset, *rss));
+        }
+        re_done = Some(d);
         phases.mark("recluster");
     } else {
         drop(singlets);

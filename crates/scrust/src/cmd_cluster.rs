@@ -298,6 +298,10 @@ pub struct Done {
     pub chain: Chain,
     /// `summary.json`'s `result` section.
     pub result: Json,
+    /// The run's phases (`run.phases`: name, seconds since `started`, peak RSS), for a caller
+    /// that records them on its own clock.
+    pub phases: Vec<(String, f64, Option<u64>)>,
+    pub started: std::time::Instant,
 }
 
 /// The chain from counts in memory, written into `out` as `scrust cluster --counts` writes it: the
@@ -681,5 +685,5 @@ pub fn finish_run(out: &Path, start: &str, s: &Settings, rec: Record, mut w: Wri
         t.purity,
         phases.elapsed()
     );
-    Ok(Done { chain: r, result })
+    Ok(Done { chain: r, result, started: phases.started(), phases: phases.marks })
 }
