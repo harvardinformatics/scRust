@@ -1,0 +1,59 @@
+# scrustio (R): scrust outputs as Seurat and SingleCellExperiment objects
+
+`scrustio` reads the plain files that scRust's command-line tool, `scrust`, writes, and builds the objects R users work with. It finds every file through the manifest in the output's `summary.json` (schema `scrust-files`, version 1: [`docs/output_manifest.md`](../../../docs/output_manifest.md)), by the file's role, never by its name. It puts each matrix only into a slot meant for its scale: the raw counts into the raw-count slots, and SCTransform's corrected counts, their log1p and the residuals only into slots for normalised data (docs/PLAN.md C3g, milestone M14).
+
+## What it builds
+
+| scrust output | `load_seurat()` | `load_sce()` |
+|---|---|---|
+| `scrust cluster --export` | the raw counts in the `RNA` assay's `counts` layer (an `Assay5`); an `SCTAssay` named `SCT`: the corrected counts in `counts`, their log1p in `data`, the residuals in `scale.data` (rows in the SCT assay's gene order, as Seurat keeps them), the variable features and exactly one `SCTModel`, rebuilt as SCTransform makes it; `meta.data` (factors in their levels' order); the `pca` reduction; the `SCT_nn` and `SCT_snn` graphs; identities from `seurat_clusters`; `SCT` the default assay | the `counts` assay; `altExp(sce, "SCT")` with the assays `corrected_counts` and `logcounts` (the model genes), the SCTModel's feature attributes as its `rowData`, its cell attributes as its `colData` and its other slots in `metadata()`; `altExp(sce, "SCT_scale_data")` with the assay `scaledata` (the variable features, in `VariableFeatures()` order); `colData`; `reducedDim(sce, "PCA")` with the loadings as its `"rotation"` attribute (and `"stdev"`, `"total.variance"`); the `colPairs` `SCT_nn` and `SCT_snn` |
+| `scrust sctransform --corrected-counts` | the `SCT` assay alone (this output holds no raw counts), with the counts' per-cell columns | no rows in the main experiment; the SCT data in the altExps |
+| `scrust doubletfinder` | the singlets' raw counts (`singlets/`) in the `RNA` assay; DoubletFinder's calls as metadata columns, named as DoubletFinder names them (`pANN_<pN>_<pK>_<nExp>`, `DF.classifications_<pN>_<pK>_<nExp>`) | the same as `counts` and `colData` |
+
+`add_scrust(object, dir)` adds an output's per-cell columns to an object you already have, matching cells by barcode: `scrust doubletfinder`'s calls (for all the input's cells), or `scrust cluster`'s labels (as factors in their levels' order), silhouette widths and purities.
+
+Seurat names features as `Read10X()` and `CreateSeuratObject()` do (`make.unique()`, then `_` and `|` replaced by `-`), and every list of features of the output is mapped onto the counts' rows; the SingleCellExperiment uses the features file's names, made unique, with the ids, names and types in `rowData`.
+
+**What is not rebuilt** (it is not in a scrust output): the `umap` reduction (scrust does not run RunUMAP, which changes nothing downstream), the `commands` (scrust records its run in `summary.json`), metadata columns of other workflow steps (such as `percent.mt`), and, for objects whose RNA assay was a v3 `Assay` (the workflow's emptyDrops objects, made by `as.Seurat()`), that class: the loader makes the `Assay5` that `CreateSeuratObject()` makes, with the same counts.
+
+**`cells_step1`.** The SCTModel's cell attributes say which cells vst() fitted on in its first step: all of them up to 5,000 cells (`ncells`), else 5,000 drawn with R's `sample()` right after SCTransform's `set.seed()`. The export records the seed and the number, and the loader makes the same draw with R's own `sample()`, saving and restoring your random-number state.
+
+## Install
+
+Into a library of your choice (scRust's validation installs it into the repository's `.rlib/`, never into the R env it tests with):
+
+```bash
+R CMD INSTALL --library=<library> loaders/R/scrustio
+```
+
+It needs `Matrix` and `jsonlite`; `Seurat` (5.5.1) and `SeuratObject` (5.4.0) for `load_seurat()`, and `SingleCellExperiment`, `SummarizedExperiment` and `S4Vectors` for `load_sce()`. It builds Seurat 5.5.1's and SeuratObject 5.4.0's classes and is tested with them; with other versions it warns and carries on.
+
+## Use
+
+```r
+library(scrustio)
+obj <- load_seurat("export")               # a Seurat object
+sce <- load_sce("export")                  # a SingleCellExperiment
+m <- read_manifest("export")               # the manifest: files by role (manifest_entries(m, "sct_counts"))
+obj <- load_seurat("export", check_sha256 = TRUE)   # check every file's SHA-256 first
+```
+
+As one line, writing `.rds`:
+
+```bash
+Rscript -e 'scrustio::save_rds("export", "object.rds")'
+```
+
+```bash
+Rscript -e 'scrustio::save_rds("export", "sce.rds", object = "sce")'
+```
+
+(with `R_LIBS=<library>` if it is not on R's library path).
+
+## The rule, enforced
+
+`slot_table()` lists the slots the loaders fill from matrix files, each with the one role, scale and format it takes. `read_for_slot()` refuses a file of any other role, scale or format, a file whose Matrix Market comment lines say "NOT raw counts" for a raw-count slot, and an unmarked file for a slot of SCTransform's layers. `read_manifest()` refuses another schema or version, a listed file that is missing or has another size (or, with `check_sha256 = TRUE`, another SHA-256), and a path outside the output; the identifiers of each matrix's rows and columns are checked against its shape.
+
+## Tests
+
+`tests/scrustio_tests.R` (in the R env, through sbatch on Cannon: `validation/slurm/m14_tests.sbatch`) makes outputs with the `scrust` binary from the committed fixtures and checks: every wrong combination of role, scale and format for every slot is refused; tampered manifests are refused; the manifest's rules; the objects' layout; FindMarkers on the Seurat object; the other commands' outputs; `add_scrust()`; and that `save_rds()`'s `.rds` reloads into the loader's object. Milestone M14's validation compares the objects with the saved workflow objects (docs/validation/clustering.md, "M14").

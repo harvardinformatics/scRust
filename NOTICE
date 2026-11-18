@@ -149,6 +149,35 @@ crates/sctransform and crates/cluster (milestone M13) port:
   (SeuratObject 5.4.0's .CalcN), in crates/sctransform/src/correct.rs and
   crates/cluster/src/chain_output.rs.
 
+The loaders, loaders/R/scrustio and loaders/python/scrustio (milestone M14),
+adapt:
+
+- Seurat 5.5.1 (MIT): PrepVSTResults() (R/objects.R), the SCTModel's feature
+  and cell attributes as it assembles them from vst()'s result, in
+  loaders/R/scrustio/R/sctmodel.R and loaders/python/scrustio/scrustio/
+  sctmodel.py; SCTransform.Assay's and SCTransform.Seurat's assembly of the SCT
+  assay (R/preprocessing.R: CreateAssayObject() on the corrected counts, the
+  variable features, the data and scale.data layers, the SCTAssay class and its
+  assay.orig), RunPCA.default's reduction (R/dimensional_reduction.R) and
+  FindClusters.Seurat's identities (R/clustering.R), which
+  loaders/R/scrustio/R/seurat.R makes with SeuratObject's and Seurat's own
+  functions.
+- SeuratObject 5.4.0 (MIT): CheckFeaturesNames()'s renaming of features
+  (R/utils.R), with Read10X()'s make.unique(), in loaders/R/scrustio/R/names.R.
+- sctransform 0.4.3 (Christoph Hafemeister and Saket Choudhary, GPL-3): the
+  arguments vst() records (R/vst.R: its arguments with Seurat's values, and
+  set_min_var) and its step-1 cells (sample(colnames(umi), n_cells) right
+  after SCTransform's set.seed()), in sctmodel.R and sctmodel.py.
+- The workflow's find_markers.R and combine_markers.R (scRNAseq-preprocessing,
+  workflow/scripts/), copied with their source cited into
+  validation/R/markers_from_loader.R, as M8's markers_clustering.R copies them.
+
+The loaders fill the classes of SingleCellExperiment 1.32.0 (Davide Risso and
+Aaron Lun, GPL-3: altExps, reducedDims, colPairs) and follow the conventions of
+anndata 0.13.4 and scanpy 1.13.0 (BSD-3-Clause: uns["log1p"],
+uns[<key>]["connectivities_key"], var_names_make_unique); no code of theirs is
+copied.
+
 Planned, with licensing to be handled when the work starts
 ----------------------------------------------------------
 SoupX 1.6.2                            GPL-2 only. This is incompatible with

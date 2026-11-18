@@ -5,6 +5,8 @@
 # Project-local toolchain, envs and caches (env.sh keeps everything inside the repo)
 /.cargo-home/
 /.envs/
+# The R loader's library (loaders/R/scrustio is installed here, never into the R env; M14)
+/.rlib/
 
 # Large fixtures and downloaded upstream sources (tracked through validation/manifest.toml)
 /data/

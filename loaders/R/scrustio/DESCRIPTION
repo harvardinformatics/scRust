@@ -1,0 +1,20 @@
+Package: scrustio
+Type: Package
+Title: Load scrust Outputs into Seurat and SingleCellExperiment Objects
+Version: 0.1.0
+Author: scRust contributors
+Maintainer: scRust contributors <scrust-maintainers@example.org>
+Description: Reads the plain files that scRust's command-line tool (scrust)
+    writes, through the manifest in each output's summary.json (schema
+    scrust-files, version 1), and builds Seurat 5.5.1 objects (with an SCT
+    assay and its SCTModel as SCTransform makes them) and SingleCellExperiment
+    objects. Each matrix goes only into a slot meant for its scale: the raw
+    counts into the raw-count slots, SCTransform's corrected counts, their log1p
+    and the residuals only into slots for normalised data.
+License: GPL-3
+URL: https://github.com/harvardinformatics/scRust
+Encoding: UTF-8
+Depends: R (>= 4.5.0)
+Imports: methods, utils, tools, stats, Matrix, jsonlite
+Suggests: Seurat (>= 5.5.1), SeuratObject (>= 5.4.0), SingleCellExperiment,
+    SummarizedExperiment, S4Vectors

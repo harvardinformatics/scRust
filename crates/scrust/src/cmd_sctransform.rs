@@ -23,7 +23,7 @@ pub fn readme_intro() -> Vec<String> {
     vec![
         "These files hold SCTransform's model and normalised data as Seurat 5.5.1's SCTransform() makes them (sctransform 0.4.3, glmGamPoi 1.22.0), computed by scrust. NONE OF THE MATRICES HERE ARE RAW COUNTS. The corrected counts are integers, corrected to the median sequencing depth by sctransform's correct(): read as raw counts, they would be taken for counts without complaint. For that reason no file here has a name a 10x reader looks for (matrix.mtx, barcodes.tsv, features.tsv, genes.tsv), and each matrix says what it holds in its comment lines.".into(),
         "summary.json lists every file (its files section): its role, its scale (raw_counts, corrected_counts, log1p_corrected_counts, residuals, ...), its shape, where its row and column names are, its size and SHA-256, and how the output was made. The schema is described in docs/output_manifest.md of the scRust repository.".into(),
-        "Loaders that build Seurat, SingleCellExperiment and AnnData objects from these files, each layer in a slot meant for its scale, are coming (scRust milestone M14, loaders/). Until then, each file below loads with standard readers, as shown.".into(),
+        "scRust's loaders (loaders/ in the scRust repository) build objects from these files, each layer in a slot meant for its scale, through the manifest: in R, scrustio::load_seurat(\"<this directory>\") (the SCT assay with its SCTModel) and scrustio::load_sce(); in Python, scrustio.load_anndata(\"<this directory>\"). Each file below also loads with standard readers, as shown.".into(),
     ]
 }
 

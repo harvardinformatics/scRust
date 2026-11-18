@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scrustio"
+version = "0.1.0"
+description = "Load scrust outputs (scRust) into AnnData objects, each matrix in a slot meant for its scale"
+readme = "README.md"
+license = "GPL-3.0-only"
+requires-python = ">=3.10"
+dependencies = ["numpy", "scipy", "pandas", "anndata"]
+
+[project.urls]
+Repository = "https://github.com/harvardinformatics/scRust"
+
+[project.scripts]
+scrustio = "scrustio.cli:main"
+
+[tool.setuptools]
+packages = ["scrustio"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
