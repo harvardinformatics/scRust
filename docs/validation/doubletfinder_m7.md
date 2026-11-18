@@ -340,3 +340,21 @@ env -u R_LIBS_USER -u R_LIBS_SITE -u R_LIBS -u PERL5LIB PYTHONNOUSERSITE=1 "$R_E
 The manifest: `validation/R/manifest_doubletfinder.R`, in a batch job (13 minutes). The SLURM logs of every M7 job, and the batch scripts of the report and the manifest, are in `data/doubletfinder/logs/m7/`.
 
 **A fresh clone** of the branch (commit 23e5321) passes `cargo test --workspace`: 160 tests, no warnings (job 60176266). Its release binary is byte-identical to `scrust-m7-b8c8a8c` when it is built against the same conda env path. The build scripts record `$CONDA_PREFIX/lib` as the binary's rpath, so a clone whose `.envs/rust-dev` lies at another path embeds that path instead. That changes the file's bytes, and its size by the path's length, but not the code.
+
+## Update, 17 November 2026: zmaysGSM5552419's rerun
+
+Sample zmaysGSM5552419's Cell Ranger output was redone on 16 November. On 17 November the workflow rebuilt the sample's 28 objects: Snakemake run `2026-11-17T092949.576075`. The data did not change.
+
+- **Cell Ranger.** Both runs read the same reads, SRR15686125 to SRR15686132: the first read of every lane, in files last changed on 10 March. One run is that of 10 March, kept as `cellranger_count/zmays/deprecated/wrongdatapath_GSM5552419`; the other is that of 16 November.
+  - The raw matrices and `metrics_summary.csv` are byte-identical (2,676 cells, 542,055,474 reads).
+  - The filtered matrices hold identical contents; their gzip files differ only in the time stamp in their headers.
+- **The workflow.** All 28 objects' logged optimizer numbers are unchanged: nodes, edges, maximum modularity, communities.
+- **DoubletFinder.** The five objects were exported again from the rerun's saved files. All 50 data files equal M7's exports, byte for byte; the export records differ only in the checksum and size they record for each rewritten `.rds` file.
+  - `scrust doubletfinder`, built from `main` at b44015a (label `zmays-b44015a`), passed all 45 checks against the rerun's saved outputs.
+  - Its outputs equal M7's runs (label `m7-b8c8a8c`): 30 of 30 files and 5 of 5 result sections.
+
+So M7's exports and results stand, and M17 may reuse the exports. The manifest's source checksums remain those of the `.rds` files of 8 November. The rerun's exports and runs were deleted after the comparison; its logs and checks are in `data/doubletfinder/logs/zmays_refresh/`.
+
+The panel tables now name the rerun's jobs:
+- the five rows of `validation/doubletfinder_panel.tsv` come from `doubletfinder_panel.sh` run on the rerun's log alone, in place of the old rows;
+- `validation/clustering_panel.tsv` comes from `clustering_panel.R` on the two logs of rerun #2 plus the rerun's (see [clustering_m8.md](clustering_m8.md)'s note of the same date).

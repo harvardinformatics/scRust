@@ -6,6 +6,9 @@
 #
 # For M8, the two Snakemake runs of the workflow's rerun #2 (8 and 9 November 2026):
 #   .snakemake/log/2026-11-08T214133.605174.snakemake.log .snakemake/log/2026-11-09T220250.045638.snakemake.log
+# Since 17 November 2026, also zmaysGSM5552419's rerun, whose jobs supersede that sample's
+# earlier ones (docs/validation/doubletfinder_m7.md, "Update, 17 November 2026"):
+#   .snakemake/log/2026-11-17T092949.576075.snakemake.log
 #
 # It reads the pipeline repo's Snakemake logs, samplesheet, config and job logs (read-only), the
 # saved objects' modification times (no .rds is opened), and queries sacct and scontrol, so a
