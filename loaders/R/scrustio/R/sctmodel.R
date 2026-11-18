@@ -37,14 +37,29 @@
 # cells and overdispersed, with probabilities from the density of their log10 geometric means.
 # The export lists those genes in that order (sct_model_pars), so the gene draw is made too, with
 # sctransform's own row_gmean() and row_var(), and must give that list; a different set of cells
-# would not. It needs no file the export does not have, and only sctransform, which Seurat
-# imports (load_sce() without sctransform installed skips it).
-.cells_step1 <- function(m, cells, counts = NULL, tabs = NULL) {
+# would not. It needs no file the export does not have.
+#
+# The gene draw is weighted, so a last-bit change in its inputs can change it: in sctransform's
+# internal functions, in R's density() (R 4.4.0 changed its values by about 0.1%) or in the C
+# library's log() and exp(). So the check runs, and refuses an output whose list differs, only
+# with the versions it mirrors and was validated with (`tested`: R 4.5.3, sctransform 0.4.3, on
+# Linux). Otherwise, as without sctransform, the cells are drawn without it (the draw needs only
+# R's sample()) and one warning says why.
+.cells_step1 <- function(m, cells, counts = NULL, tabs = NULL, tested = .STEP1_TESTED) {
   s <- .step1_settings(m, length(cells))
   if (s$n_cells >= length(cells)) return(rep(TRUE, length(cells)))
   if (is.null(s$seed)) stop("scrustio: the manifest does not give SCTransform's seed", call. = FALSE)
-  # (loading sctransform's namespace may not touch the caller's generator either)
-  st <- if (!is.null(counts) && !is.null(tabs)) .keep_rng(.step1_gene_stats(counts, tabs$gene_names)) else NULL
+  st <- NULL
+  if (!is.null(counts) && !is.null(tabs)) {
+    # (loading sctransform's namespace may not touch the caller's generator either)
+    why <- .keep_rng(.step1_check_skip(tested))
+    if (is.null(why)) {
+      st <- .keep_rng(.step1_gene_stats(counts, tabs$gene_names))
+    } else {
+      warning("scrustio: the SCTModel's cells_step1 was drawn again without its check against the output's step-1 genes: ",
+              why, call. = FALSE)
+    }
+  }
   if (!is.null(st) && is.null(s$min_cells)) stop("scrustio: the manifest does not give vst's min_cells", call. = FALSE)
   drawn <- .with_seed(s$seed, {
     chosen <- sample(x = cells, size = s$n_cells)
@@ -85,12 +100,29 @@
   list(n_cells = n_cells, seed = seed, n_genes = n_genes, min_cells = one(par$min_cells))
 }
 
+# The versions the self-check mirrors and was validated with (M14: K11, K13, M17).
+.STEP1_TESTED <- c(R = "4.5.3", sctransform = "0.4.3", os = "linux")
+
+# Why the self-check cannot run in this session (NULL when it can): sctransform is not installed,
+# or R, sctransform or the operating system is not the one in `tested`.
+.step1_check_skip <- function(tested = .STEP1_TESTED) {
+  if (!requireNamespace("sctransform", quietly = TRUE)) return("sctransform is not installed")
+  have <- c(R = as.character(getRversion()), sctransform = as.character(utils::packageVersion("sctransform")),
+            os = tolower(Sys.info()[["sysname"]]))
+  got <- unname(have[names(tested)])
+  differ <- names(tested)[is.na(got) | got != tested]
+  if (length(differ) == 0) return(NULL)
+  paste0("the check is made only under ", paste(names(tested), tested, collapse = ", "),
+         " (what it mirrors and was validated with), and this session has ",
+         paste(differ, have[differ], collapse = ", "))
+}
+
 # vst()'s per-gene statistics over all cells (vst.R: 199-207, 242-246): log10 of the geometric
 # mean (row_gmean, eps 1) and whether the variance exceeds the mean (row_var, rowMeans), for the
 # model's genes, which are the raw counts' genes vst kept, in their order. sctransform's own
-# functions, row by row, so on the whole matrix they give vst's values on umi[genes, ].
+# functions, row by row, so on the whole matrix they give vst's values on umi[genes, ]. Called
+# only when .step1_check_skip() finds nothing.
 .step1_gene_stats <- function(counts, genes) {
-  if (!requireNamespace("sctransform", quietly = TRUE)) return(NULL)
   idx <- match(genes, rownames(counts))
   if (anyNA(idx) || is.unsorted(idx, strictly = TRUE)) {
     stop("scrustio: the model's genes (gene_attr) are not the raw counts' genes in their order", call. = FALSE)

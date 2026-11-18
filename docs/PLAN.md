@@ -882,6 +882,7 @@ The `knn` crate doesn't replace Annoy: Annoy's search is approximate, and Seurat
   - The draw does not depend on the caller's session: R's default generator kinds are set for it, and the caller's kinds and `.Random.seed` are restored afterwards (removed again if there was none).
   - K11 compares `cells_step1` on its own with every saved object (every cell on tier T, the draw on the six tier-P objects above 5,000 cells), and M17's comparison includes it.
   - A self-check is added only if it is cheap and needs no new file. There is one: vst's next draw, from the same stream, picks the step-1 genes the export lists in sampling order (`sct_model_pars`). The loader makes that draw too, from the raw counts with sctransform's own functions, and refuses the output if the list differs.
+  - The check must never make the loader unusable. It runs, and can refuse, only under what it mirrors and was validated with: R 4.5.3, sctransform 0.4.3, on Linux. The weighted draw depends on sctransform's internals, R's `density()` (changed in R 4.4.0) and the C library's `log()` and `exp()`. Elsewhere the cells are drawn without it, with one warning.
   - The R package's README and the report say so.
 
   The SingleCellExperiment carries the same `cells_step1` (the model's cell attributes in `altExp(sce, "SCT")`'s `colData`). The Python loader does not reproduce R's generator and leaves `cells_step1` out above 5,000 cells.

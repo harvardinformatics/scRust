@@ -280,6 +280,41 @@ refuses(load_seurat(d), "seeds differ", "cells_step1: the manifest's two records
 d <- copy_output(drawn, "step1_n")
 tamper_line(d, c("\"result\": {", "\"sctransform\": {"), "n_cells_step1", "101")
 refuses(load_seurat(d), "n_cells_step1 \\(101\\) is not min\\(ncells, cells\\) = 100", "cells_step1: the summary's n_cells_step1 must be min(ncells, cells)")
+# The check runs only under the versions it mirrors (`tested`, injectable as .check_versions()'s
+# is); with others the cells are drawn without it, with one warning, and nothing is refused.
+check(is.null(scrustio:::.step1_check_skip()), "cells_step1: this session has the versions the check mirrors (R, sctransform, Linux)")
+why <- scrustio:::.step1_check_skip(c(R = "4.3.0", sctransform = "0.4.3", os = "linux"))
+check(!is.null(why) && grepl(paste("this session has R", getRversion()), why, fixed = TRUE), "cells_step1: another R skips the check, saying so")
+other <- c(R = as.character(getRversion()), sctransform = "0.0.1", os = "linux")
+m_d <- read_manifest(drawn)
+feat_d <- scrustio:::.counts_features(m_d)
+cells_d <- scrustio:::.cells_of(m_d)
+cnt_d <- read_for_slot(m_d, "raw_counts", "Seurat RNA counts")
+rownames(cnt_d) <- feat_d$seurat
+# .cells_step1() under `other` versions, from a known generator state: its result, its warnings and
+# whether the state is as before
+skip_run <- function(m, tabs) {
+  suppressWarnings(RNGkind("Mersenne-Twister", "Inversion", "Rejection"))
+  set.seed(4)
+  before <- get(".Random.seed", envir = globalenv())
+  kind <- RNGkind()
+  warns <- character()
+  x <- withCallingHandlers(scrustio:::.cells_step1(m, cells_d, cnt_d, tabs, tested = other), warning = function(w) {
+    warns <<- c(warns, conditionMessage(w))
+    invokeRestart("muffleWarning")
+  })
+  list(step1 = x, warns = warns, kept = identical(get(".Random.seed", envir = globalenv()), before) && identical(RNGkind(), kind))
+}
+k1 <- skip_run(m_d, scrustio:::.sct_tables(m_d, feat_d))
+check(identical(k1$step1, r1$step1), "cells_step1 under other versions: the same cells, drawn without the check")
+check(length(k1$warns) == 1 && grepl("without its check.*this session has sctransform", k1$warns),
+      "cells_step1 under other versions: one warning, saying why")
+check(k1$kept, "cells_step1 under other versions: the caller's generator state restored")
+m_s <- read_manifest(file.path(tmp, "step1_swapped"))
+k2 <- skip_run(m_s, scrustio:::.sct_tables(m_s, scrustio:::.counts_features(m_s)))
+check(identical(k2$step1, r1$step1) && length(k2$warns) == 1,
+      "cells_step1 under other versions: an output the check would refuse loads, with one warning")
+suppressWarnings(RNGkind("default", "default", "default"))
 
 # 4. SingleCellExperiment ----------------------------------------------------------------------------
 sce <- load_sce(export)

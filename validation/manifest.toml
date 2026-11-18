@@ -12746,8 +12746,8 @@ note = "K11, Python loader (production export): compare_anndata.json"
 dataset = "soupx_tenx_test"
 
 [[file]]
-path = "data/clustering/m14/cargo_tests/61888985/results.tsv"
-sha256 = "e575f4c37ac10a4d3718aae10a4244aeb470a6f34e20258a9f185aaa58fed1ac"
+path = "data/clustering/m14/cargo_tests/61892170/results.tsv"
+sha256 = "d579c3c2d47f7f609c83755f1ff43299d18dd3a03f457eb302161777c7aed360"
 bytes = 25977
 tool = "clustering"
 role = "check"
@@ -12755,8 +12755,8 @@ milestone = "M14"
 note = "cargo test --workspace, debug and release, every test's outcome"
 
 [[file]]
-path = "data/clustering/m14/tests/61878765/r.log"
-sha256 = "e91b736378e8a8274bfd1dac0517540fffe0cc684b40dc5d1f8ab4c1840753c2"
+path = "data/clustering/m14/tests/61892168/r.log"
+sha256 = "210ab3560fd902657060677597e107a83567e572a883072b84c4931403626bdf"
 bytes = 116
 tool = "clustering"
 role = "check"
@@ -12764,9 +12764,9 @@ milestone = "M14"
 note = "the loaders' own tests: r"
 
 [[file]]
-path = "data/clustering/m14/tests/61878765/python.log"
-sha256 = "a544c0135f67b599ff94e0f34e592ff43dff2430324fd7821f2f98db797ec850"
-bytes = 100
+path = "data/clustering/m14/tests/61892168/python.log"
+sha256 = "e172accf1aad6ee365e1e4a5345f14373ac5f90ba92d53e3cb8af324efe1b987"
+bytes = 99
 tool = "clustering"
 role = "check"
 milestone = "M14"
