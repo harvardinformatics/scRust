@@ -57,6 +57,7 @@ load_seurat <- function(dir, check_sha256 = FALSE) {
   feat <- .counts_features(m)
   cells <- .cells_of(m)
   obj <- NULL
+  counts <- NULL
   if (.has_role(m, "raw_counts")) {
     counts <- read_for_slot(m, "raw_counts", "Seurat RNA counts")
     if (!identical(colnames(counts), cells)) stop("scrustio: the raw counts' cells differ from the output's", call. = FALSE)
@@ -64,7 +65,7 @@ load_seurat <- function(dir, check_sha256 = FALSE) {
     obj <- SeuratObject::CreateSeuratObject(counts = counts)
   }
   if (.has_role(m, "sct_counts")) {
-    sct <- .sct_assay(m, feat, cells)
+    sct <- .sct_assay(m, feat, cells, counts)
     if (is.null(obj)) {
       obj <- SeuratObject::CreateSeuratObject(counts = sct, assay = "SCT")
     } else {
@@ -96,8 +97,8 @@ load_seurat <- function(dir, check_sha256 = FALSE) {
 # The SCT assay: CreateAssayObject() on the corrected counts, VariableFeatures, the data and
 # scale.data layers set as SCTransform.Assay sets them (SetAssayData() keeps scale.data's rows in
 # the assay's gene order), and the one SCTModel; the class and assay.orig as SCTransform.Seurat
-# leaves them.
-.sct_assay <- function(m, feat, cells) {
+# leaves them. `counts`: the raw counts, when the output holds them (the model's step-1 check).
+.sct_assay <- function(m, feat, cells, counts = NULL) {
   tabs <- .sct_tables(m, feat)
   sct_names_written <- .identifiers(m, .entry(m, "sct_counts")$rows)
   if (!identical(sct_names_written, tabs$gene_attr$name)) {
@@ -125,7 +126,7 @@ load_seurat <- function(dir, check_sha256 = FALSE) {
   SeuratObject::VariableFeatures(assay) <- vf_names
   assay <- SeuratObject::SetAssayData(assay, layer = "data", new.data = dd)
   assay <- SeuratObject::SetAssayData(assay, layer = "scale.data", new.data = sd)
-  model <- .sct_model(m, tabs, cells)
+  model <- .sct_model(m, tabs, cells, counts)
   methods::new(methods::getClass("SCTAssay", where = asNamespace("Seurat")), assay,
                SCTModel.list = list(model1 = model), assay.orig = "RNA")
 }

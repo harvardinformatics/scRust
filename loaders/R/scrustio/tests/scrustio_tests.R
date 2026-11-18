@@ -208,6 +208,79 @@ check(identical(readRDS(f), obj) && identical(x, obj), "save_rds: the .rds reloa
 w <- tryCatch({ scrustio:::.check_versions(c(Seurat = "0.0.1")); NULL }, warning = function(w) conditionMessage(w))
 check(!is.null(w) && grepl("untested", w), "another Seurat version warns")
 
+# 3b. The SCTModel's cells_step1: every cell up to ncells; above it, drawn again from the
+# manifest's seed and ncells and checked against the step-1 genes the export lists; the caller's
+# random-number state left as it was --------------------------------------------------------------
+check(all(obj[["SCT"]]@SCTModel.list[[1]]@cell.attributes$cells_step1), "cells_step1: every cell when there are at most ncells")
+drawn <- file.path(tmp, "export_ncells100")
+run("cluster", "--counts", counts_in, "--preset", "workflow", "--ncells", "100", "--export", "--dump-stages", "light",
+    "--out", drawn, "--threads", "2")
+rust_step1 <- scrustio:::.read_npy(file.path(drawn, "stages", "S2a_cells_step1.npy")) + 1L
+# loads drawn's Seurat object after setup(); the cells_step1 it rebuilds, and whether the caller's
+# generator kinds and .Random.seed (or its absence) are as before, with no warning
+rng_kept <- function(setup) {
+  setup()
+  env <- globalenv()
+  had <- exists(".Random.seed", envir = env, inherits = FALSE)
+  before <- if (had) get(".Random.seed", envir = env) else NULL
+  kind <- RNGkind()
+  warned <- FALSE
+  o <- withCallingHandlers(load_seurat(drawn), warning = function(w) {
+    warned <<- TRUE
+    invokeRestart("muffleWarning")
+  })
+  has <- exists(".Random.seed", envir = env, inherits = FALSE)
+  kept <- identical(RNGkind(), kind) && identical(has, had) && (!had || identical(get(".Random.seed", envir = env), before))
+  list(step1 = o[["SCT"]]@SCTModel.list[[1]]@cell.attributes$cells_step1, kept = kept && !warned)
+}
+r1 <- rng_kept(function() { suppressWarnings(RNGkind("Mersenne-Twister", "Inversion", "Rejection")); set.seed(1) })
+check(sum(r1$step1) == 100 && identical(which(r1$step1), sort(as.integer(rust_step1))),
+      "cells_step1: the 100 cells scrust drew (its own record, stages/S2a_cells_step1.npy)")
+check(r1$kept, "cells_step1: the caller's generator state is restored (R's default kinds)")
+r2 <- rng_kept(function() { suppressWarnings(RNGkind("L'Ecuyer-CMRG", "Box-Muller", "Rounding")); set.seed(2) })
+check(identical(r2$step1, r1$step1), "cells_step1: the same draw whatever the caller's generator kinds")
+check(r2$kept, "cells_step1: the caller's generator kinds and state are restored (L'Ecuyer-CMRG, Box-Muller, Rounding)")
+r3 <- rng_kept(function() {
+  suppressWarnings(RNGkind("default", "default", "default"))
+  if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) rm(".Random.seed", envir = globalenv())
+})
+check(identical(r3$step1, r1$step1) && r3$kept, "cells_step1: no .Random.seed before the load, none after")
+suppressWarnings(RNGkind("default", "default", "default"))
+check(identical(as.data.frame(colData(altExp(load_sce(drawn), "SCT")))$cells_step1, r1$step1),
+      "cells_step1: the same in the SingleCellExperiment's altExp SCT")
+check(identical(load_seurat(drawn)[["SCT"]]@SCTModel.list[[1]]@cell.attributes[, c("umi", "log_umi")],
+                obj[["SCT"]]@SCTModel.list[[1]]@cell.attributes[, c("umi", "log_umi")]),
+      "cells_step1: the other cell attributes as without the draw")
+# the self-check: two of the listed step-1 genes swapped (the file's size unchanged)
+d <- copy_output(drawn, "step1_swapped")
+f <- file.path(d, "sct", "model_pars.tsv")
+x <- readLines(f)
+k <- which(!startsWith(x, "#"))[2:3]
+x[k] <- x[rev(k)]
+writeLines(x, f)
+refuses(load_seurat(d), "cells_step1 cannot be rebuilt", "cells_step1: a draw that does not give the listed step-1 genes is refused")
+refuses(load_sce(d), "cells_step1 cannot be rebuilt", "cells_step1: the SingleCellExperiment refuses it too")
+# another seed, in both places the manifest records it: another draw, which the check catches
+tamper_line <- function(dir, anchors, field, value) {
+  f <- file.path(dir, "summary.json")
+  txt <- readLines(f)
+  k <- 0L
+  for (a in anchors) k <- k + match(TRUE, grepl(a, txt[(k + 1):length(txt)], fixed = TRUE))
+  j <- k + match(TRUE, grepl(paste0("\"", field, "\": "), txt[(k + 1):length(txt)], fixed = TRUE))
+  txt[j] <- sub(paste0("(\"", field, "\": )[^,]*"), paste0("\\1", value), txt[j])
+  writeLines(txt, f)
+}
+d <- copy_output(drawn, "step1_seed")
+tamper_line(d, c("\"files\": {", "\"provenance\": {", "\"sctransform\": {"), "seed_use", "12346")
+tamper_line(d, c("\"files\": {", "\"provenance\": {", "\"seeds\": {"), "SCTransform seed.use", "12346")
+refuses(load_seurat(d), "cells_step1 cannot be rebuilt", "cells_step1: a draw from another seed is caught by the check")
+d <- copy_output(drawn, "step1_seeds_differ")
+tamper_line(d, c("\"files\": {", "\"provenance\": {", "\"seeds\": {"), "SCTransform seed.use", "12346")
+refuses(load_seurat(d), "seeds differ", "cells_step1: the manifest's two records of the seed must agree")
+d <- copy_output(drawn, "step1_n")
+tamper_line(d, c("\"result\": {", "\"sctransform\": {"), "n_cells_step1", "101")
+refuses(load_seurat(d), "n_cells_step1 \\(101\\) is not min\\(ncells, cells\\) = 100", "cells_step1: the summary's n_cells_step1 must be min(ncells, cells)")
+
 # 4. SingleCellExperiment ----------------------------------------------------------------------------
 sce <- load_sce(export)
 check(identical(assay(sce, "counts"), cnt), "SCE counts: the raw counts")

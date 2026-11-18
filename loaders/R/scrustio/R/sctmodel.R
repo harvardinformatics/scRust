@@ -21,36 +21,122 @@
        cell_attr = ca, pars = pars)
 }
 
-# Which cells vst fitted on in its first step (SCTModel cell.attributes$cells_step1). vst()
-# takes every cell when there are at most n_cells (Seurat passes min(ncells, cells)), else
-# sample(colnames(umi), n_cells): the first draw from R's generator after SCTransform's
-# set.seed(seed.use) (sctransform 0.4.3, R/vst.R). The export records the seed and n_cells, so
-# the draw is made again here with R's own sample(), under R's default generator kinds; the
-# caller's random-number state is saved and restored.
-.cells_step1 <- function(m, cells) {
-  sct <- m$summary$result$sctransform
-  if (is.null(sct)) sct <- m$summary$result
-  n_step1 <- sct$n_cells_step1
-  if (is.null(n_step1)) stop("scrustio: the summary does not give vst's number of step-1 cells", call. = FALSE)
-  if (n_step1 >= length(cells)) return(rep(TRUE, length(cells)))
-  seed <- .sct_parameters(m)$seed_use
-  if (is.null(seed)) stop("scrustio: the manifest does not give SCTransform's seed", call. = FALSE)
-  chosen <- .with_seed(as.integer(seed), sample(x = cells, size = n_step1))
-  cells %in% chosen
+# Which cells vst fitted on in its first step (SCTModel cell.attributes$cells_step1). Seurat
+# 5.5.1's SCTransform.default calls set.seed(seed.use) and passes vst n_cells = min(ncells,
+# cells); vst() takes every cell unless n_cells is below the number of cells, else
+# sample(x = colnames(umi), size = n_cells), the first draw from R's generator after that
+# set.seed() (sctransform 0.4.3, R/vst.R: 216-218 and 233; Seurat's PrepVSTResults then marks the
+# drawn cells TRUE). The export does not list the cells: it records the seed and ncells (the
+# manifest's parameters and seeds). So the draw is made again here, from those, on the cells in
+# counts/ order (vst's colnames(umi)), with R's own sample() under R's default generator kinds
+# set for the draw; the caller's generator kinds and .Random.seed are restored afterwards (and
+# .Random.seed removed again if there was none).
+#
+# The self-check, given the raw counts: vst's next draw, from the same stream, picks the step-1
+# genes (vst.R: 225-266) among the model's genes detected in at least min_cells of the drawn
+# cells and overdispersed, with probabilities from the density of their log10 geometric means.
+# The export lists those genes in that order (sct_model_pars), so the gene draw is made too, with
+# sctransform's own row_gmean() and row_var(), and must give that list; a different set of cells
+# would not. It needs no file the export does not have, and only sctransform, which Seurat
+# imports (load_sce() without sctransform installed skips it).
+.cells_step1 <- function(m, cells, counts = NULL, tabs = NULL) {
+  s <- .step1_settings(m, length(cells))
+  if (s$n_cells >= length(cells)) return(rep(TRUE, length(cells)))
+  if (is.null(s$seed)) stop("scrustio: the manifest does not give SCTransform's seed", call. = FALSE)
+  # (loading sctransform's namespace may not touch the caller's generator either)
+  st <- if (!is.null(counts) && !is.null(tabs)) .keep_rng(.step1_gene_stats(counts, tabs$gene_names)) else NULL
+  if (!is.null(st) && is.null(s$min_cells)) stop("scrustio: the manifest does not give vst's min_cells", call. = FALSE)
+  drawn <- .with_seed(s$seed, {
+    chosen <- sample(x = cells, size = s$n_cells)
+    list(cells = chosen, genes = if (is.null(st)) NULL else .step1_genes(st, counts, chosen, s))
+  })
+  if (!is.null(st) && !identical(unname(drawn$genes), unname(tabs$step1_names))) {
+    stop("scrustio: SCTransform's step-1 cells, drawn again from the manifest's seed (", s$seed, ") and ncells (",
+         s$n_cells, " of ", length(cells), " cells), do not give the step-1 genes the output lists in vst's sampling ",
+         "order (sct_model_pars): the SCTModel's cells_step1 cannot be rebuilt", call. = FALSE)
+  }
+  cells %in% drawn$cells
 }
 
-.with_seed <- function(seed, expr) {
+# The step-1 settings from the manifest: n_cells = min(ncells, cells) from its parameters, which
+# the summary's n_cells_step1 (where given) must equal; the seed from its parameters, which its
+# seeds (where given) must equal; n_genes (0 or absent: every gene) and min_cells.
+.step1_settings <- function(m, n_total) {
+  par <- .sct_parameters(m)
+  one <- function(x) if (is.null(x) || length(x) == 0) NULL else as.numeric(unlist(x))[1]
+  ncells <- one(par$ncells)
+  if (is.null(ncells)) stop("scrustio: the manifest does not give SCTransform's ncells", call. = FALSE)
+  n_cells <- min(ncells, n_total)
+  res <- m$summary$result
+  sct <- if (!is.null(res$sctransform)) res$sctransform else res
+  n_step1 <- one(sct$n_cells_step1)
+  if (!is.null(n_step1) && n_step1 != n_cells) {
+    stop("scrustio: the summary's n_cells_step1 (", n_step1, ") is not min(ncells, cells) = ", n_cells,
+         " from the manifest's parameters", call. = FALSE)
+  }
+  seed <- one(par$seed_use)
+  recorded <- one(m$provenance$seeds[["SCTransform seed.use"]])
+  if (!is.null(seed) && !is.null(recorded) && seed != recorded) {
+    stop("scrustio: the manifest's SCTransform seeds differ (parameters ", seed, ", seeds ", recorded, ")", call. = FALSE)
+  }
+  if (is.null(seed)) seed <- recorded
+  n_genes <- one(par$n_genes)
+  if (!is.null(n_genes) && n_genes == 0) n_genes <- NULL
+  list(n_cells = n_cells, seed = seed, n_genes = n_genes, min_cells = one(par$min_cells))
+}
+
+# vst()'s per-gene statistics over all cells (vst.R: 199-207, 242-246): log10 of the geometric
+# mean (row_gmean, eps 1) and whether the variance exceeds the mean (row_var, rowMeans), for the
+# model's genes, which are the raw counts' genes vst kept, in their order. sctransform's own
+# functions, row by row, so on the whole matrix they give vst's values on umi[genes, ].
+.step1_gene_stats <- function(counts, genes) {
+  if (!requireNamespace("sctransform", quietly = TRUE)) return(NULL)
+  idx <- match(genes, rownames(counts))
+  if (anyNA(idx) || is.unsorted(idx, strictly = TRUE)) {
+    stop("scrustio: the model's genes (gene_attr) are not the raw counts' genes in their order", call. = FALSE)
+  }
+  row_gmean <- utils::getFromNamespace("row_gmean", "sctransform")
+  row_var <- utils::getFromNamespace("row_var", "sctransform")
+  list(idx = idx, genes = genes, log_gmean = log10(row_gmean(counts, eps = 1))[idx],
+       overdispersed = (row_var(counts) - Matrix::rowMeans(counts))[idx] > 0)
+}
+
+# vst()'s step-1 genes for the drawn cells (vst.R: 225-226, 242-257, 262-266), drawing from the
+# generator as vst does; the caller has set the seed and made the cells' draw.
+.step1_genes <- function(st, counts, chosen, s) {
+  det <- Matrix::rowSums(counts[st$idx, match(chosen, colnames(counts)), drop = FALSE] > 0)
+  keep <- det >= s$min_cells & st$overdispersed
+  genes_step1 <- st$genes[keep]
+  log_gmean_step1 <- st$log_gmean[keep]
+  if (!is.null(s$n_genes) && s$n_genes < length(genes_step1)) {
+    dens <- stats::density(x = log_gmean_step1, bw = "nrd", adjust = 1)
+    prob <- 1 / (stats::approx(x = dens$x, y = dens$y, xout = log_gmean_step1)$y + .Machine$double.eps)
+    genes_step1 <- sample(x = genes_step1, size = s$n_genes, prob = prob)
+  }
+  genes_step1
+}
+
+# Evaluates expr, then puts the caller's generator kinds and .Random.seed back (and removes
+# .Random.seed again if there was none).
+.keep_rng <- function(expr) {
   env <- globalenv()
   had <- exists(".Random.seed", envir = env, inherits = FALSE)
   old_seed <- if (had) get(".Random.seed", envir = env, inherits = FALSE) else NULL
   old_kind <- RNGkind()
   on.exit({
-    do.call(RNGkind, as.list(old_kind))
+    suppressWarnings(do.call(RNGkind, as.list(old_kind)))
     if (had) assign(".Random.seed", old_seed, envir = env) else if (exists(".Random.seed", envir = env, inherits = FALSE)) rm(".Random.seed", envir = env)
   })
-  suppressWarnings(RNGkind("Mersenne-Twister", "Inversion", "Rejection"))
-  set.seed(seed)
   expr
+}
+
+# Evaluates expr after set.seed(seed) under R's default generator kinds, whatever the caller's.
+.with_seed <- function(seed, expr) {
+  .keep_rng({
+    suppressWarnings(RNGkind("Mersenne-Twister", "Inversion", "Rejection"))
+    set.seed(as.integer(seed))
+    expr
+  })
 }
 
 # SCTransform's parameters as the manifest's provenance records them (scrust cluster: under
@@ -61,8 +147,9 @@
 }
 
 # The SCTModel's slots, as a list (no Seurat needed): feature.attributes, cell.attributes, clips,
-# umi.assay, model, arguments, median_umi.
-.sct_model_parts <- function(m, tabs, cells) {
+# umi.assay, model, arguments, median_umi. `counts`, the raw counts (when the output holds them),
+# lets .cells_step1() check its draw.
+.sct_model_parts <- function(m, tabs, cells, counts = NULL) {
   res <- m$summary$result
   sct <- if (!is.null(res$sctransform)) res$sctransform else res
   par <- .sct_parameters(m)
@@ -80,7 +167,7 @@
   dimnames(model_pars_fit) <- list(tabs$gene_names, tabs$pars)
   model_pars <- as.matrix(tabs$step1[, tabs$pars])
   dimnames(model_pars) <- list(tabs$step1_names, tabs$pars)
-  cells_step1 <- cells[.cells_step1(m, cells)]
+  cells_step1 <- cells[.cells_step1(m, cells, counts, tabs)]
 
   # PrepVSTResults (Seurat 5.5.1, R/objects.R)
   cell.names <- intersect(x = cells, y = rownames(x = cell_attr))
@@ -151,8 +238,8 @@
 }
 
 # The SCTModel object (Seurat's class), as PrepVSTResults() makes it.
-.sct_model <- function(m, tabs, cells) {
-  p <- .sct_model_parts(m, tabs, cells)
+.sct_model <- function(m, tabs, cells, counts = NULL) {
+  p <- .sct_model_parts(m, tabs, cells, counts)
   methods::new(methods::getClass("SCTModel", where = asNamespace("Seurat")),
                feature.attributes = p$feature.attributes, cell.attributes = p$cell.attributes,
                clips = p$clips, umi.assay = p$umi.assay, model = p$model, arguments = p$arguments,

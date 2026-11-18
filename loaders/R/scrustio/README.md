@@ -16,7 +16,14 @@ Seurat names features as `Read10X()` and `CreateSeuratObject()` do (`make.unique
 
 **What is not rebuilt** (it is not in a scrust output): the `umap` reduction (scrust does not run RunUMAP, which changes nothing downstream), the `commands` (scrust records its run in `summary.json`), metadata columns of other workflow steps (such as `percent.mt`), and, for objects whose RNA assay was a v3 `Assay` (the workflow's emptyDrops objects, made by `as.Seurat()`), that class: the loader makes the `Assay5` that `CreateSeuratObject()` makes, with the same counts.
 
-**`cells_step1`.** The SCTModel's cell attributes say which cells vst() fitted on in its first step: all of them up to 5,000 cells (`ncells`), else 5,000 drawn with R's `sample()` right after SCTransform's `set.seed()`. The export records the seed and the number, and the loader makes the same draw with R's own `sample()`, saving and restoring your random-number state.
+**`cells_step1` is drawn again, not read.** The SCTModel's cell attributes say which cells vst() fitted on in its first step. SCTransform calls `set.seed(seed.use)` and passes vst `min(ncells, cells)`; vst takes every cell when there are at most `ncells` (5,000 by default), and otherwise draws them with `sample(colnames(umi), ncells)`, the first draw after that `set.seed()`. The output does not list the drawn cells; its manifest records the seed and `ncells` (the parameters and the seeds). That is enough to make the same draw, so no file was added for them. The loader therefore:
+
+- takes `ncells` and the seed from the manifest (the summary's `n_cells_step1` and the manifest's two records of the seed must agree with them) and the cells in `counts/` order, which is vst's `colnames(umi)`;
+- draws only when `min(ncells, cells)` is below the number of cells, with R's own `sample()` under R's default generator kinds (`RNGkind("Mersenne-Twister", "Inversion", "Rejection")`), set for the draw whatever yours are;
+- puts your generator kinds and `.Random.seed` back afterwards, and removes `.Random.seed` again if you had none;
+- checks the draw against the output, when it holds the raw counts. vst's next draw, from the same stream, picks the step-1 genes from those detected in at least `min_cells` of the drawn cells, and the output lists those genes in vst's sampling order (`sct_model_pars`). The loader makes that draw too, with sctransform's own `row_gmean()` and `row_var()`, and refuses the output if it does not give that list. A different set of cells would not give it. This adds a few seconds on the largest objects and needs no extra file.
+
+`load_sce()` keeps the same `cells_step1` in the `colData` of `altExp(sce, "SCT")`. Without sctransform installed (it comes with Seurat), it draws without the check.
 
 ## Install
 
@@ -56,4 +63,4 @@ Rscript -e 'scrustio::save_rds("export", "sce.rds", object = "sce")'
 
 ## Tests
 
-`tests/scrustio_tests.R` (in the R env, through sbatch on Cannon: `validation/slurm/m14_tests.sbatch`) makes outputs with the `scrust` binary from the committed fixtures and checks: every wrong combination of role, scale and format for every slot is refused; tampered manifests are refused; the manifest's rules; the objects' layout; FindMarkers on the Seurat object; the other commands' outputs; `add_scrust()`; and that `save_rds()`'s `.rds` reloads into the loader's object. Milestone M14's validation compares the objects with the saved workflow objects (docs/validation/clustering.md, "M14").
+`tests/scrustio_tests.R` (in the R env, through sbatch on Cannon: `validation/slurm/m14_tests.sbatch`) makes outputs with the `scrust` binary from the committed fixtures and checks: every wrong combination of role, scale and format for every slot is refused; tampered manifests are refused; the manifest's rules; the objects' layout; FindMarkers on the Seurat object; `cells_step1` on an export with `--ncells 100` (the cells scrust drew, by its own record; the caller's generator state restored under several kinds; the check refusing listed step-1 genes out of order and another seed); the other commands' outputs; `add_scrust()`; and that `save_rds()`'s `.rds` reloads into the loader's object. Milestone M14's validation compares the objects with the saved workflow objects (docs/validation/clustering.md, "M14").

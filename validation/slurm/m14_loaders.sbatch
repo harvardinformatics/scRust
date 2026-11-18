@@ -17,6 +17,8 @@
 # Reads .rds files. From the repository's top directory, after installing scrustio into .rlib/
 # (R CMD INSTALL --library=.rlib loaders/R/scrustio) and creating .envs/loaders-py:
 #   sbatch [--mem=..] validation/slurm/m14_loaders.sbatch <label> <profile> <object> [<object> ...]
+# M14_STEPS (default r,python,guard) runs only the steps named: M14_STEPS=r reruns the R loaders'
+# comparisons alone, leaving the other steps' records as they are.
 # Output: data/clustering/<object>/loaders/<label>/<profile>/{r,python,guard}/ (df:
 # data/doubletfinder/<input>/loaders/<label>/<profile>/{r,python}/), each step's time_v.txt.
 # No step uses BLAS, so any CPU type will do. Memory: 4 GB covers tier T, 96 GB the largest P
@@ -57,6 +59,9 @@ export MPLCONFIGDIR=$PWD/$cache/mpl NUMBA_CACHE_DIR=$PWD/$cache/numba XDG_CACHE_
 renv() { env -u R_LIBS_USER -u R_LIBS_SITE -u R_LIBS -u PERL5LIB PYTHONNOUSERSITE=1 "$@"; }
 penv() { env -u PYTHONPATH -u PYTHONHOME PYTHONNOUSERSITE=1 "$@"; }
 status=0
+steps=,${M14_STEPS:-r,python,guard},
+step() { [[ $steps == *,$1,* ]]; }
+echo "steps: ${steps:1:-1}"
 
 for o in "$@"; do
     if [[ $o == df:* ]]; then
@@ -81,31 +86,35 @@ for o in "$@"; do
     [ -f "$export_dir/summary.json" ] || { echo "$o: no output in $export_dir" >&2; status=1; continue; }
     mkdir -p "$out"
     tmp=$out/tmp.${SLURM_JOB_ID:-$$}
-    echo "== $o ($kind, $profile): R loaders"
-    rm -rf "$out/r"
-    mkdir -p "$out/r"
-    if ! renv /usr/bin/time -v -o "$out/r/time_v.txt" "$R_ENV/bin/Rscript" validation/R/loader_compare.R --object "$name" \
-            --export "$export_dir" --rds "$saved" --out "$out/r" --kind "$kind" --tmp "$tmp" > "$out/r/log.txt" 2>&1; then
-        echo "$o: R loaders FAILED" >&2
-        status=1
+    if step r; then
+        echo "== $o ($kind, $profile): R loaders"
+        rm -rf "$out/r"
+        mkdir -p "$out/r"
+        if ! renv /usr/bin/time -v -o "$out/r/time_v.txt" "$R_ENV/bin/Rscript" validation/R/loader_compare.R --object "$name" \
+                --export "$export_dir" --rds "$saved" --out "$out/r" --kind "$kind" --tmp "$tmp" > "$out/r/log.txt" 2>&1; then
+            echo "$o: R loaders FAILED" >&2
+            status=1
+        fi
+        tail -n 30 "$out/r/log.txt" | grep -E "components|FAIL|Error" || true
     fi
-    tail -n 30 "$out/r/log.txt" | grep -E "components|FAIL|Error" || true
-    echo "== $o ($kind, $profile): Python loader"
-    rm -rf "$out/python"
-    mkdir -p "$out/python"
-    if [ "$kind" = cluster ]; then
-        pargs=(--saved "data/clustering/$obj/saved" --input "data/clustering/$obj/input")
-    else
-        pargs=(--saved "data/doubletfinder/$obj/saved" --kind doubletfinder)
+    if step python; then
+        echo "== $o ($kind, $profile): Python loader"
+        rm -rf "$out/python"
+        mkdir -p "$out/python"
+        if [ "$kind" = cluster ]; then
+            pargs=(--saved "data/clustering/$obj/saved" --input "data/clustering/$obj/input")
+        else
+            pargs=(--saved "data/doubletfinder/$obj/saved" --kind doubletfinder)
+        fi
+        if ! penv /usr/bin/time -v -o "$out/python/time_v.txt" "$PY" -I -W ignore validation/python/loader_compare.py \
+                --object "$name" --export "$export_dir" "${pargs[@]}" --out "$out/python" --tmp "$tmp" > "$out/python/log.txt" 2>&1; then
+            echo "$o: Python loader FAILED" >&2
+            status=1
+        fi
+        tail -n 30 "$out/python/log.txt" | grep -E "components|Error" || true
     fi
-    if ! penv /usr/bin/time -v -o "$out/python/time_v.txt" "$PY" -I -W ignore validation/python/loader_compare.py \
-            --object "$name" --export "$export_dir" "${pargs[@]}" --out "$out/python" --tmp "$tmp" > "$out/python/log.txt" 2>&1; then
-        echo "$o: Python loader FAILED" >&2
-        status=1
-    fi
-    tail -n 30 "$out/python/log.txt" | grep -E "components|Error" || true
     rm -rf "$tmp"
-    if [ "$kind" = cluster ]; then
+    if [ "$kind" = cluster ] && step guard; then
         echo "== $o ($profile): the 10x readers on the export"
         mkdir -p "$out/guard"
         if renv "$R_ENV/bin/Rscript" validation/R/guard_read10x.R "$out/guard/read10x_seurat.tsv" "$export_dir" "data/clustering/$obj/input" \

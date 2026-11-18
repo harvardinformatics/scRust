@@ -32,6 +32,7 @@ load_sce <- function(dir, check_sha256 = FALSE) {
   if (is.null(md)) md <- data.frame(row.names = cells)
   if (!identical(rownames(md), cells)) stop("scrustio: the metadata's cells differ from the output's", call. = FALSE)
   cd <- S4Vectors::DataFrame(md, check.names = FALSE)
+  counts <- NULL
   if (.has_role(m, "raw_counts")) {
     counts <- read_for_slot(m, "raw_counts", "SingleCellExperiment counts")
     if (!identical(colnames(counts), cells)) stop("scrustio: the raw counts' cells differ from the output's", call. = FALSE)
@@ -53,7 +54,7 @@ load_sce <- function(dir, check_sha256 = FALSE) {
     }
     dimnames(cc) <- list(tabs$gene_names, cells)
     dimnames(dd) <- list(tabs$gene_names, cells)
-    parts <- .sct_model_parts(m, tabs, cells)
+    parts <- .sct_model_parts(m, tabs, cells, counts)
     vf <- .read_tsv(.full_path(m, .entry(m, "sct_variable_features")))
     vf_names <- .map_features(feat, vf$name, vf$id, "variable features", "sce")
     sct <- SingleCellExperiment::SingleCellExperiment(

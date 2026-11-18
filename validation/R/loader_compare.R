@@ -127,6 +127,14 @@ cmp_model <- function(L, fa, ca, other, m2) {
   cb <- m2@cell.attributes
   add(L, "SCTModel cell.attributes", identical(as.data.frame(ca), cb), list(n = nrow(cb)), blas = FALSE,
       detail = paste(colnames(cb), collapse = ","))
+  # cells_step1 on its own (also within cell.attributes): the loaders draw it again (M14)
+  if ("cells_step1" %in% colnames(cb)) {
+    a <- ca[["cells_step1"]]; b <- cb[["cells_step1"]]
+    add(L, "SCTModel cells_step1", identical(a, b),
+        list(n = length(b), differing = if (length(a) == length(b)) sum(a != b) else NA), blas = FALSE,
+        detail = paste0(sum(b), " of ", length(b), " cells in the saved model: ",
+                        if (all(b)) "every cell (at most ncells, no draw)" else "drawn again from the manifest's seed and ncells"))
+  }
   for (s in c("clips", "umi.assay", "model", "arguments", "median_umi")) {
     add(L, paste("SCTModel", s), identical(other[[s]], methods::slot(m2, s)), blas = s %in% c("clips", "arguments"))
   }

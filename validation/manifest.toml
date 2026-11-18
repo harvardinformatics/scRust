@@ -2807,8 +2807,8 @@ slurm_job_id = "61798854"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_ghirsutum2/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "0a57365c27040c48cfe05546219e96fea43d4b0165770cbf8534bc8e9a69c84a"
-bytes = 11858
+sha256 = "7c4c551295669701731c145035bf4ae2f09dfe730c5cd9f1f4af3feee49474b7"
+bytes = 12209
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -2837,8 +2837,8 @@ dataset = "cellbender_fromraw_ghirsutum2"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_ghirsutum2/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "5b7005ec7304608c581e87938f729e92491e267eb2b244c9e374a5242972a9d4"
-bytes = 1986
+sha256 = "16165a76b44b1f0c300b45a5a94f95005fb5452cb14fea6f0dc3c113b0978f19"
+bytes = 1965
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -2907,8 +2907,8 @@ dataset = "cellbender_fromraw_ghirsutum2"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_ghirsutum2/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "9d4fc08a46fd3620114f6ef4de008f0b67cd5025766fc75df8e603279d62edf8"
-bytes = 3529
+sha256 = "cfab7c31556e3b07cdeb3003580571406ab5283af720232be1fed32e8878068b"
+bytes = 3530
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -2927,8 +2927,8 @@ dataset = "cellbender_fromraw_ghirsutum2"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_ghirsutum2/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "35836af962c08a3f755da92230ce3b0ec3caba86d7ecd78b74dea5959e2e9bbb"
-bytes = 10992
+sha256 = "32716222b463e9e12cbef7d178a33dba73e4987339c49d38e68a19fac4578378"
+bytes = 11343
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -2957,8 +2957,8 @@ dataset = "cellbender_fromraw_ghirsutum2"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_ghirsutum2/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "a3565077ffdbc8ecb51709bc39ca777d30bb28a645a7749dbd900cdcc976c88e"
-bytes = 1994
+sha256 = "d990a1f7ee4ed15360b8402671bbd5e65b92be4ed7dc60d249463776407c3d5c"
+bytes = 1983
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3027,8 +3027,8 @@ dataset = "cellbender_fromraw_ghirsutum2"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_ghirsutum2/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "58c3c98760641c8d604392f2c1308e669d75ceb4477b6834cbb0f32ed2611d5a"
-bytes = 3543
+sha256 = "2719d3e3a45446b4dd631d1535b3e3538a4fd9dceef05297e77ed2bec3a25644"
+bytes = 3542
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3047,8 +3047,8 @@ dataset = "cellbender_fromraw_ghirsutum2"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_ghirsutum2/loaders/m13-9ce0adb/production/m17/k11.tsv"
-sha256 = "9a8a4273206959ee978a8ac1868678236368138ea5b3cb31c69dca249f94d478"
-bytes = 6475
+sha256 = "b4f84c0baf3ffd919cef73fa9e38c5a1a3073074d179f36c48372f86f97a29d7"
+bytes = 6652
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3057,7 +3057,7 @@ dataset = "cellbender_fromraw_ghirsutum2"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_ghirsutum2/loaders/m13-9ce0adb/production/m17/compare.json"
-sha256 = "81e2a15c8c161be3e3fe724249c83e45e4378ca0a74d096dde7cead3e6dde434"
+sha256 = "6d931ab0ffce462a58eb6f8dc5c7190d6e1d34fccdbbfb5ad0a6b1fd2f1e4ac9"
 bytes = 1548
 tool = "clustering"
 role = "check"
@@ -3067,8 +3067,8 @@ dataset = "cellbender_fromraw_ghirsutum2"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "de5dee7a9cb8a7194ac2e88be44220b272b207b893487f8212e44962ae89dbbc"
-bytes = 10724
+sha256 = "9c078ff4c7f8a116057637cf8d81c2f2d78a127392f969314ded100137de3766"
+bytes = 11031
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3097,8 +3097,8 @@ dataset = "cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "2479860e1516a83de44526c9ec4f91381e2bed1a00d4cbf17c2932d7a345542a"
-bytes = 1950
+sha256 = "8fc91d77cd721d76107126a6b7245e6af4926d10a1ce5d9f93fce4c1adc21db2"
+bytes = 1992
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3167,7 +3167,7 @@ dataset = "cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "389a7d3cb435e4b4d7b6759e7d9be36ee4c642926dfe6dfba46745ec0c8c9237"
+sha256 = "aece8c6fa708472184cbf6eaa66b7f45f2b8517517c5ed543e184c4aef94d6ff"
 bytes = 1516
 tool = "clustering"
 role = "check"
@@ -3187,8 +3187,8 @@ dataset = "cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "d4190986fc3b672e1ea937a4ed40eb29da7d1bfee20cde23e9e106461a7f3ef4"
-bytes = 10266
+sha256 = "3fed759624cea42d3241199a08daf6df2fb4fe4a94ac07af3432d74329002de0"
+bytes = 10573
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3217,8 +3217,8 @@ dataset = "cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "29014e5f4ea8af498a6047ec0c97612519f606f03f59c3e2a4f9ab5b5ff9a4a8"
-bytes = 1996
+sha256 = "03dbcbadec654c3200f5aca358b25550731fb1692eabb581b38c56789e6f1f08"
+bytes = 1998
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3287,7 +3287,7 @@ dataset = "cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/cellbender_fromraw_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "e0e4f13efb039599756e31ebdda6a73cec7eb0871e2740d643a8dba7d8d23668"
+sha256 = "3f5a321a873714a73503da2b9e11c5eb5ca547795c07c9052a198a65e406a691"
 bytes = 1529
 tool = "clustering"
 role = "check"
@@ -3307,8 +3307,8 @@ dataset = "cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "4ff70d6337a479c1a5d9616396a109c21ef24e5627399b3fd586dad400b352f0"
-bytes = 11122
+sha256 = "5df6e0e7cadec023a88dba3f7b27cdcc572160e5bb0805873032472b81c57ea1"
+bytes = 11437
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3337,8 +3337,8 @@ dataset = "decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "022e1933408d86cc3511eda0713da9f6680a5cb69dfb523fcd4eab953977ae3c"
-bytes = 1995
+sha256 = "0296712750ff8e6876c243a18517fb710a3b991fb6aeeeb7de5c6a149da18d2d"
+bytes = 1996
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3407,8 +3407,8 @@ dataset = "decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "549f8ffe6f857504f5017d2843b611206fd513507dbc9b5be3cedc8b1dd063d4"
-bytes = 1537
+sha256 = "b539fe84842ed9878010ae5c7ce8fdc5f75b9381601cb549249764d09e5bea4f"
+bytes = 1524
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3427,8 +3427,8 @@ dataset = "decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "ec83767247ffd18a3af5a27c11fad635b2c4027d3a22c03e79ff13039ca68a6d"
-bytes = 10662
+sha256 = "38567f13a77dbdba735039f3329fbce69b7ed5ed50f79ad3554dac58da34af17"
+bytes = 10977
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3457,8 +3457,8 @@ dataset = "decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "e3a14f256091467d8700f857525c5dd816b714c83ae6e6f4ab32c4a99c0be2ee"
-bytes = 2003
+sha256 = "7f21c0a2412ec5ff6debb63eb418bdb476b4b492d5809d44959d61512aa521ce"
+bytes = 2004
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3527,8 +3527,8 @@ dataset = "decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "e059471904f901ef1b31b64c37d67bc3f2c2620d4684c5b4396d765d1884e88e"
-bytes = 1540
+sha256 = "75b8db4183c42a6975628b5b1c13349a228e0743cfca45040d09a56a49392591"
+bytes = 1539
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3547,8 +3547,8 @@ dataset = "decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "a65f92d8ebe4bf8d7c126953a40564f02a4a24d6aa2eba44c5df1ea5ff942a64"
-bytes = 10526
+sha256 = "f84958e1007dd1ff4cb0d738e7641970cff17116d71dc7a8beb67aa9c3fe3e5d"
+bytes = 10829
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3577,8 +3577,8 @@ dataset = "decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "cfeec3f8e56969e0c0eb36e4049d3d9b0ee2eb4fad527603b9332b8b5ed74103"
-bytes = 1977
+sha256 = "31a32b973df5cbaed6c09b24c607222f1eb50f8e221ca3a8eb1baca0521e756d"
+bytes = 1979
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3647,8 +3647,8 @@ dataset = "decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "656ff8be911afa966c54f4755350fd365d4e7eb0dffc065ff2abf2fcf0eb11df"
-bytes = 1408
+sha256 = "67f03cfcfeb0ff1ff900f53a0b6402172105181b112b28b636e18bcf459c90e5"
+bytes = 1407
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3667,8 +3667,8 @@ dataset = "decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/decontx_raw_tenx_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "c1ceadc35c49776cb75764855082b3e0c49d7f54216171df09939f7b2afc6f5d"
-bytes = 10068
+sha256 = "7694a569519e18ca356ef6fc0a3ee974461c9e69668155278c89bfd40bc9dea5"
+bytes = 10371
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3697,8 +3697,8 @@ dataset = "decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/decontx_raw_tenx_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "e6552da912c0b9dbd61cf2c11c2147e72b9e7db8edc0239d0de96f4ac011b19c"
-bytes = 1985
+sha256 = "4ec5b9de94b5124add2efb5c68b5668b7f2507e1a7dea43c175d0f7cb7889149"
+bytes = 1984
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3767,8 +3767,8 @@ dataset = "decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/decontx_raw_tenx_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "28353589d86a1fc08beac4f202acf6252f2a2f293287aa10c433e23f79d2abaa"
-bytes = 1409
+sha256 = "83893c20ba970db42b3da3a47e2e129331294b2abc0245e9c24e8df24267c07c"
+bytes = 1410
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3787,8 +3787,8 @@ dataset = "decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "8880764fc4d0162d976b20123155a5e846d2f745f14a7c640c74d39ec2402a50"
-bytes = 12238
+sha256 = "e94a897333de074e0a31884f9247be965d3860750f00ac3ef90b189c57b2dea1"
+bytes = 12573
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3817,8 +3817,8 @@ dataset = "doubletfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "63fd05fbfdd21926b5f228c2bc11577506eff66b35e20f1a6dd168aaaa2014a1"
-bytes = 2027
+sha256 = "d2f3279b1827c110c7049812f7f5e09ca42bbd288e99ccb7ef6e127a9c120f0d"
+bytes = 2015
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3887,8 +3887,8 @@ dataset = "doubletfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "bac0fc23715b153e2041ab7f80ddfe630969f600a6ddd487ae555aec39ba3337"
-bytes = 1460
+sha256 = "83af7ce8093aabf15f05faf6a8c3c92f287d3bbfb476d9175fa2a10f4bdced50"
+bytes = 1472
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3907,8 +3907,8 @@ dataset = "doubletfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "8bcacda3a38598fa4c15e701d1a8030175f96cb961c831926e87cec1f725796a"
-bytes = 11704
+sha256 = "b3062518464bba9f3c230b8c0a169af536cf8fad17a0b3b150e3d9da9fd40d67"
+bytes = 12039
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -3937,7 +3937,7 @@ dataset = "doubletfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "7c7b80ef4a8c69a5132a34bd8a122ac7b3205800da93ecb73097d278cc9242ef"
+sha256 = "b90b765c0379907c5026d4f839eb4e30d3ff3058673997928a188d04b8c763cd"
 bytes = 2035
 tool = "clustering"
 role = "check"
@@ -4007,8 +4007,8 @@ dataset = "doubletfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "7b57ba8122d48ac7b732a0335dbb391e622a07ba49e665899549c40d12e6c474"
-bytes = 1472
+sha256 = "565311136a9418f1a66c03d919345cf574c8a58de84d0cfc00d11e18dbc5acf0"
+bytes = 1474
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4027,8 +4027,8 @@ dataset = "doubletfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "776f7fbb26e6f1a8763ae1e4ef701d8f1b39f091ce9c7135cde87f048163e913"
-bytes = 12556
+sha256 = "6ff86ab310702204aac75080cb1be868686be7ca4e047dbe0f49157aa6a152ca"
+bytes = 12899
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4057,8 +4057,8 @@ dataset = "doubletfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "000e5a7708af5ec704267187567cd71935105cc5a27b481c73b2a27c25429a57"
-bytes = 2039
+sha256 = "321d66e35fdf5857dc1b800b17a340d39d146b065b545801080f218cd1dba2b7"
+bytes = 2038
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4127,8 +4127,8 @@ dataset = "doubletfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "5970527b6d61252864481cf0fd9f86890bddb9a583ff01ab5124b9e4687d0a42"
-bytes = 1595
+sha256 = "cd275ba9580fd8514318fe64fb229d278d2752adb23fc3f5077c65ff3225336d"
+bytes = 1596
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4147,8 +4147,8 @@ dataset = "doubletfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "46c501d17045582fcd4ded3fa94eed70740f0edf31471c7bf9f9e9abad6216ad"
-bytes = 12100
+sha256 = "f609f7795a2092548c55871b2a6f15d532673a5ab0974099c72f5f5c74a83e46"
+bytes = 12443
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4177,8 +4177,8 @@ dataset = "doubletfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "d072fb79186d78b9d2173be887583027e52d8be8918749614ca28682d4a30abe"
-bytes = 2044
+sha256 = "70d61d7e6db89e430439ec938329391ca13aefdcd556c6d54a79a4eb79ed25e0"
+bytes = 2033
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4247,8 +4247,8 @@ dataset = "doubletfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "511afa983c4ff81ff38339dad44a083e6623a1636a880e91f845b08470125c4d"
-bytes = 1585
+sha256 = "230745b2a3b263043c8700cbcf317fedfffbb7a84646abed1ac8b0b01816549c"
+bytes = 1584
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4267,8 +4267,8 @@ dataset = "doubletfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "1ed0eb5367954f3ea38d98869a7d404e962d464b5b87d717f4325b4baac044d3"
-bytes = 11966
+sha256 = "d3fc82f3743dc192588f0915f508d0db14131ec904ef0755c623ad083f0e222b"
+bytes = 12297
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4297,8 +4297,8 @@ dataset = "doubletfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "6a9dd9346d1028412d385cd3a1080ed544373b1eb5ea9a6fe0ab6bc0948a3920"
-bytes = 2021
+sha256 = "26951758c03e0418e81bd77b8d335df2252e0973bec724ca6e2b096617865181"
+bytes = 2010
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4367,8 +4367,8 @@ dataset = "doubletfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "d2d89d1d1889d771919a492f7315c89883684848a3e0549b119ccefcbc5dd994"
-bytes = 1455
+sha256 = "585fd0194b5428956d0fd4dfb340ea3a632199c3e1e32b081c4f166561cc3c56"
+bytes = 1454
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4387,8 +4387,8 @@ dataset = "doubletfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "82669c0c382776c476aa29d10299d1f6f5ab7198d98fd32e8b2f804efec01d27"
-bytes = 11506
+sha256 = "13b641d506e39a5f698b77962751d31fc8fdb3d9967e2ab7539c9e2aed89e14b"
+bytes = 11837
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4417,8 +4417,8 @@ dataset = "doubletfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "a8b51b78f3b490866e8c5833a59708bf4c2af18e11008fd2017146e24aec1ee9"
-bytes = 2029
+sha256 = "6a7e2f4b7fb3cdcc7ffa9b6104cc4fa6bb2f32d0cb898dcf1626bb63f74ed4ec"
+bytes = 2030
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4487,8 +4487,8 @@ dataset = "doubletfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "0714d7a407ad4cbde8068d195e684713aa1f0169ecb4099603dab5903ad62fd7"
-bytes = 1469
+sha256 = "8ed325d0f0c79e220cad18a7d92300c3f7af91beb5b0ff51677dba84e86b2bad"
+bytes = 1468
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4507,8 +4507,8 @@ dataset = "doubletfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "d4a606cae2079d8b1ab82bcfba818a114f778966c70fcef388adcdda5a977e8d"
-bytes = 11966
+sha256 = "493830c94aa658b8378e5777c38f915fd7199d7d1dda452aa62ac8492c270921"
+bytes = 12297
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4537,8 +4537,8 @@ dataset = "doubletfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "dcde0d5745d226a18d37d68c67c208a48a124a66a030b46c9da2ff4e092200e1"
-bytes = 2008
+sha256 = "ee67a82c673affc01ea3a71727f0b32e3aa1322cd407d22f9fe9f7e4440fec68"
+bytes = 2019
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4607,8 +4607,8 @@ dataset = "doubletfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "c48b68814cf844e6484ed8e8c99b1128c27c767bce9bffa0643fa33699109d7f"
-bytes = 1464
+sha256 = "fd6307c3228ce5f033c4ec037afb0c9096589f6c3b428b32b05a6c1b4e99a3d3"
+bytes = 1451
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4627,8 +4627,8 @@ dataset = "doubletfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "21b97781af477235b233b36e44aefe4cf21f6c2f4adf7f738d22c391c644b94d"
-bytes = 11506
+sha256 = "3d5ab4a8753bf18192830cb177e255a46caddd90fea707ad0105f7a3d232a898"
+bytes = 11837
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4657,8 +4657,8 @@ dataset = "doubletfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "8d886d95b18b8bb820ecde9887343f1491c961703d7a506232985b9dafc023bf"
-bytes = 2026
+sha256 = "ea0ca60ac523948ed7ca9d9f093899d1f7afd31783fe68ef40b015f3f611bd29"
+bytes = 2030
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4727,8 +4727,8 @@ dataset = "doubletfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "f9f1bc2c51cd0daaff2cfd0f192ec72f6302c43210fb10858ceb0fddc234bfe8"
-bytes = 1453
+sha256 = "45d61adce4c92f0d08c76ed946d2a6061e8fafbf0a113414be67c4e35cd49a2d"
+bytes = 1465
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4747,8 +4747,8 @@ dataset = "doubletfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_soupx_tenx_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "4b99867c4555aa1044eb93238557be243de3ccf7ce6045f9b5a59d5ab23ebdba"
-bytes = 11372
+sha256 = "498acd0939be9ff04de8e6986a7f76dc1e809404237c479ebfcc7fe05f946625"
+bytes = 11691
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4777,8 +4777,8 @@ dataset = "doubletfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_soupx_tenx_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "4eb0f35ace0e39b6c56b28fc3ba7d32995c2ca1010c0c50faf895a82174a3c3f"
-bytes = 2003
+sha256 = "3ff34d7a7613aff95e84cacc821b3dc8cbfe602e9d6bcbac4340ff4656d3b4c0"
+bytes = 1992
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4847,8 +4847,8 @@ dataset = "doubletfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_soupx_tenx_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "0391f313b1fe417cbc21872bbfeb444ad95aeb094fdf85987e708c7114c2474a"
-bytes = 1440
+sha256 = "542f431027e2207a6c2ef30e0ff7f07743af305bfa3dc1c9e5056f1579a39262"
+bytes = 1439
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4867,8 +4867,8 @@ dataset = "doubletfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_soupx_tenx_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "d4afc597c46d52bf8edad5a144676290bfee54bcd74819ef658acfe70c94fb59"
-bytes = 10912
+sha256 = "96e352e5016587d380506de523ef16622f07954e1c1976da585a9b506c4f1920"
+bytes = 11231
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4897,7 +4897,7 @@ dataset = "doubletfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_soupx_tenx_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "e71a8f681a9a9419b7120e78abe684ceaae61e8a4ef78a13aa69a1930700bb77"
+sha256 = "37c149bd2173c448dd4a832b73980ceacc7eefc0961fdfc8c84dc713bc90bdd1"
 bytes = 2011
 tool = "clustering"
 role = "check"
@@ -4967,8 +4967,8 @@ dataset = "doubletfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/doubletfinder_soupx_tenx_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "ccf4b10eee8fb69052148e14e82a336fe8fba0f88a72cb6d6c64b9d549355099"
-bytes = 1443
+sha256 = "1e7be0d28608d731cd7a8a73284a50b46c21b77343497f27a355cee210bd8f9c"
+bytes = 1442
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -4987,8 +4987,8 @@ dataset = "doubletfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_sscovelli/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "c247586d90b1afb77fdb7c27d17ab0b465946394c360a1189e93db0e9d245f3f"
-bytes = 12785
+sha256 = "9a4e1c168770167b3ba23d113a52509ff58370a0c8805e24a17e77a2d9469d4b"
+bytes = 13150
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5017,8 +5017,8 @@ dataset = "filtered_seurat_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_sscovelli/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "0f40c9d1808dab447b415479b550f7fde251615a39c39da98b4f7e617f32fb16"
-bytes = 1981
+sha256 = "26b0588fe7f5b69de38ce2e27ee14a6a13b0fa2dc293f3c5814815e596fc9f58"
+bytes = 1982
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5087,8 +5087,8 @@ dataset = "filtered_seurat_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_sscovelli/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "96f321bd8b0fb769390a06c3ec059e808862b1afba5900695f1aa484e46f0f0d"
-bytes = 5231
+sha256 = "e4537caf65fb9cee5f4ca6dc4b546884dac9a4fb6bc2063fe06df83e4805d1e4"
+bytes = 5210
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5107,8 +5107,8 @@ dataset = "filtered_seurat_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_sscovelli/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "b2d92b3c6bac9ec51051c9c48a61e751448cc59c52522f6829490d5886eb863c"
-bytes = 11917
+sha256 = "5df0a4fcd054947305c07c28c8c308a4edab64309f85a0780172368ab4121f77"
+bytes = 12282
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5137,8 +5137,8 @@ dataset = "filtered_seurat_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_sscovelli/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "305a96cdbb6fe0870eb41375125dd5f09bdc6c5dac2b4abb3c384212e9c60254"
-bytes = 1987
+sha256 = "f226657823ed9bf156ab6c8f87a1e9c8d985468ae033c445f4a1630736e2e4d5"
+bytes = 2001
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5207,8 +5207,8 @@ dataset = "filtered_seurat_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_sscovelli/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "4e1303839e0b5477e3c33364c3051e2ee47c6caa29f49d3a23b191baa9ba9bf1"
-bytes = 5214
+sha256 = "fb9ab1169b5c59bac1e96c0a5bf96cb8b83a007919d3720ac926614824f89dcd"
+bytes = 5229
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5227,8 +5227,8 @@ dataset = "filtered_seurat_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_sscovelli/loaders/m13-9ce0adb/production/m17/k11.tsv"
-sha256 = "90f77a977877d042ad26247a759648490e39bc719bffebcc2ba86b1e4d4bfc11"
-bytes = 7108
+sha256 = "8bc626d723b990bbedc9cb51aea41bac32fc16ee4751fa521899d9b9a70ca45d"
+bytes = 7292
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5237,8 +5237,8 @@ dataset = "filtered_seurat_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_sscovelli/loaders/m13-9ce0adb/production/m17/compare.json"
-sha256 = "0b5837ab8e1a36f1f44a33dcbd9b5a7046d0139031e61b7e9e014e43eca0ab9c"
-bytes = 1553
+sha256 = "f2eea5e4c0ced50ba86d04bf7b73f7b8358f92c76ae2a07bc983a8e1f1730e86"
+bytes = 1532
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5247,8 +5247,8 @@ dataset = "filtered_seurat_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "f371bbfba49abcc4c0426785e45154ecafdf4da6d768e8f5d367a5c72c730217"
-bytes = 11828
+sha256 = "1dd0a72b80e03de0aa801e695ba00340da47733253eec023a030c6a5e9502775"
+bytes = 12151
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5277,7 +5277,7 @@ dataset = "filtered_seurat_emptydrops_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "6c34428c1dda4dd90dfdd6ed9e8db9849efa51786286949cfab1be4d10e563e4"
+sha256 = "514d7108fc8dc17cf332cee3b02845ae6c3ed5c7d0a83a460ea9679fe12c2040"
 bytes = 1999
 tool = "clustering"
 role = "check"
@@ -5347,8 +5347,8 @@ dataset = "filtered_seurat_emptydrops_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "d1436e332c1f0787b9a274fe2ceda04945748e77cc40cc9332ca4c6cfa1cff36"
-bytes = 1538
+sha256 = "72f8be305f5886360cd54143f566b4383829d529ee56356bd33e910a08a21836"
+bytes = 1535
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5367,8 +5367,8 @@ dataset = "filtered_seurat_emptydrops_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "6c612aa3be3723da5d70247b9630c1b5b35c3c0042ec9af55f0ce3376d556af2"
-bytes = 11294
+sha256 = "29a14442ef6eae30dbd583872326ae5fff416ecc3ba694f7b2b18cb44f83bd8f"
+bytes = 11617
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5397,8 +5397,8 @@ dataset = "filtered_seurat_emptydrops_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "a1191a4e7ee1011fd90eb6c642231478aee87f8a754946dd09fbb9aac812ca97"
-bytes = 2006
+sha256 = "14f73c753bc31984b8a07cc909ee3aed3f9497c6c098a25885b2a1a2a02c643f"
+bytes = 1981
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5467,7 +5467,7 @@ dataset = "filtered_seurat_emptydrops_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "3b05a0b9cc08c99ed48b8955e85eed41ffda774f8965bbc7ed6de461c2d77b62"
+sha256 = "f38d1cee7093ff936725a179328ae43c60f6937d24edaba1d92aeb043faa535d"
 bytes = 1540
 tool = "clustering"
 role = "check"
@@ -5487,8 +5487,8 @@ dataset = "filtered_seurat_emptydrops_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_test/loaders/m13-9ce0adb/production/m17/k11.tsv"
-sha256 = "093cdea613c491a23359375cd61895c3032b5bc0977050ab94de1183137d352b"
-bytes = 6759
+sha256 = "42d6b5487d3c5df0068a61f1dcfe100bbc0a8187b45a0f0d344c62982607b4fa"
+bytes = 6922
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5497,8 +5497,8 @@ dataset = "filtered_seurat_emptydrops_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_emptydrops_test/loaders/m13-9ce0adb/production/m17/compare.json"
-sha256 = "7b3e6231c65a33a1953ecf33e47245a23f58b994e03ed34971d77a28cefb01df"
-bytes = 1565
+sha256 = "e71bf2e5a291f9e782e395e16618eace5b8bcbb0135cc9fa42ab188ff6ab9cb6"
+bytes = 1568
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5507,8 +5507,8 @@ dataset = "filtered_seurat_emptydrops_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_10xmousebrain/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "4609a8dcf2775d723feaf28bb1ed6c0f4018d70982abe471c4c6bb461ed1f27d"
-bytes = 12329
+sha256 = "87067cd1ad50144c8f04d5b9305696cdf7fc778fc1b561a1ccb5e24adacf9455"
+bytes = 12690
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5537,8 +5537,8 @@ dataset = "filtered_seurat_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_10xmousebrain/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "f5e1c5b4eeb70be956a25d5177eabb193b9e0474530cf919e3a5599ef790e415"
-bytes = 1976
+sha256 = "dbe450c132faafb71cd89e185053808e7593dded5c557df5c841b8176621b6a9"
+bytes = 1989
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5607,8 +5607,8 @@ dataset = "filtered_seurat_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_10xmousebrain/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "a1769e0e66fe19d852fef581eb60402b6a1675e8cb667707e6dc39b07b9b38f8"
-bytes = 3417
+sha256 = "0f7edce4bd50c3e432d0c1ee596cf48905b8defe7beefe03e447a4cc190de9b2"
+bytes = 3413
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5627,8 +5627,8 @@ dataset = "filtered_seurat_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_10xmousebrain/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "38d583fd269c6379e86817f4329ef9655e7333267d342dd5e76ad5307322615e"
-bytes = 11473
+sha256 = "bde6efd14ce27a0e858e0db49d7522244e2f47e7611b473a6b91b777edcea1b9"
+bytes = 11834
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5657,8 +5657,8 @@ dataset = "filtered_seurat_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_10xmousebrain/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "262e7d52fe466e29a85172af706e278093508a039fe4fdf02fcac0bfae920e06"
-bytes = 1995
+sha256 = "05da9d6d79954e5f1f429960d98865c34241b6870aa924ae71f3f47db007cd9a"
+bytes = 1996
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5727,8 +5727,8 @@ dataset = "filtered_seurat_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_10xmousebrain/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "14d3c041a5af86f7f5549a067cae48577c846393dca184040eedabd316a1c765"
-bytes = 3430
+sha256 = "3d512d10ec9641534e14a461cb0d3e4d19a97df68c667814f1b3f8ce30738611"
+bytes = 3419
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5747,8 +5747,8 @@ dataset = "filtered_seurat_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_10xmousebrain/loaders/m13-9ce0adb/production/m17/k11.tsv"
-sha256 = "b8f3a61ce6dab72040858231422db6bf5171a9a161b7eca28f1cea55c9a7e54d"
-bytes = 6753
+sha256 = "097fb204a74f87cc915bd6f54ee65bf95981c9a12a5c852eba6158b26a5b2f56"
+bytes = 6935
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5757,8 +5757,8 @@ dataset = "filtered_seurat_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_10xmousebrain/loaders/m13-9ce0adb/production/m17/compare.json"
-sha256 = "b74f6302fa57433f4922a75fcc4f542b3922b9cd787bd890f664cdda61d46488"
-bytes = 1550
+sha256 = "7ce529b03289936d9c339b6841ae132b1d99c450a3bc909509622cc73b2b29c7"
+bytes = 1551
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5767,8 +5767,8 @@ dataset = "filtered_seurat_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "4a92db305251ebc684b7818e310c21cff4c73f538f0c49dec354088436f30d30"
-bytes = 10924
+sha256 = "511ba8c59a562fa4b4228fc182e11f8dd6000938e77631e9c2292ab306232e20"
+bytes = 11235
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5797,8 +5797,8 @@ dataset = "filtered_seurat_tenx_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "dfcd0abbf4c7af2e1be836613f04b7609cff2f41222411b2ed026a4727e059f4"
-bytes = 1985
+sha256 = "3f2b39646838804c47c22b2e5d263502f5290179199fb9a89eea264bfe87456c"
+bytes = 1987
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5867,8 +5867,8 @@ dataset = "filtered_seurat_tenx_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "e948997d43210831c788f9ec3ad5b38759d5780e17e53ac4a9e7038432f3dc81"
-bytes = 1402
+sha256 = "32502d4f2a305cec522776361b9c6ab133ed9f5811fb8062b44eaff151b64416"
+bytes = 1411
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5887,8 +5887,8 @@ dataset = "filtered_seurat_tenx_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "b254566a8e60f570a9ded73f25c3ff08cb902f8350ba56b946efa924c78d33fa"
-bytes = 10464
+sha256 = "a8618138f7556721a67555b0cb95f4844ae09ea742f7d78e4b4b2227e03345a2"
+bytes = 10775
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5917,8 +5917,8 @@ dataset = "filtered_seurat_tenx_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "b194624bbe35dadca3f1f19db9d6e518ed71e70378ceb9d8eb5d647e9a7fe0a8"
-bytes = 1980
+sha256 = "d8d54d1c44dbffb08e19975a1ed2cefb3728a1058842be5dabffd5e80ebeddfc"
+bytes = 1976
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -5987,8 +5987,8 @@ dataset = "filtered_seurat_tenx_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "ef50848751ec12f12272b4f60b6ccf9c73adbcf297bbb7b060c12033c79bb48b"
-bytes = 1416
+sha256 = "4f16d10d336ad11662f11da43a4f9e6f5364ccc169849c8b634b90b411273962"
+bytes = 1403
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6007,8 +6007,8 @@ dataset = "filtered_seurat_tenx_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_test/loaders/m13-9ce0adb/production/m17/k11.tsv"
-sha256 = "e2ec80820740ea82516e1d76a1f524c080dbaeb9ac401ab70cebf61b873fc9ea"
-bytes = 6181
+sha256 = "0aa12ef338b99257494181bec89af32f92eacb0e934abbf69d19f6829921a2bd"
+bytes = 6338
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6017,8 +6017,8 @@ dataset = "filtered_seurat_tenx_test"
 
 [[file]]
 path = "data/clustering/filtered_seurat_tenx_test/loaders/m13-9ce0adb/production/m17/compare.json"
-sha256 = "e97ff5ec22fe5f1008ab2f8d285b6e651ba44608fe611eb1c1342b7fec241994"
-bytes = 1551
+sha256 = "7d757b499a57df2a2c2a1b8cb808de30fe52b4924439e1c77d5d612485964356"
+bytes = 1542
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6027,8 +6027,8 @@ dataset = "filtered_seurat_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "e0bf5a8878149cc9fb9b06c0046e62309721724a16ee9d8004d81894e309bbed"
-bytes = 14336
+sha256 = "a363f6c12d9e03c94ae7927cf9d2fb10f7c174f9cfbaa2af0fa1d352a023ba92"
+bytes = 14715
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6057,8 +6057,8 @@ dataset = "posthocfilt_threshold_doubletfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "715e20b88c8a0a5cb30658a9ff2a89ab13fba6ce8a96763b26af3b3387568791"
-bytes = 2088
+sha256 = "ea567cfe9aed96068f1485b82c14d3da35749d8850deafb14045020af75a6c10"
+bytes = 2092
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6127,8 +6127,8 @@ dataset = "posthocfilt_threshold_doubletfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "72bf60d48024c78b04a55c85f648da6059e3ce3707bcfa52f29e14334c47fd1b"
-bytes = 1439
+sha256 = "61d9ef9e2cad65439176cf2afc0d7b38d4e86c56e89237a4556d0b40cdecb7a2"
+bytes = 1451
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6147,8 +6147,8 @@ dataset = "posthocfilt_threshold_doubletfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "75943d5b595839e723b5e192814bb28e35836d106a10d2645a5fc1452bd483a3"
-bytes = 13882
+sha256 = "67271754d4eb8d03e8220e2a6d3a844e988aee9cfe1ca9eeaff69379b4939efe"
+bytes = 14261
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6177,8 +6177,8 @@ dataset = "posthocfilt_threshold_doubletfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "9455d34437aec722e8ddff144b0891e9aacdc7c59c1d265f400a836c0236fc43"
-bytes = 2097
+sha256 = "21cbab7b2f2df2d01eae872300d958cdeccf149aba7e043ca0022ad6031ba2e4"
+bytes = 2099
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6247,8 +6247,8 @@ dataset = "posthocfilt_threshold_doubletfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "bcb7881b47cacb6a2fed650671b943912b4a8fc7a5783417ce525c98f3093148"
-bytes = 1452
+sha256 = "b387ffbde1a2ad9ea2f9eeda78c2e8fb80e63089e80d63aaccab2533e926de89"
+bytes = 1453
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6267,8 +6267,8 @@ dataset = "posthocfilt_threshold_doubletfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "1cde3a6b4f7114c99c291c644d440e95d146180e3fe18b8b58a66e56e97cfbe0"
-bytes = 14714
+sha256 = "90ffb977c31f0051e17b2096d9e724d867203d96df018586762bd762f05b10c9"
+bytes = 15095
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6297,8 +6297,8 @@ dataset = "posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "11156af40a23070661615a6ab66accdc2f8ef65b12bb223e19178d7371a51d33"
-bytes = 2102
+sha256 = "b03092b234db93c5d32d9a28bc2c3ae9636093ca05270d39cfabb094edc174bc"
+bytes = 2091
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6367,7 +6367,7 @@ dataset = "posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "6106d8c012d0fb08f899c2c34e3a29f8da54263968d6e2c527365090fd00b3d7"
+sha256 = "907180d795837b74d854f1f4d1f70f9308ec0026d1e1b9d909417f3c2b0d3e4d"
 bytes = 1576
 tool = "clustering"
 role = "check"
@@ -6387,8 +6387,8 @@ dataset = "posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "b8303e7ed83373327bdc7ca244dece42b98f9b2fd80cbc6ffd38379cbf9a372b"
-bytes = 14256
+sha256 = "3324f479a637a5480a98d12e820bd9822f2481b4ea992c871bf070b3c8fd6bfe"
+bytes = 14637
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6417,8 +6417,8 @@ dataset = "posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "c44f2b9e1931fcec3a28d37a40173b0bdf637a3b6a9841bdb42e5c268e23c2b3"
-bytes = 2109
+sha256 = "efc4fd01e0ed3363168fdcdfb488f6750178702efd6865a4b3e8fe52abcd68c9"
+bytes = 2110
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6487,8 +6487,8 @@ dataset = "posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "5866cb2362879ea86aad872525d7e7e76bedb754bc0b6382c8bda2ccf6912b9b"
-bytes = 1576
+sha256 = "e8950d407aa9f6da01df048ebf6c8b7a35b42cd5623127dbfaf4242c5df97f38"
+bytes = 1578
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6507,8 +6507,8 @@ dataset = "posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "05405a394d8fae00b77dcfbbba9e83037e6efbbdcc9bfe78e9330bf6531b7855"
-bytes = 14120
+sha256 = "20ff12fc29793c9d1467254017cfc88984e32f27153f5180d8ebc9a0acd8e6bd"
+bytes = 14489
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6537,8 +6537,8 @@ dataset = "posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "dacd31c205ee7771b00dd37d7ae20d16a03739741f11640bd26702d3fdacc671"
-bytes = 2083
+sha256 = "37102f656e68c806b132a3d35d2ba1d7e5942c3d1176a77ef77e368751998fb7"
+bytes = 2044
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6607,7 +6607,7 @@ dataset = "posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "4247a8e4941d59808dfdca2ff39b2e843b735815edafff9b3ac27edda6022c80"
+sha256 = "133c198ca3b08e2f16451aef23ce1c142b729a37d325745a0cbc1e50479f54fd"
 bytes = 1443
 tool = "clustering"
 role = "check"
@@ -6627,8 +6627,8 @@ dataset = "posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "eebb01f08f416ac37407c14ebba0983b552c486d827c6536529e7d14e5fee77e"
-bytes = 13662
+sha256 = "cf8ccde01a77929048daead2997b43e8b365fc5743a0b8f738ae1d5c25f61c88"
+bytes = 14031
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6657,7 +6657,7 @@ dataset = "posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "37765f14ad96c10b52a693c02e237da2ec40ee1a6d4525c1b736e9ea402ddb44"
+sha256 = "75de8878073da0b199b0769c3c938d1ed85782633462e3c8ca1c97cf44fe8ff2"
 bytes = 2079
 tool = "clustering"
 role = "check"
@@ -6727,8 +6727,8 @@ dataset = "posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "cbf5037743382c009fbf45bd289df95932ca142b94b7cb2aaa01dcd2dd4f1b8d"
-bytes = 1445
+sha256 = "b6d8431c81131248ada3ce4f27ef16a0aa1a0c1d7b134a67bcc558b75c0e281a"
+bytes = 1442
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6747,8 +6747,8 @@ dataset = "posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "d8734cdcb9568c828a8ad46d5fd0cd82131b0ac2dd68bab18cd74c738b1f0e6f"
-bytes = 14222
+sha256 = "f9707c4126acf8e11e825b81992e0dd2a166d17855386d189c808fc273d95e1b"
+bytes = 14597
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6777,8 +6777,8 @@ dataset = "posthocfilt_threshold_doubletfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "55a019365ba92533821746aa0dac1f8f8d5899541cf5b4caca221d10b906da2a"
-bytes = 2084
+sha256 = "01ba1bbd8c4fbd56afa324af24d9000b184104bf1fadd5d813d6478a000173ed"
+bytes = 2072
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6847,8 +6847,8 @@ dataset = "posthocfilt_threshold_doubletfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "e13d0cf0b301b0870d6577f09a3cf6027a2e964c2240329945a933ff24ee9500"
-bytes = 1420
+sha256 = "2d307c51f03c104e1bff791425c874acfb04a22eaa2fece30bb9f86ee9c465a3"
+bytes = 1444
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6867,8 +6867,8 @@ dataset = "posthocfilt_threshold_doubletfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "75dd0c47e79983b35964c8bf10ff238e94611114770c6b7d5e5e1833d14da812"
-bytes = 13684
+sha256 = "5209164f9e1ecce96014524a558ec847d254b988f537f7f485f30ed18674b0ba"
+bytes = 14059
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6897,8 +6897,8 @@ dataset = "posthocfilt_threshold_doubletfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "fdb631b2b08611edb1bbfe6379efcbbecf58292f1a8f143e0e31f83484f6fddf"
-bytes = 2091
+sha256 = "b7d0b893c179476e14d57eff60f2071d51feaff99be9eb598dfb097962dffaff"
+bytes = 2067
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6967,8 +6967,8 @@ dataset = "posthocfilt_threshold_doubletfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "69ff1b1bd99bd2fda9757cd79f185be269674a3615a6807866cfc7a5768f9637"
-bytes = 1446
+sha256 = "a59d9b3bb8fd800f6fc0f8c7226cb31af781b93090c4bf4eda7c016f0fdaa5d1"
+bytes = 1432
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -6987,8 +6987,8 @@ dataset = "posthocfilt_threshold_doubletfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_soupx_tenx_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "011103dc003025aac28a6f711eaac6886d4a8b72d78577b8a376f7ddf5bf1e30"
-bytes = 13546
+sha256 = "001ee60be1485d0dd0b20c883a96815afd6f91ec8a148d35cb825354d514725f"
+bytes = 13909
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7017,8 +7017,8 @@ dataset = "posthocfilt_threshold_doubletfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_soupx_tenx_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "b8592eb8ab4f64d99119b6c5c9e2a67cbc0176738298f7fdb4cbcae5e33f53de"
-bytes = 2066
+sha256 = "62097445adb170aad050f82811c064c57aefb759ed821aad1a5bc670aae3eb1d"
+bytes = 2067
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7087,8 +7087,8 @@ dataset = "posthocfilt_threshold_doubletfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_soupx_tenx_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "60aa5a26ddf9515eeeaa3fdad8c3442f4ac43e7e0bd092e9c57ce62413b71179"
-bytes = 1408
+sha256 = "c60049c78e82a6dfdfe10b4f61efbcdc6a3b35d7ad689d41130692ca7e571fc3"
+bytes = 1420
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7107,8 +7107,8 @@ dataset = "posthocfilt_threshold_doubletfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_soupx_tenx_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "84cedaa830ac26d6bad3081c0c6c5c0a7fae61c385a150422e75cf74d010fc18"
-bytes = 13090
+sha256 = "c271818c1273fc3d9d7c8bd50aab41dfd73c465619b95c7d0fb8a106e691474b"
+bytes = 13453
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7137,8 +7137,8 @@ dataset = "posthocfilt_threshold_doubletfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_soupx_tenx_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "549b1221843b63f61fe6721e3438830bffdbe184a336897e2e558e035a2e769c"
-bytes = 2061
+sha256 = "7016945c37b87425c26dcfc278a6cc74f3e4f2ea9a23c2bd1c1da9ec24dc620f"
+bytes = 2076
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7207,8 +7207,8 @@ dataset = "posthocfilt_threshold_doubletfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_doubletfinder_soupx_tenx_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "95b700f8428677e0ae06ab9abbf4d6b0c3b83525b0812823998998813b958390"
-bytes = 1422
+sha256 = "cb5ef8d4f7de4ae3d6c54ef138e2e9c92cd776462ef437ed12bba98a136b5afe"
+bytes = 1407
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7227,8 +7227,8 @@ dataset = "posthocfilt_threshold_doubletfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "887d1ee5b9fd49034519a2ba4534ab065603c464379a004709be52a422b4451c"
-bytes = 14189
+sha256 = "0e2786b64b2b4f348e43b0d409d2ebd95d522a68f2ca55bf2b50e4812d862e8d"
+bytes = 14564
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7257,8 +7257,8 @@ dataset = "posthocfilt_threshold_scdblfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "c99f41b043f1a3ee21e81343fae53141ee42dfdeb649a932258b5521b1364a3e"
-bytes = 2084
+sha256 = "4e070e3b7cb379ff3347dd4b60cd4c69514e006c996c76e3993979512e760f27"
+bytes = 2085
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7327,8 +7327,8 @@ dataset = "posthocfilt_threshold_scdblfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "1b3b98ff27aaf13ea172a115059da5e961fca28e5da0cc2be8d6959f2c246140"
-bytes = 1431
+sha256 = "53bca118873d748067ee041d90d41148f9232aa85b9dc48e04cb73d10a28e949"
+bytes = 1445
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7347,8 +7347,8 @@ dataset = "posthocfilt_threshold_scdblfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "f62914330cf39a902115e2a7edbbef2c2860a3ac2a5953b067c36d31a1fdbd2e"
-bytes = 13651
+sha256 = "2d47f1994d6c25f704136ff17cf59e554bda80eb643c44a2d025c733e5de0f66"
+bytes = 14026
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7377,7 +7377,7 @@ dataset = "posthocfilt_threshold_scdblfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "c752e3b52495f2decbbbc16c11552de7a39f6092efd18db3eb1ae26c20a9df08"
+sha256 = "d4f83d1b977c2eb6a543ce334542d4ad973aea47662e19911c979c78264f1115"
 bytes = 2092
 tool = "clustering"
 role = "check"
@@ -7447,8 +7447,8 @@ dataset = "posthocfilt_threshold_scdblfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "329c7700364a3dc2f0ae36b9371b80feab0a5005133410fad6bff21f01f1d99a"
-bytes = 1444
+sha256 = "2ab01572c42afa3c305ff53fd789c22b0017dab624ccc6d0a1e8a10b5994c8f6"
+bytes = 1447
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7467,8 +7467,8 @@ dataset = "posthocfilt_threshold_scdblfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "308898fb4e38d52cf7d55da6f7cbf47667d6abe771ecebd91b682e13122db062"
-bytes = 14503
+sha256 = "4ab6e54fd42347851f0acc934ec63878f57cbfbcf655dc462b5d668d00603468"
+bytes = 14886
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7497,8 +7497,8 @@ dataset = "posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "ddb4d884b030852885d1123ee3e00507d750ebcf542e68b30718325683ddccb7"
-bytes = 2096
+sha256 = "862c5d03e1a671b620deef0ba2915831f57a28a45544de8c5226d91542ec1149"
+bytes = 2097
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7567,8 +7567,8 @@ dataset = "posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "555a4c2a98d13d4475869699561ae9f41440b7a0fd292455e304c95934f27d91"
-bytes = 1568
+sha256 = "d316f756e11aba4504e6e0b52eb1359e079d1c285d8e61a76ff00374208f5489"
+bytes = 1567
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7587,8 +7587,8 @@ dataset = "posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "3c81fdb61a3da796719ff27e0d302ce24e6dd6748f620183ffce8f30bbbc568a"
-bytes = 14043
+sha256 = "9d0105c171a956e31dca52517fcb76b844895580884473687aaae0f1ff1b10d2"
+bytes = 14426
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7617,8 +7617,8 @@ dataset = "posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "dcb8b7535c04c7ea61f3b5c9f245df4bbc667acd62fbeff4b48f37956f7ee08d"
-bytes = 2104
+sha256 = "76583e8af1d24bd495be516516ed864c6c9ca5c8b3916f32d8e9cc5fadbfde1c"
+bytes = 2105
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7687,8 +7687,8 @@ dataset = "posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "233089d93ad156bfe7a0e2e15688b0f29d645f983d3cdedaba293a340ce50134"
-bytes = 1570
+sha256 = "5cb12222cd1adb2c5806b90e1be38b9d7f078e2203b7cbe049a45d1049251600"
+bytes = 1558
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7707,8 +7707,8 @@ dataset = "posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "f5f04d4318ce62a685ec6e24d5de3fff041d79886fa3aac52728d692c0f8d301"
-bytes = 13965
+sha256 = "f2c13bcee9d0cbcdbadb0b9ed1472a4faa22e26de257cd796eaf4d86d9a06191"
+bytes = 14330
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7737,8 +7737,8 @@ dataset = "posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "27b6ce7216e28df81911c1301847a077dd871a8fdd9374e300cd28e139222f34"
-bytes = 2078
+sha256 = "0216cf30bdd856a4733b9d1cf7f40046b73ee6dc71c87f102fcce4f8bb733321"
+bytes = 2066
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7807,8 +7807,8 @@ dataset = "posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "9bc56a8e95ff6232ce137b4bcaff897d04d40d8e0e4c75ec36d4449d2d872e03"
-bytes = 1410
+sha256 = "307c7f5b35a9b9a2902b2ae61485e175b64e0bc943b5a077445d4f50d98421bd"
+bytes = 1434
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7827,8 +7827,8 @@ dataset = "posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "3a75945514bfb35643202ba39329da167b37e682d2c3187127d31aaa4278c190"
-bytes = 13431
+sha256 = "c88acf27e96ca1c81e54681f4367c418c17ebc53377f0b092d41cc9111229d01"
+bytes = 13796
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7857,7 +7857,7 @@ dataset = "posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "093d49ce560dbdeb50e9b4f763fe70a395164813d310b778e8276e419efa2cc2"
+sha256 = "faf3f5730a48ab44b7f93753280fc28286c8c4978221945e648f06e38fa51ad7"
 bytes = 2073
 tool = "clustering"
 role = "check"
@@ -7927,8 +7927,8 @@ dataset = "posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "5182f45e856b3ceaa3eab8f4b1455e35d16c53269b570621a72e85e006e18124"
-bytes = 1436
+sha256 = "b137fceb532f7fd0cf50b3edc6f6e4e4e22936d083c61f75a1058919a32781b1"
+bytes = 1424
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7947,8 +7947,8 @@ dataset = "posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "890317a7f8a33dd5f9bf1c8fce541fa9d5001a34619e95c473a8673999618f0d"
-bytes = 13991
+sha256 = "23ba6ac5a48d19c48c17d60a5fbabccd15f2aa6723ef8274dfc82401ca12f84f"
+bytes = 14362
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -7977,8 +7977,8 @@ dataset = "posthocfilt_threshold_scdblfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "a9ad33a6f8e529d860cb3954b1d10c145ca9544a090e9ac108cd14849655cf3c"
-bytes = 2065
+sha256 = "0f8dcecd8fe9e15e68e7e622f2152e2b8b99bb81e7bbc62ea1580fe6e499eda9"
+bytes = 2080
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8047,8 +8047,8 @@ dataset = "posthocfilt_threshold_scdblfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "4051d5d3f0245aaf5a98a47b3db4bffe688ad0e79f6cccb58ff97f556e7aa564"
-bytes = 1543
+sha256 = "c1467bbeaaeaa8d33d3cfe351fb45f17c313ac31983aa75e7dbb851ab0006c44"
+bytes = 1531
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8067,8 +8067,8 @@ dataset = "posthocfilt_threshold_scdblfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "7c6dc3b4a2885ca0d28102730b609ee758249ad2b8704ad28f8e7bde6e5db1cd"
-bytes = 13453
+sha256 = "c6dd99ef6afe8b689a9083733a4ffb9630427d57d7f6d49f06396a2ede171387"
+bytes = 13824
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8097,8 +8097,8 @@ dataset = "posthocfilt_threshold_scdblfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "b21376ae41c878e10c9d3f586b9a785cb0458fbfd3fc3916de8cdc282c9fa8ca"
-bytes = 2072
+sha256 = "5aa4ea5ee02086a3b42b05456e9030f89ce7d555334e538a891d653dd0c1494e"
+bytes = 2088
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8167,8 +8167,8 @@ dataset = "posthocfilt_threshold_scdblfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "dd7ea826cf789778538528ebe62213cab3ab78ad399e977c1b9f887089e605f8"
-bytes = 1544
+sha256 = "cc48706e17f0985ace2911424dcad7aaf2e28d2e5f4e1158fb55d2f4a6892037"
+bytes = 1545
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8187,8 +8187,8 @@ dataset = "posthocfilt_threshold_scdblfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_soupx_tenx_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "74e201e94bb497a0f298ad8a007c2ff7cae67c1e9ccab14c93961c157d14bab0"
-bytes = 13319
+sha256 = "917244b34bb818a8024638754956b3e0160ef201ee6f5d6f3f45ec99c202132d"
+bytes = 13678
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8217,8 +8217,8 @@ dataset = "posthocfilt_threshold_scdblfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_soupx_tenx_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "86bde51d13e26a39a9bb30e1366d059195552f9b3dc9fd120b9d86afc5908f0b"
-bytes = 2059
+sha256 = "aeaa19348723a17344c2b72b90880230901a2beb0ac02c92473d07fcce69bac6"
+bytes = 2061
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8287,8 +8287,8 @@ dataset = "posthocfilt_threshold_scdblfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_soupx_tenx_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "342de33a33ff0d54d04e5b061ee98939f67c1201533cb9bf7c59037f43df9499"
-bytes = 1401
+sha256 = "7f8cbed0d7e1f13a44875bab16684db4ea4087cddb11690e2d1c7fdb7250e209"
+bytes = 1413
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8307,8 +8307,8 @@ dataset = "posthocfilt_threshold_scdblfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_soupx_tenx_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "7dc7a1b01c8338f25c8a1acd347a4ddd5a20c107fef121ef4a041252f3461005"
-bytes = 12859
+sha256 = "a2c1edc95e4746fa10336963da0fd31d848d37936e4a5e5e96bc9373efef7c62"
+bytes = 13218
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8337,7 +8337,7 @@ dataset = "posthocfilt_threshold_scdblfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_soupx_tenx_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "ed1b7b5c36d28d4b64394d28ae624a0b2076d17c6da1a17a0ae57f8b4cfa86a1"
+sha256 = "cce2b681090ad1aa9c0d7625d94a1693093ef225f4a7d5e460b5e717361086d4"
 bytes = 2055
 tool = "clustering"
 role = "check"
@@ -8407,8 +8407,8 @@ dataset = "posthocfilt_threshold_scdblfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/posthocfilt_threshold_scdblfinder_soupx_tenx_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "1ffbe203d05989bc8446e0a82c3193459feb24e30139d8d061da1bac2f7de53f"
-bytes = 1401
+sha256 = "d0d352dccb27be2eb79a76bf38f8aa5fe54af663219c60ffd44d67cd19587a29"
+bytes = 1414
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8427,8 +8427,8 @@ dataset = "posthocfilt_threshold_scdblfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "8ed7659f43472894fb863dff5c259d056495195dfb42d49a77ce313dae828176"
-bytes = 11931
+sha256 = "93bdd32bd91efefd410b1fec5d4b9b8bd92c0ca8cd2d26d955aabd34aef7ab14"
+bytes = 12262
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8457,8 +8457,8 @@ dataset = "scdblfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "df46714906cb994ec101987762c622a1a6e198d245b4856bebfe62f97b7213dc"
-bytes = 2018
+sha256 = "af5b665736f9bda669da22daa9262c35172fb7a192a9d70e43fc225381abb678"
+bytes = 2021
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8527,8 +8527,8 @@ dataset = "scdblfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "581fc671ddcb34b4f232e2ac9413b88b03b48231a45731950edb6cd994109d8c"
-bytes = 1569
+sha256 = "755148cbd65a83d683316fe1a805f8694c3cea8af0ecd7ac608592c7a4485451"
+bytes = 1556
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8547,8 +8547,8 @@ dataset = "scdblfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "855185375336cf2785036ce9de3fd6a44e700d0127e0c2bc4ecf2c293453b1b0"
-bytes = 11473
+sha256 = "9412af8800edc51a8f9bc1e47609817930975d36e0713805b7b1c9ccc3ae5281"
+bytes = 11804
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8577,7 +8577,7 @@ dataset = "scdblfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "90545156acfa51fbfd1893d8ab34d6d1e9304034115e167226689f0f1529a79e"
+sha256 = "12c6cb26ae21a7e03d4a0f5e5c73895a1c3c0a7e6ef1fa8072278a8b2540e5c3"
 bytes = 2027
 tool = "clustering"
 role = "check"
@@ -8647,7 +8647,7 @@ dataset = "scdblfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_cellbender_fromraw_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "24f43d2ddf520a1d2d6d457d15b2552546fada5138d20c23a52ed6d6f54664fb"
+sha256 = "3d18c539908668b6f8551d5b5529f5fc736d37da3867f4f11317235369ad154c"
 bytes = 1571
 tool = "clustering"
 role = "check"
@@ -8667,8 +8667,8 @@ dataset = "scdblfinder_cellbender_fromraw_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "6a3ee1cd95117bb22fe7a5b130776382321b6aadf065422c315b357513e4dbfa"
-bytes = 12327
+sha256 = "226399ea2bf03c1a17b4635467797b135f9c782dc8ed55b732b7a8e61206aacb"
+bytes = 12666
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8697,8 +8697,8 @@ dataset = "scdblfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "7f5a2b81e0cd526920db758cbfdae8a7ae4f5f340622bb252b7eb96d0b0624c0"
-bytes = 2018
+sha256 = "7bd1010f1836d8fd5d937bbfd4516d9663b54dff3f13c31898816416707b5fb4"
+bytes = 2019
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8767,8 +8767,8 @@ dataset = "scdblfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "9d12f9afa18c8648989dc95d11ae964c18a7af33b801258b1b8db353311fd286"
-bytes = 1586
+sha256 = "3c949862634e41e0082e59730ef024b1e7c249bc1c47cf6cc6a08c252c6e6cd9"
+bytes = 1585
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8787,8 +8787,8 @@ dataset = "scdblfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "2adf5d7d11d28c37b2fdf932c73f4bb439b49f680ae35bed7a071a6d43642cb2"
-bytes = 11869
+sha256 = "26b2bebe7d8547a2e2cdbe57fc276cf3be26c332ba0f2ab438bf3705bd7114e5"
+bytes = 12208
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8817,8 +8817,8 @@ dataset = "scdblfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "3b36e379c4622fbf621ce65d69afa6ce3b0486903d8b1c6cb8b061115a4d9b16"
-bytes = 2038
+sha256 = "5567467fee847f1125f84d780abe196bbee53e90ad472350672022ffe015cec7"
+bytes = 2040
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8887,8 +8887,8 @@ dataset = "scdblfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_decontx_raw_emptydrops_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "06320d2278506fb6f441e32a369771ca7d6da7ec4aa8393a570fcffe26d9f02f"
-bytes = 1587
+sha256 = "89708e349ffe582e5a25e83f59e6872c93c189e6509bc9f90459ddea4b9a64de"
+bytes = 1588
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8907,8 +8907,8 @@ dataset = "scdblfinder_decontx_raw_emptydrops_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "fa2e0e6d0d9907ab3ddc4695491311df1936f1f59e427b18acc7dfd334055347"
-bytes = 11733
+sha256 = "994f1842b55d0360ebab823db4a5655c077ad3eebda4e8d2a818fa3c5a9f0f96"
+bytes = 12060
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -8937,7 +8937,7 @@ dataset = "scdblfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "99c5fadbe9fa8d2757131b1048d7925ac60570fefbaef4dc04650d05cbcab251"
+sha256 = "9bfd23b00d8dcb312ade7978c545d542c2b0e3bb921d323c8784664c5fce03a0"
 bytes = 2013
 tool = "clustering"
 role = "check"
@@ -9007,7 +9007,7 @@ dataset = "scdblfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "e5ec1a9d89b76bc6a7a5c988866b979f0e3dbe8b0616c64c48d6dc1af80f6e71"
+sha256 = "0ddb4410180d3125e709350d131af657da50ef471d25eb0f96314d2c9ef6b384"
 bytes = 1457
 tool = "clustering"
 role = "check"
@@ -9027,8 +9027,8 @@ dataset = "scdblfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "5b644f4b8437e761dec94d42e309481f3d3d6ce31ea90a3d4b9dcce3ba9e49e6"
-bytes = 11275
+sha256 = "e76920d8e1a3730f3155ec387bbf2eb68d1f3d984615652e84f47003ee0eaa6f"
+bytes = 11602
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9057,8 +9057,8 @@ dataset = "scdblfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "e558db12d788ddd080d5eb1fc04c00069541b9cedf9addf7be860dcace0a859d"
-bytes = 2018
+sha256 = "3aaa760111c62dfe2afa1f0e611992530b19c6018a805b84267c5551ee3fcf0f"
+bytes = 2022
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9127,7 +9127,7 @@ dataset = "scdblfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_decontx_raw_tenx_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "a71ed9aed647754d78235d83e6109f0ec211717b659d316c67d1682d3b39e4a5"
+sha256 = "e5910176a21e96d9934b97577f45047dadaa6dc559aae9362d55f677fe32ac67"
 bytes = 1459
 tool = "clustering"
 role = "check"
@@ -9147,8 +9147,8 @@ dataset = "scdblfinder_decontx_raw_tenx_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "b31f27baec2c4888443f32c3c7c38bc1873f6000ca034336a3658900be67a323"
-bytes = 11733
+sha256 = "203d6447ea222f566fa01303139d79c45e3b30759c074ba23c7ab35c85c25f5a"
+bytes = 12060
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9177,8 +9177,8 @@ dataset = "scdblfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "e1975f664b345ddb9541f66c7b277829d719ae09ebc135ed993aed3f6f58e72b"
-bytes = 1999
+sha256 = "9b6804a572fb7400b039cadd5f10827676e35333a42ae620bccf78dd6eab7ed7"
+bytes = 1998
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9247,8 +9247,8 @@ dataset = "scdblfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "4eec96c85fa480a9d7119ea66ea2d3d3fe448087f20acc4408bb982f1ac6bea6"
-bytes = 1550
+sha256 = "8fec20cb918332cad59f01abe84b8e0c21446ddd537d8f3da108d03f3af6440b"
+bytes = 1549
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9267,8 +9267,8 @@ dataset = "scdblfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "1161f6ba98991f7eec035a27a7488e4f47531c696e319741f9646ad708ab0110"
-bytes = 11275
+sha256 = "1339433c1d256f81b6e6d6aa570cb8a5f17461a5028d21a66677cf8c1a11753c"
+bytes = 11602
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9297,8 +9297,8 @@ dataset = "scdblfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "eac1bd1079f613867be9d420709d3edc55475b98fe741915d5715b0130ba5b86"
-bytes = 2020
+sha256 = "26c4c17e57722c7e6aa574eff257149fdc110ed507fc2a278343465d44d80979"
+bytes = 2021
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9367,7 +9367,7 @@ dataset = "scdblfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_soupx_emptydrops_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "0204b9f473d9a1fff00a8edf05b5fc3214abbadbd7efc8e13bdfebafcbca8281"
+sha256 = "ccdc50950ea53c384b5c340917d78536fea74a4c793c31a41527c2e52f27613f"
 bytes = 1563
 tool = "clustering"
 role = "check"
@@ -9387,8 +9387,8 @@ dataset = "scdblfinder_soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_soupx_tenx_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "6a99a57f6527da02b56a738af424233a7c3f5d67a110b706941c7e5b7c7d3860"
-bytes = 11139
+sha256 = "8a4fc30b2c00801ba041638e1016de045fc61e61adce5f7d52bf4ed829309a0b"
+bytes = 11454
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9417,8 +9417,8 @@ dataset = "scdblfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_soupx_tenx_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "27410ba456fbe35b6b09e8ac0479b3041b1afe120c2f811e72df5682000309dd"
-bytes = 1994
+sha256 = "9a56865285dbed8382e4e03d6cae240b447399aff19bae32820a99a3f8ee608e"
+bytes = 1983
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9487,8 +9487,8 @@ dataset = "scdblfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_soupx_tenx_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "2382e2e8769a60506e899ee565d6d9b9ff6b9fefd3542e8ffca13a47396a98cd"
-bytes = 1407
+sha256 = "6b96941bedbbb5154369c24716aee388371fe5c0da73879be049a947c7c60f84"
+bytes = 1432
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9507,8 +9507,8 @@ dataset = "scdblfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_soupx_tenx_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "5f4a908e702d5a2d976f0d70f46130d5fa4670116d7d1fabab2bd6186018a88a"
-bytes = 10681
+sha256 = "02d7fd5407874ddee89cd3b6a14b4a6fc6b0d827762f265676e5bee0b3606018"
+bytes = 10996
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9537,8 +9537,8 @@ dataset = "scdblfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_soupx_tenx_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "2ac937a048b7c6f9374f86a97f05f0eab04193ef5f8e9411590d4ef46235aa03"
-bytes = 2002
+sha256 = "585929439d76267c781309c57a847354cfe4e7a024006d0ce5911d9e3833ab17"
+bytes = 2004
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9607,8 +9607,8 @@ dataset = "scdblfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/scdblfinder_soupx_tenx_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "cf9bee1264d641ac3e527236acb9a35c168e0f66c4ecbaf559fd84213a92010a"
-bytes = 1433
+sha256 = "2b498b1cf342b5ccb207bdf57d3647094d733ca21cfd814a7a0663cfde4aa4c8"
+bytes = 1432
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9627,8 +9627,8 @@ dataset = "scdblfinder_soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_4500871lane/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "72d577dc158894e38cf24b05eea3dabd6e52b751ff50ec04c31e0e78a72caaac"
-bytes = 11663
+sha256 = "840164b1cee98f8a435f9f9a478caffa42c1d49862bff3973e1177e42210ed46"
+bytes = 12012
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9657,8 +9657,8 @@ dataset = "soupx_emptydrops_4500871lane"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_4500871lane/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "393c735ee3881e80eb3f6f13f4d183879490d1489b2a0a850e85e60fba5f278b"
-bytes = 1966
+sha256 = "cf4ee9bf7c6192afcbd35723f722d23ff344083fe7835756876be7122b0e2efb"
+bytes = 1956
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9727,8 +9727,8 @@ dataset = "soupx_emptydrops_4500871lane"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_4500871lane/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "a1168d22986668dff137f1dae6376d0f90417bf36891752b7173718df9acba58"
-bytes = 4510
+sha256 = "f7e0a5ec3213e8ad07493454756f92a124e8d219b809135fa7ab4390746116ce"
+bytes = 4521
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9747,8 +9747,8 @@ dataset = "soupx_emptydrops_4500871lane"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_4500871lane/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "0eef9f058a96cce115f2e71752b1272f17e417074cfbc492fed2a9f45c3d9b69"
-bytes = 10877
+sha256 = "4ed6109d7b3855cbdb22aff2f771fd443ba5109af0dc3d1d7411e63a08e4228b"
+bytes = 11226
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9777,8 +9777,8 @@ dataset = "soupx_emptydrops_4500871lane"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_4500871lane/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "3d0809f8c6e45819ca1234acc6808295cab379fadbd4232b417d040ff2e0177d"
-bytes = 1963
+sha256 = "23f10b874901893b8f6b25b654699f33d5373c678b5de3f77d1ece0e6bd7b6ea"
+bytes = 1953
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9847,8 +9847,8 @@ dataset = "soupx_emptydrops_4500871lane"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_4500871lane/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "30f45d938febcb233d01397ed25f9c9b8b47864902589278c8ed76f2bfcb2973"
-bytes = 4525
+sha256 = "f1b4ffb1cc90084f25dfe155955808852e4eac3dff3c160fdbc7f67d55ec353f"
+bytes = 4513
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9867,8 +9867,8 @@ dataset = "soupx_emptydrops_4500871lane"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_4500871lane/loaders/m13-9ce0adb/production/m17/k11.tsv"
-sha256 = "9e10e3b082c404c1ce7d632c5758b2ed1519ce1f174786269213d3b616ef085c"
-bytes = 6410
+sha256 = "1bad49685631155fdeff083e1863b3e93499e2df8afb20dffc8e72729009debf"
+bytes = 6586
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9877,8 +9877,8 @@ dataset = "soupx_emptydrops_4500871lane"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_4500871lane/loaders/m13-9ce0adb/production/m17/compare.json"
-sha256 = "e1bfbbeab34b3005b16c9dad4e2899f9072ccef9c5c045ffaa2374f42b399c60"
-bytes = 1505
+sha256 = "9ef9ae5161c50000ff4e6c9170aa500b9b7106319404267ec40952db032843a7"
+bytes = 1529
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9887,8 +9887,8 @@ dataset = "soupx_emptydrops_4500871lane"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_sscovelli/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "fe561ea40a9b6c2ab45f63c47e05e13dbb6ae8b58ac854b75c9637effa8ef5a5"
-bytes = 11557
+sha256 = "fb443d584f9650805fd8b1b3d9c8296ef18861655d1fa4af8bb6c7495787eb0a"
+bytes = 11902
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9917,8 +9917,8 @@ dataset = "soupx_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_sscovelli/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "2ff867f508b8cf5b2a0453943f31fb15dd81603c25c54e03e2f5ab7eb329bf3f"
-bytes = 1931
+sha256 = "834ba877f69a282d40f9906b46209906b81aab1e92c65c3fe733f4bfe7f7ac47"
+bytes = 1906
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -9987,8 +9987,8 @@ dataset = "soupx_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_sscovelli/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "a58e6a78e397a96964597f28a1a5cccf12049122605395caaeff9800279de821"
-bytes = 5066
+sha256 = "4f69bb9f177fe5ec242ce949d00260132933618f47aa450b9829a05e3985ccc3"
+bytes = 5079
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10007,8 +10007,8 @@ dataset = "soupx_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_sscovelli/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "966f143ee720803b7d0bbecc537f9146ff28ed0e8e2338db491f20f781f5e76e"
-bytes = 10691
+sha256 = "fd65be3d605c8056dcab9274d10ed0a56b578a8894451c8e04e11ea67d6ee200"
+bytes = 11036
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10037,8 +10037,8 @@ dataset = "soupx_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_sscovelli/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "ce66e9b886f58bc33874d6b79f5fab164960087b68176828f00462e558308eef"
-bytes = 1959
+sha256 = "13d62729f2992d6aa9b4de3628685e4c47c098996d823ef58f7c97dae3770dcd"
+bytes = 1960
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10107,8 +10107,8 @@ dataset = "soupx_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_sscovelli/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "489142dd876ccb6f7193af6de72d50e2abdd7a2a0e120ced33e682383ddacf2b"
-bytes = 5077
+sha256 = "0069b7218bf8732e428e097ab5f9e993a339f199f8d5d4796031b4fb688a10a5"
+bytes = 5087
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10127,8 +10127,8 @@ dataset = "soupx_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_sscovelli/loaders/m13-9ce0adb/production/m17/k11.tsv"
-sha256 = "6751b4e6faf074a01ee0448b2a6b7aba7e651a1737bc00c67e252570d1a1feee"
-bytes = 6302
+sha256 = "ad96411ef1b2d6a67b2d54a6de27c000fd479f2babd5672e21da77e47990851f"
+bytes = 6476
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10137,8 +10137,8 @@ dataset = "soupx_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_sscovelli/loaders/m13-9ce0adb/production/m17/compare.json"
-sha256 = "8a5b09247bf75a4405b409556c217fce979897e4965f500b2fe7e6f40840e83b"
-bytes = 1504
+sha256 = "e9bd9851e65aa1827a8da4725c45947dab99a34b157df38d207448f08703a28a"
+bytes = 1515
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10147,8 +10147,8 @@ dataset = "soupx_emptydrops_sscovelli"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "1355dfda0a788fef1b2d6470173c9f32132543f87a7e38120e3dc17a23275d88"
-bytes = 10528
+sha256 = "dcd3bd0fc85afbf144433ba7f58a5d453e9b11949c311fe73d213443b67a1c08"
+bytes = 10831
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10177,8 +10177,8 @@ dataset = "soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "899a897d6cb077f6deb1c42f0e5077bf8ce98cd1fad7764d3789619c5b781e7c"
-bytes = 1972
+sha256 = "86ad68088b5ec4a6035a31736a197cacceaab3c5a6742f1be4959d8ca4730124"
+bytes = 1958
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10247,8 +10247,8 @@ dataset = "soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "362bd41762c8018f255025d6e6998c528858e6631005bba9f16a6f439e25a0a9"
-bytes = 1504
+sha256 = "85d404f6931a3ab1f9ded9f537f1ec904f278fad3395fdb9741a6775ceca8c01"
+bytes = 1495
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10267,8 +10267,8 @@ dataset = "soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "3c825093d1124c8b68d638a266b5758d4b25b25f9713fb0a9b6b736601519736"
-bytes = 10068
+sha256 = "a30c4283f957ce933078ece348e385f19d8337201f2f5f84f9c882bd7590d8a7"
+bytes = 10371
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10297,8 +10297,8 @@ dataset = "soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "1fe0dfcb1dc00a7a2c406f8076a6856b16f84d42189dd6a1c83b45059f242cae"
-bytes = 1979
+sha256 = "7233f71c38c1d43c66567697b8afdd6508bc48aa56e307b2e889353519d28ee3"
+bytes = 1964
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10367,8 +10367,8 @@ dataset = "soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/soupx_emptydrops_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "3d6d634ad4a85190077c87c66b17957a279fb78008ec6dc4a9c8e91bbac6d93b"
-bytes = 1508
+sha256 = "e76db98bb288b2262f437ed8c7381d4016901c3964083a7b751332f64b0ac1de"
+bytes = 1507
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10387,8 +10387,8 @@ dataset = "soupx_emptydrops_test"
 
 [[file]]
 path = "data/clustering/soupx_tenx_10xmousebrain/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "0be1ce9486ba027b9d2b63d92ee2a036f9bd51868e21463cb7f76ec2f424ade1"
-bytes = 11263
+sha256 = "d661fab2f477cce3592d518b95c86a6453e7b256cda711658972c000532dd855"
+bytes = 11604
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10417,8 +10417,8 @@ dataset = "soupx_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/soupx_tenx_10xmousebrain/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "620542d037355ffdbea79d1d1aff9d149fd6c94865dcf14b6ff8bd68883c601e"
-bytes = 1955
+sha256 = "dccb8f5a0e4d1d12fba3e8b1e26a59cd71a8f2497d82e96718553292621ff5a0"
+bytes = 1945
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10487,8 +10487,8 @@ dataset = "soupx_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/soupx_tenx_10xmousebrain/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "956a47ddb6b71c4226a16a4694c26a03665e0800a3b3a420677b83b4537b0988"
-bytes = 3395
+sha256 = "276d79ce0de5348d9990f1dbd4bcc5f695fc71bfddd58da59da27d611ab882a9"
+bytes = 3365
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10507,8 +10507,8 @@ dataset = "soupx_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/soupx_tenx_10xmousebrain/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "2431645c8259d398296c2f6420597727a3ba9fbc0d595ca01bf875b06d1d6e64"
-bytes = 10483
+sha256 = "6a0dc4ba009f5e72fa367ae85574388b85d9a41a396324f17824397e3f2ca314"
+bytes = 10824
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10537,8 +10537,8 @@ dataset = "soupx_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/soupx_tenx_10xmousebrain/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "e9119e8b1faaea1a2823567fb35bee8e3bd3bdba561a31d884fc1f5f6bc967e6"
-bytes = 1951
+sha256 = "a8fdc59bb1dafba9ea3cf9dc747e60d764f64cb00ec5cc9221414050e0259afa"
+bytes = 1941
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10607,8 +10607,8 @@ dataset = "soupx_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/soupx_tenx_10xmousebrain/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "daf74309413ac44b240261e46ee67a798cc9888a92be71aa068ff6d11a1cc4fa"
-bytes = 3383
+sha256 = "f8ecbfe448f750ac75ff7f1b163c22e5bde4a3faf7adad1ee4f0dcb75b727c10"
+bytes = 3393
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10627,8 +10627,8 @@ dataset = "soupx_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/soupx_tenx_10xmousebrain/loaders/m13-9ce0adb/production/m17/k11.tsv"
-sha256 = "9e2bc6d099fc634bc385d74c3827c68e3b9e110c5be3ab247a44b0a01a8d5d6b"
-bytes = 6183
+sha256 = "2be07e18f37f7ea90dd48dfdecb14b5bcaf40cb9e5b4cd6397a4ac03ae9494c6"
+bytes = 6355
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10637,8 +10637,8 @@ dataset = "soupx_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/soupx_tenx_10xmousebrain/loaders/m13-9ce0adb/production/m17/compare.json"
-sha256 = "6e2e1c873eca28280d55d6a8ad3d3dc7d8cd968cc07a7c83752a1282fde04439"
-bytes = 1495
+sha256 = "46e8a8661860bc86cc12d5533044cab7d5be95effce9a2920cebe8416f92c718"
+bytes = 1518
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10647,8 +10647,8 @@ dataset = "soupx_tenx_10xmousebrain"
 
 [[file]]
 path = "data/clustering/soupx_tenx_SRR18256555/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "c82d1b0a3a1754b075061dfa984826fd213134ad8f6dbcb3ddc21239e32f3310"
-bytes = 11031
+sha256 = "3ff6dc2fa6c6462a03147a25ce6f3401a2dcd4a9dd4b18c5372f5ceb5fc9c0f5"
+bytes = 11342
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10677,8 +10677,8 @@ dataset = "soupx_tenx_SRR18256555"
 
 [[file]]
 path = "data/clustering/soupx_tenx_SRR18256555/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "792af9d8308b4ab066a8398d2c9ea79a3bd887345cb7f5f5d3cac4838b5ea611"
-bytes = 1934
+sha256 = "89a49a256575f86af617d315dca4a222f08ec5768f367e2556af136bba87e498"
+bytes = 1935
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10747,8 +10747,8 @@ dataset = "soupx_tenx_SRR18256555"
 
 [[file]]
 path = "data/clustering/soupx_tenx_SRR18256555/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "5c65dc1101350f91cd5be6301e2ed7f0cba6f8b830ae24c65c8822505d7facfa"
-bytes = 2707
+sha256 = "b8e85c307e96ad33f508f445538b8b7cd344033be2e8cca04680a98a5e37d555"
+bytes = 2695
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10767,8 +10767,8 @@ dataset = "soupx_tenx_SRR18256555"
 
 [[file]]
 path = "data/clustering/soupx_tenx_SRR18256555/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "1fc21910dc7483f7eab6cd87e06706ca454c0001e151bf168b3477d34f00d6c7"
-bytes = 10253
+sha256 = "51fbe7eadc825d4bd725c17f40e70a5f7859ada1defa8f7a30779d5d81410dea"
+bytes = 10564
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10797,8 +10797,8 @@ dataset = "soupx_tenx_SRR18256555"
 
 [[file]]
 path = "data/clustering/soupx_tenx_SRR18256555/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "382c4527b8761bf4f5af51f93e538330c641f07283030ac453f5c54d7a7a361b"
-bytes = 1941
+sha256 = "9733fc649d6a681e51973a3194eff16e9aabe1de1bd5c7d31fae5df0d7ab37a3"
+bytes = 1954
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10867,8 +10867,8 @@ dataset = "soupx_tenx_SRR18256555"
 
 [[file]]
 path = "data/clustering/soupx_tenx_SRR18256555/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "194b1f9dcf2435d387af42e67aa0418c43de4e539fde4bebe537168410a54875"
-bytes = 2709
+sha256 = "615b7e2714fc0b52c87715b4c5e6a466cee97f46fd6dc32ee94f11d33ef2b14d"
+bytes = 2698
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10887,8 +10887,8 @@ dataset = "soupx_tenx_SRR18256555"
 
 [[file]]
 path = "data/clustering/soupx_tenx_SRR18256555/loaders/m13-9ce0adb/production/m17/k11.tsv"
-sha256 = "ea2b065c8541d9b4835cef358cc1cb09d9798e26c2305030d45ddf945acbeb13"
-bytes = 6053
+sha256 = "324a0f07984a97b30a9d26667485f7558cd6197ebd3162492fe4201074a9ccc6"
+bytes = 6210
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10897,8 +10897,8 @@ dataset = "soupx_tenx_SRR18256555"
 
 [[file]]
 path = "data/clustering/soupx_tenx_SRR18256555/loaders/m13-9ce0adb/production/m17/compare.json"
-sha256 = "1c6627afb4fa97227955c2d7962747034301de1bdd64158b31df84fd0ed84963"
-bytes = 1485
+sha256 = "a97434be18fc32698bc788d398839d898d9ea0494967bbfdafb0bb35049793e1"
+bytes = 1508
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10907,8 +10907,8 @@ dataset = "soupx_tenx_SRR18256555"
 
 [[file]]
 path = "data/clustering/soupx_tenx_test/loaders/m13-9ce0adb/portable/r/k11.tsv"
-sha256 = "3ad094622e573db3476a7319524a5ac05d9564775222b0bf10401f456ae550a2"
-bytes = 9926
+sha256 = "93480863bbeba18006be12cf83f896645d6c023c65ff43a812ba10ebb9ea1bcc"
+bytes = 10217
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -10937,8 +10937,8 @@ dataset = "soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/soupx_tenx_test/loaders/m13-9ce0adb/portable/r/compare.json"
-sha256 = "ecf57be12e6a172b4c898f3f93f718b51d390eeb019c73f14b89c022e14e6c8f"
-bytes = 1940
+sha256 = "ae04130db79387b486ed418ae52b841f804f96b20c5cbb837c26e65f6fbff1f9"
+bytes = 1954
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -11007,8 +11007,8 @@ dataset = "soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/soupx_tenx_test/loaders/m13-9ce0adb/portable/markers/markers.json"
-sha256 = "15e24a616b9dff0f92d59733cf1d94c54c765f661d1a7f4f624d318809e0e543"
-bytes = 1377
+sha256 = "a8aeba5139ae3413f729e0c4b924aea46f36a8182e67558fb10c3a8d44d684e0"
+bytes = 1363
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -11027,8 +11027,8 @@ dataset = "soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/soupx_tenx_test/loaders/m13-9ce0adb/production/r/k11.tsv"
-sha256 = "f67a94aa50f9b55ad442b46891c81ba0a44a859c3a7008a57ba3467309169fae"
-bytes = 9474
+sha256 = "8d92cf8932b101bd60b12991f42b142d78fb3f2882e4a224e392a4bd3ca69b64"
+bytes = 9765
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -11057,8 +11057,8 @@ dataset = "soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/soupx_tenx_test/loaders/m13-9ce0adb/production/r/compare.json"
-sha256 = "9121b8a131c8f22367b32deab557456ee761122522857142e19d36b1e4bbe0c7"
-bytes = 1960
+sha256 = "333e90b9364d45c3f42849cf37f59c43ffd71343de179834b0b145785eabd5b9"
+bytes = 1962
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -11127,8 +11127,8 @@ dataset = "soupx_tenx_test"
 
 [[file]]
 path = "data/clustering/soupx_tenx_test/loaders/m13-9ce0adb/production/markers/markers.json"
-sha256 = "701a5746ece056e9039b3bae007308294c22c8878b75267f1217602e6a02c890"
-bytes = 1355
+sha256 = "e092c0ef5ed67e4fe6686db9696de242c73925419d179f4f33dbc5da3caee88c"
+bytes = 1380
 tool = "clustering"
 role = "check"
 milestone = "M14"
@@ -12746,8 +12746,8 @@ note = "K11, Python loader (production export): compare_anndata.json"
 dataset = "soupx_tenx_test"
 
 [[file]]
-path = "data/clustering/m14/cargo_tests/61872136/results.tsv"
-sha256 = "71808af0ab54d2512c8d6f18ca13bf90c3bb08a318917f27d77b458609ac13ad"
+path = "data/clustering/m14/cargo_tests/61888985/results.tsv"
+sha256 = "e575f4c37ac10a4d3718aae10a4244aeb470a6f34e20258a9f185aaa58fed1ac"
 bytes = 25977
 tool = "clustering"
 role = "check"
@@ -12755,8 +12755,8 @@ milestone = "M14"
 note = "cargo test --workspace, debug and release, every test's outcome"
 
 [[file]]
-path = "data/clustering/m14/tests/61873628/r.log"
-sha256 = "99484ac468b17e908c7baa88471a05b9dda5935863fe3b6631ad9aeafe86f543"
+path = "data/clustering/m14/tests/61878765/r.log"
+sha256 = "e91b736378e8a8274bfd1dac0517540fffe0cc684b40dc5d1f8ab4c1840753c2"
 bytes = 116
 tool = "clustering"
 role = "check"
@@ -12764,8 +12764,8 @@ milestone = "M14"
 note = "the loaders' own tests: r"
 
 [[file]]
-path = "data/clustering/m14/tests/61873628/python.log"
-sha256 = "3067a04078efc2ca0e1d8519377c7d59a13f6f5a12b6845b0e98b850240c058a"
+path = "data/clustering/m14/tests/61878765/python.log"
+sha256 = "a544c0135f67b599ff94e0f34e592ff43dff2430324fd7821f2f98db797ec850"
 bytes = 100
 tool = "clustering"
 role = "check"
