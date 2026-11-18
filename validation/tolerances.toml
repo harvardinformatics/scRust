@@ -428,6 +428,18 @@ K8_cluster_var = { max_abs = 1.75e-9, max_scaled = 1.67e-13 }
 K9_dist50 = { max_abs = 6.5e-11, max_scaled = 2.8e-13 }
 K9_neighbor_count = { cells_differing = 22, objects = 11 }
 K9_purity = { cells_differing = 19, objects = 10, max_abs = 0.019 }
+# M12 adds the K9 entries M11's measurement holds but M8's table did not list (job 60798602,
+# data/clustering/floor_kernel_m11/summary.md; maxima over the 34 objects, rounded up), and the
+# neighbour lists compared cell by cell, which that measurement could only call incomparable
+# (lengths differ): measured on the 28 objects whose runs kept them (27 tier T and
+# soupx_tenx_SRR18256555), 12 cells in 6 objects, each the median cell or its k-th neighbour of
+# an odd-sized object, none differing in order only. In every case the median cell's k-th
+# neighbour lies on the radius and the kernel decides whether it is within it (M12).
+K9_sums = { cells_differing = 22, objects = 11, max_abs = 1.8e-2, max_scaled = 2.0e-2 }
+K9_totals = { cells_differing = 22, objects = 11, max_abs = 1.8e-2, max_scaled = 1.04e-2 }
+K9_neighbors = { cells_differing = 12, objects = 6, note = "the 28 objects with lists; each differing list gains or loses one cell" }
+purity_radius = { max_abs = 1.2e-12, max_scaled = 6.3e-14 }
+purity_mean_neighbors = { max_abs = 2.3e-2, max_scaled = 5.2e-4, objects = 11 }
 
 # Kernel-gated grading (M11; docs/PLAN.md A5b mechanism 3): `scrust validate cluster` grades every
 # check exactly when the reference's and the candidate's recorded OpenBLAS kernels match;
@@ -450,8 +462,8 @@ exact_when = "the reference's and the candidate's recorded OpenBLAS kernels matc
 otherwise = "tolerance: BLAS-free checks exact; BLAS-dependent checks within [clustering.floor.kernel], exact where it lists nothing"
 no_kernel_recorded = "tolerance (never exact)"
 saved_object_kernel = "SapphireRapids"
-blas_free = ["FindClusters' settings", "barcodes", "nCount_RNA", "nFeature_RNA", "S2a", "SCTransform's RNG states", "RunPCA's entry and irlba's entry states", "approxSilhouette teacher-forced on R's embeddings and labels", "every check of a run started from R's embeddings or SNN graph"]
-blas_dependent = ["S2b", "S2c", "S2d", "scale.data's digest", "S3", "irlba's exit state", "K3", "K4", "K5", "K6", "K7", "K8", "the result section's numbers", "the saved object's labels and silhouette widths"]
+blas_free = ["FindClusters' settings", "barcodes", "nCount_RNA", "nFeature_RNA", "S2a", "SCTransform's RNG states", "RunPCA's entry and irlba's entry states", "approxSilhouette teacher-forced on R's embeddings and labels", "neighborPurity teacher-forced on R's embeddings and labels (M12)", "the purity certificate (a property of the search)", "every check of a run started from R's embeddings or SNN graph"]
+blas_dependent = ["S2b", "S2c", "S2d", "scale.data's digest", "S3", "irlba's exit state", "K3", "K4", "K5", "K6", "K7", "K8", "K9 (M12)", "the result section's numbers", "the saved object's labels, silhouette widths and purities"]
 floor = "clustering.floor.kernel"
 
 # K0, Kiss64Random (M9): RcppAnnoy 0.0.23's kissrandom.h, compiled with the R env's compiler and
@@ -545,7 +557,64 @@ blas_dependent = true
 compare = ["K3", "K4", "K5", "K6", "K7", "K8_silhouette_width", "K8_silhouette_other", "K8_centroids", "K8_cluster_var", "metadata.tsv", "levels", "cluster_ids.txt", "nclusters.txt", "pca/", "graphs", "result", "saved labels and levels", "saved silhouette widths (production profile)"]
 otherwise = { criterion = "floor", floor = "clustering.floor.kernel" }
 teacher_forced_silhouette = "exact on any machine"
-not_compared = ["neighborhood_purity (M12)", "nCount_SCT, nFeature_SCT (M13)", "K9, K10 arrays", ".Random.seed after RunUMAP"]
+not_compared = ["nCount_SCT, nFeature_SCT (M13)", "K10 arrays", ".Random.seed after RunUMAP"]
+# (M11 also left out neighborhood_purity and the K9 arrays; M12 compares them, under [clustering.K9].)
+
+# K9, neighbourhood purity (M12; docs/PLAN.md C3e, C5): bluster 1.20.0's neighborPurity as the
+# workflow calls it (k = 50, weighted, BiocNeighbors 2.4.0's default index, KMKNN), searched
+# exhaustively with knncolle's arithmetic (crates/knn/src/purity.rs) and summed as bluster sums
+# (crates/cluster/src/purity.rs). Compared: each cell's 50th distance, the radius (R's median) and
+# the mean neighbour count, the neighbour counts, the neighbour lists cell by cell where R kept
+# them (level full, and the small tier-P object), the weights, the per-cluster sums, the totals,
+# the purities and the maxima (K9_* against the instrumented runs); neighborhood_purity and
+# purity_maximum in metadata.tsv against the direct runs; neighborhood_purity against the saved
+# object, under its kernel. Teacher-forced on R's own embeddings and labels the comparison is
+# BLAS-free, so exact on any machine; from the counts it depends on the PCA, so it is
+# BLAS-dependent: exact under the reference's kernel, otherwise within [clustering.floor.kernel].
+#
+# The certificate: every pair close enough to a threshold for KMKNN's floating-point
+# triangle-inequality bounds to treat it differently from the exhaustive search. Step 3 (the range
+# query): pairs within the radius with a raw (squared) distance above
+# L = ((radius - kappa B)/(1 + e))^2 (1 - g). Step 1 (the 50th distance): a raw distance in (v, H),
+# H = ((sqrt(v/(1 - g))(1 + e) + kappa B)/(1 - u))^2, above a cell's 50th raw distance v. From
+# knncolle's arithmetic as BiocNeighbors 2.4.0 builds it (u = 2^-53, dims summed m):
+# g = gamma(m + 2), e = g/2 + g^2/2 + u + ug, kappa = 2e + u + eu, B the diagonal of the cells'
+# bounding box, each side widened by the k-means centres' rounding (gamma(n + 2) + 2u) max|x|;
+# each constant enlarged by 1%, each threshold moved 16 ulps outwards. Each flag is labelled
+# median_pair (a cell whose 50th distance is the radius, and its 50th neighbour: on the radius by
+# construction, so with an odd number of cells whenever it is within it) or other.
+#
+# M12's decision point (C6): the certificate flags pairs, so the user chose between porting KMKNN
+# and agreeing how to treat the flagged cells. Decided on 2026-11-17: keep the exhaustive result,
+# report the flagged pairs (summary.json result.purity.certificate, the stage dumps'
+# K9_certificate_*, the validation reports and docs/validation/clustering.md), and grade the
+# certificate "flagged, reported", passing. M17's comparison of the 840 saved objects' purities
+# covers every flagged pair. A KMKNN port can follow (plan C6), and nothing depends on it.
+# Decision-point survey (validation/slurm/m12_certificate.sbatch, binary scrust-m12-survey, jobs
+# 61647015 and 61647016): on R's own embeddings, both profiles' instrumented runs of the 34 objects
+# (68 runs), the certificate flags the median pair of each of the 17 odd-sized objects whenever it
+# is within the radius (23 runs, at 0 or 1 ulp below the radius squared) and nothing else; every
+# other K9 check is identical to R's (1,053 teacher-forced, 181 others).
+[clustering.K9]
+criterion = "exact"
+blas_dependent = "from the counts or from SCTransform's output; BLAS-free from R's embeddings (teacher-forced)"
+compare = ["K9_dist50", "purity_radius", "purity_mean_neighbors", "K9_neighbor_count", "K9_neighbors (cell by cell)", "K9_weights", "K9_sums", "K9_totals", "K9_purity", "K9_maximum", "metadata.tsv neighborhood_purity", "metadata.tsv purity_maximum", "saved neighborhood_purity"]
+otherwise = { criterion = "floor", floor = "clustering.floor.kernel" }
+teacher_forced = "exact on any machine"
+saved_objects = "exact in the production profile; the portable runs graded under the saved objects' kernel against the floor (K9_purity), as M8 measured"
+certificate = "flagged pairs reported, not failed (M12's decision); every flag labelled median_pair or other"
+certificate_decision = "2026-11-17: keep the exhaustive result; report the flagged pairs; M17's saved purities check them; a KMKNN port is optional"
+# Settled (M12; label m12-4231635, validation/slurm/m12_cluster.sbatch, jobs 61652407, 61652409,
+# 61652412, 61652416): 222 comparisons of the chain from the counts with every R run of its profile
+# (the 27 tier-T and 7 tier-P objects, both profiles), all in exact mode and passing: 1,831 K9
+# checks identical (the stage dumps, the scalars, the files), none differing or missing; the saved
+# objects' purities identical in the production profile on all 34 objects, and in the portable
+# profile within the floor in the 28 runs M8 found (the median pair); teacher-forced on R's
+# embeddings, 1,033 checks identical in the 98 comparisons with instrumented runs. The certificate:
+# the median pair of every odd-sized object, whenever within the radius (17 objects; 23 of the 68
+# runs on R's embeddings), and nothing else; 102 certificates reported in the 222 comparisons.
+# Every check M11's 290 reports held keeps its status and counts (31,269).
+settled = { comparisons = 222, k9_identical = 1831, teacher_forced_identical = 1033, certificates_reported = 102, saved_within_floor_portable = 28, m11_checks_unchanged = 31269 }
 
 # Kernel-gated grading shown on deliberately mismatched pairs (M11): each Rust run against the
 # other profile's instrumented R run on Sapphire Rapids, 68 pairs of the 34 objects in both
@@ -558,6 +627,11 @@ not_compared = ["neighborhood_purity (M12)", "nCount_SCT, nFeature_SCT (M13)", "
 pairs = 68
 passed = 68
 checks_within_floor = 1028
+# M12 (label m12-4231635): the same 68 pairs with purity, all in tolerance mode and passing: 1,304
+# checks within [clustering.floor.kernel], 276 of them K9's (the 50th distances, the radius, the
+# mean neighbour count, and the counts, lists, sums, totals and purities of the median pairs);
+# teacher-forced K9 identical (713 checks).
+m12 = { pairs = 68, passed = 68, checks_within_floor = 1304, k9_within_floor = 276 }
 
 # Threads (M9, scrust neighbors): 1 and 32 threads on both 79,409-cell objects give byte-identical
 # knn_index.tsv, knn_distance.tsv, nn.mtx.gz, snn.mtx.gz and annoy.ann (job 60383132,
@@ -670,6 +744,16 @@ compared = [
   { tier = "P", profile = "portable", objects = 7, threads = [8, 1], files = "55-56", differing = 0 },
   { tier = "P", profile = "production", objects = 7, threads = [1, 32, 8], files = 17, differing = 0 },
 ]
+# M12 (label m12-4231635; m12_cluster.sbatch, the one-thread tier-P run job 61652418, the benchmark
+# job 61652420), with purity: the same comparisons, every file byte-identical, the K9 dumps and the
+# certificate's arrays included; the one-thread tier-P runs' 17 reports equal the 8-thread runs'
+# check by check. cargo test compares 1, 2, 5 and 16 threads.
+compared_m12 = [
+  { tier = "T", profile = "portable", objects = 27, threads = [8, 1], files = "71 or 76", differing = 0 },
+  { tier = "T", profile = "production", objects = 27, threads = [8, 1], files = "71 or 76", differing = 0 },
+  { tier = "P", profile = "portable", objects = 7, threads = [8, 1], files = "63-68", differing = 0 },
+  { tier = "P", profile = "production", objects = 7, threads = [1, 32, 8], files = 17, differing = 0 },
+]
 
 # Performance (M11), the chain: scrust cluster --counts --preset workflow on the seven tier-P
 # objects, without stage dumps, at 1 and 32 threads, one Sapphire Rapids node (Xeon Platinum 8480CL,
@@ -717,4 +801,29 @@ measured_m11 = [
   { object = "cellbender_fromraw_ghirsutum2", side = "R", threads = 1, umap = true, wall_s = 1144.7, runumap_s = 82.9, peak_rss_gib = 104.13 },
   { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, wall_s = 255.5, sctransform_s = 181.3, pca_s = 39.8, neighbors_s = 14.3, cluster_s = 9.6, silhouette_s = 1.10, peak_rss_gib = 2.65 },
   { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, wall_s = 52.1, sctransform_s = 20.8, pca_s = 7.2, neighbors_s = 4.5, cluster_s = 9.2, silhouette_s = 1.10, peak_rss_gib = 2.69 },
+]
+# M12 (label m12-4231635; job 61652420, validation/slurm/m12_benchmark.sbatch, holy8a24302, Xeon
+# Platinum 8480CL, test partition, 32 CPUs reserved): the same runs with purity, against the same R
+# runs (measured_m11's R rows; R's purity_s is its neighborPurity). Settled (M12): met. Rust at one
+# thread takes 2.4-5.6 times less time than R's whole run and 1.9-2.7 times less than R's chain
+# through purity, at 32 threads 8.2-15.8 times less than R's whole run; peaks at 0.15-3.19 GiB
+# against R's 2.50-104.13 GiB; 3.15 GiB (1 thread) and 3.19 GiB (32) on the 79,409-cell objects.
+# Purity at one thread: 0.18-83.5 s against R's 0.18-192.6 s (R's KMKNN is faster on the two
+# 11,831-cell objects: 0.94-0.97 s against 1.87-1.88 s); at 32 threads 0.018-2.8 s. Purity never
+# raises the peak RSS (run.phases: the peak after it equals the peak before it).
+measured_m12 = [
+  { object = "soupx_tenx_SRR18256555", side = "Rust", threads = 1, wall_s = 11.3, sctransform_s = 6.8, pca_s = 3.1, neighbors_s = 0.6, cluster_s = 0.2, silhouette_s = 0.04, purity_s = 0.177, peak_rss_gib = 0.15 },
+  { object = "soupx_tenx_SRR18256555", side = "Rust", threads = 32, wall_s = 3.2, sctransform_s = 1.3, pca_s = 0.9, neighbors_s = 0.3, cluster_s = 0.2, silhouette_s = 0.04, purity_s = 0.018, peak_rss_gib = 0.18 },
+  { object = "soupx_tenx_10xmousebrain", side = "Rust", threads = 1, wall_s = 38.6, sctransform_s = 20.9, pca_s = 6.7, neighbors_s = 2.4, cluster_s = 1.0, silhouette_s = 0.20, purity_s = 1.880, peak_rss_gib = 1.44 },
+  { object = "soupx_tenx_10xmousebrain", side = "Rust", threads = 32, wall_s = 14.7, sctransform_s = 5.4, pca_s = 1.5, neighbors_s = 1.0, cluster_s = 1.0, silhouette_s = 0.21, purity_s = 0.102, peak_rss_gib = 1.44 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "Rust", threads = 1, wall_s = 39.6, sctransform_s = 21.3, pca_s = 7.1, neighbors_s = 2.6, cluster_s = 1.1, silhouette_s = 0.21, purity_s = 1.870, peak_rss_gib = 1.44 },
+  { object = "filtered_seurat_tenx_10xmousebrain", side = "Rust", threads = 32, wall_s = 14.7, sctransform_s = 5.3, pca_s = 1.5, neighbors_s = 1.0, cluster_s = 1.1, silhouette_s = 0.20, purity_s = 0.110, peak_rss_gib = 1.44 },
+  { object = "soupx_emptydrops_4500871lane", side = "Rust", threads = 1, wall_s = 86.2, sctransform_s = 41.6, pca_s = 17.4, neighbors_s = 7.0, cluster_s = 4.6, silhouette_s = 0.69, purity_s = 9.231, peak_rss_gib = 1.48 },
+  { object = "soupx_emptydrops_4500871lane", side = "Rust", threads = 32, wall_s = 25.1, sctransform_s = 8.4, pca_s = 3.4, neighbors_s = 2.3, cluster_s = 4.2, silhouette_s = 0.68, purity_s = 0.368, peak_rss_gib = 1.48 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 1, wall_s = 314.4, sctransform_s = 124.6, pca_s = 54.8, neighbors_s = 23.7, cluster_s = 16.6, silhouette_s = 2.41, purity_s = 83.460, peak_rss_gib = 3.15 },
+  { object = "soupx_emptydrops_sscovelli", side = "Rust", threads = 32, wall_s = 66.9, sctransform_s = 19.9, pca_s = 10.0, neighbors_s = 6.5, cluster_s = 17.1, silhouette_s = 2.42, purity_s = 2.273, peak_rss_gib = 3.19 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 1, wall_s = 297.9, sctransform_s = 116.1, pca_s = 49.0, neighbors_s = 22.0, cluster_s = 18.9, silhouette_s = 2.43, purity_s = 80.664, peak_rss_gib = 3.15 },
+  { object = "filtered_seurat_emptydrops_sscovelli", side = "Rust", threads = 32, wall_s = 67.3, sctransform_s = 19.8, pca_s = 9.7, neighbors_s = 6.6, cluster_s = 17.1, silhouette_s = 2.43, purity_s = 2.807, peak_rss_gib = 3.19 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 1, wall_s = 305.9, sctransform_s = 185.0, pca_s = 41.0, neighbors_s = 15.2, cluster_s = 10.1, silhouette_s = 1.11, purity_s = 43.641, peak_rss_gib = 2.65 },
+  { object = "cellbender_fromraw_ghirsutum2", side = "Rust", threads = 32, wall_s = 57.4, sctransform_s = 22.3, pca_s = 7.9, neighbors_s = 4.8, cluster_s = 9.9, silhouette_s = 1.09, purity_s = 1.566, peak_rss_gib = 2.69 },
 ]

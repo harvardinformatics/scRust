@@ -317,7 +317,7 @@ fn cluster_matches_r_and_validates() {
     let err = String::from_utf8_lossy(&run.stderr);
     assert!(err.contains("Maximum modularity in 10 random starts: "), "prints as Seurat does");
     // --stats asks for silhouette and purity by default: from the SNN graph alone neither can be
-    // computed (silhouette needs the PCA; purity comes with M12), and the command says so
+    // computed (both need the PCA), and the command says so
     assert!(err.contains("silhouette asked for, but not computed"), "{err}");
     assert!(err.contains("purity asked for, but not computed"), "{err}");
     let report = out.join("validate.json");
@@ -406,10 +406,10 @@ fn tree(dir: &Path, skip: &[&str]) -> std::collections::BTreeMap<String, Vec<u8>
     out
 }
 
-/// The clustering chain (milestone M11) from the counts in one process, and from each stage's
-/// output (`scrust sctransform`, `scrust pca`, `scrust neighbors`): the same files, byte for
-/// byte, by every route, and the same clustering in `summary.json`. Rust against Rust under one
-/// kernel, so any kernel.
+/// The clustering chain (milestones M11 and M12) from the counts in one process, and from each
+/// stage's output (`scrust sctransform`, `scrust pca`, `scrust neighbors`): the same files, byte
+/// for byte, by every route (the purities among them), and the same clustering and scores in
+/// `summary.json`. Rust against Rust under one kernel, so any kernel.
 #[test]
 fn cluster_routes_agree_byte_for_byte() {
     let counts = fixture("soupx_tenx_test").join("input");
@@ -422,7 +422,7 @@ fn cluster_routes_agree_byte_for_byte() {
     let one = tmp("chain_one");
     let o = run(&["cluster", "--counts", &c, "--preset", "workflow", "--out", one.to_str().unwrap(), "--keep-stages", "--annoy", "yes", "--threads", "2"]);
     let err = String::from_utf8_lossy(&o.stderr);
-    assert!(err.contains("purity asked for, but not computed") && !err.contains("silhouette asked for"), "{err}");
+    assert!(err.contains("neighborPurity: radius") && !err.contains("asked for, but not computed"), "{err}");
     let (s, p, n) = (tmp("chain_sct"), tmp("chain_pca"), tmp("chain_nn"));
     run(&["sctransform", "--counts", &c, "--out", s.to_str().unwrap(), "--seed", "12345", "--threads", "2"]);
     run(&["pca", "--sct", s.to_str().unwrap(), "--out", p.to_str().unwrap(), "--seed", "12345"]);
@@ -435,7 +435,7 @@ fn cluster_routes_agree_byte_for_byte() {
     let want = tree(&one, &["summary.json", "stages"]);
     assert!(want.contains_key("metadata.tsv") && want.contains_key("pca/embeddings.tsv") && want.contains_key("neighbors/snn.mtx.gz") && want.contains_key("sct/scale_data.npy"));
     let meta = String::from_utf8(want["metadata.tsv"].clone()).unwrap();
-    assert!(meta.starts_with("barcode\tnCount_RNA\tnFeature_RNA\tSCT_snn_res.0.8\tseurat_clusters\tsilhouette_width\tsilhouette_other\n"), "{}", &meta[..120]);
+    assert!(meta.starts_with("barcode\tnCount_RNA\tnFeature_RNA\tSCT_snn_res.0.8\tseurat_clusters\tsilhouette_width\tsilhouette_other\tneighborhood_purity\tpurity_maximum\n"), "{}", &meta[..160]);
     let (got_sct, got_pca, got_snn) = (tree(&from_sct, &["summary.json", "stages"]), tree(&from_pca, &["summary.json", "stages"]), tree(&from_snn, &["summary.json", "stages"]));
     assert_eq!(got_sct.keys().collect::<Vec<_>>(), want.keys().collect::<Vec<_>>());
     for (k, v) in &want {
@@ -450,14 +450,14 @@ fn cluster_routes_agree_byte_for_byte() {
     let r1 = result(&one);
     for d in [&from_sct, &from_pca, &from_snn] {
         let r = result(d);
-        for key in ["n_cells", "nodes", "edges", "total_edge_weight", "resolutions", "seurat_clusters_levels", "silhouette"] {
+        for key in ["n_cells", "nodes", "edges", "total_edge_weight", "resolutions", "seurat_clusters_levels", "silhouette", "purity"] {
             assert_eq!(r1.get(key), r.get(key), "{}: result.{key}", d.display());
         }
     }
     // the stages each route made itself are recorded too
     assert!(r1.get("rng_after_sha256").and_then(|x| x.get("RunPCA")).and_then(|x| x.as_str()).is_some());
     // the run record's phases, in order, on one clock
-    for (d, want) in [(&one, "load sctransform pca neighbors cluster silhouette write"), (&from_sct, "load pca neighbors cluster silhouette write"), (&from_pca, "load neighbors cluster silhouette write"), (&from_snn, "load cluster silhouette write")] {
+    for (d, want) in [(&one, "load sctransform pca neighbors cluster silhouette purity write"), (&from_sct, "load pca neighbors cluster silhouette purity write"), (&from_pca, "load neighbors cluster silhouette purity write"), (&from_snn, "load cluster silhouette purity write")] {
         let s = scio::Json::parse(&std::fs::read_to_string(d.join("summary.json")).unwrap()).unwrap();
         let Some(scio::Json::Object(phases)) = s.get("run").and_then(|r| r.get("phases")) else { panic!("{}: no run.phases", d.display()) };
         let names: Vec<&str> = phases.iter().map(|(k, _)| k.as_str()).collect();
@@ -523,7 +523,7 @@ fn cluster_parameters_and_refusals() {
 
 /// `scrust validate cluster` on the chain's run against a committed reference that records no
 /// OpenBLAS kernel (the fixtures keep no fingerprint): tolerance mode, never exact, said so, and
-/// every check identical. No fixture value is compared with a BLAS-dependent result unless the
+/// every check identical, the purity certificate's flagged pairs reported. No fixture value is compared with a BLAS-dependent result unless the
 /// kernel is the fixture's, so the run is made under the reference's kernel first.
 #[test]
 fn cluster_validate_without_a_recorded_kernel_is_not_exact() {
@@ -539,7 +539,10 @@ fn cluster_validate_without_a_recorded_kernel_is_not_exact() {
     let text = std::fs::read_to_string(&report).unwrap();
     assert!(text.contains("\"mode\": \"tolerance\"") && text.contains("the reference records no OpenBLAS kernel"));
     assert!(!text.contains("\"status\": \"within floor\"") && !text.contains("\"status\": \"differ\""), "everything identical");
-    for check in ["seurat_clusters: labels", "SCT_snn_res.0.8: levels", "metadata.tsv: silhouette_width", "approxSilhouette width (R's embeddings and labels)", "pca/ embeddings, dims 1:30"] {
+    // an odd number of cells (267): the median cell and its 50th neighbour lie on the radius, and
+    // the certificate's flags are reported, not failed (M12's decision), labelled as that pair
+    assert!(text.contains("\"status\": \"flagged, reported\"") && text.contains("2 pair(s) flagged (2 the median pair, 0 other"), "the certificate's report");
+    for check in ["seurat_clusters: labels", "SCT_snn_res.0.8: levels", "metadata.tsv: silhouette_width", "approxSilhouette width (R's embeddings and labels)", "pca/ embeddings, dims 1:30", "metadata.tsv: neighborhood_purity", "neighborPurity purity (R's embeddings and labels)", "certificate of the candidate's purity search"] {
         assert!(text.contains(check), "{check} not checked");
     }
 }

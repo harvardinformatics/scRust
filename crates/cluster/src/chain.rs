@@ -1,7 +1,7 @@
 //! The workflow's clustering chain as one library call (docs/PLAN.md C1, C3 and C3h; milestone
-//! M11): SCTransform, the workflow's PCA guard, RunPCA, FindNeighbors, FindClusters and the
-//! silhouette widths, from the counts, or from any stage's output (`scrust cluster --sct`,
-//! `--pca`, `--snn`).
+//! M11; purity: M12): SCTransform, the workflow's PCA guard, RunPCA, FindNeighbors, FindClusters,
+//! the silhouette widths and the neighbourhood purities, from the counts, or from any stage's
+//! output (`scrust cluster --sct`, `--pca`, `--snn`).
 //!
 //! ```text
 //! obj <- SCTransform(obj, seed.use = 12345)            sctransform::start / finish
@@ -9,7 +9,7 @@
 //! obj <- RunPCA(obj, seed.use = 12345)                   pca::run_pca (npcs 50)
 //! obj <- FindNeighbors(obj, dims = 1:30)                 neighbors::find_neighbors
 //! obj <- FindClusters(obj, random.seed = 12345)          crate::find_clusters
-//! obj <- add_silhouette_to_metadata(obj)                 crate::silhouette (purity: M12)
+//! obj <- add_silhouette_to_metadata(obj)                 crate::silhouette, crate::purity
 //! ```
 //!
 //! RunUMAP, which the workflow runs between RunPCA and FindNeighbors, is left out: it changes
@@ -27,6 +27,7 @@
 
 use crate::chain_params::ChainParams;
 use crate::find_clusters::{find_clusters, ClusterError, FindClusters};
+use crate::purity::{neighbor_purity, Purity};
 use crate::silhouette::{approx_silhouette, Silhouette};
 use neighbors::{find_neighbors, Neighbors, NeighborsError};
 use pca::{Pca, PcaError};
@@ -48,6 +49,7 @@ pub enum ChainError {
     Neighbors(NeighborsError),
     Cluster(ClusterError),
     Silhouette(String),
+    Purity(String),
     Io(io::Error),
 }
 
@@ -59,7 +61,7 @@ impl fmt::Display for ChainError {
             ChainError::Pca(e) => write!(f, "RunPCA: {e}"),
             ChainError::Neighbors(e) => write!(f, "FindNeighbors: {e}"),
             ChainError::Cluster(e) => write!(f, "FindClusters: {e}"),
-            ChainError::Silhouette(m) => write!(f, "add_silhouette_to_metadata: {m}"),
+            ChainError::Silhouette(m) | ChainError::Purity(m) => write!(f, "add_silhouette_to_metadata: {m}"),
             ChainError::Io(e) => write!(f, "{e}"),
         }
     }
@@ -106,7 +108,10 @@ pub trait Observer {
     fn silhouette(&mut self, _s: &Silhouette) -> io::Result<()> {
         Ok(())
     }
-    /// A stage ended (`sctransform`, `pca`, `neighbors`, `cluster`, `silhouette`).
+    fn purity(&mut self, _p: &Purity) -> io::Result<()> {
+        Ok(())
+    }
+    /// A stage ended (`sctransform`, `pca`, `neighbors`, `cluster`, `silhouette`, `purity`).
     fn phase(&mut self, _name: &str) {}
 }
 
@@ -115,12 +120,14 @@ pub struct NoObserver;
 
 impl Observer for NoObserver {}
 
-/// What a run keeps beyond the result: every random start's partition (FindClusters), and the
-/// full residual matrix (for the `full` stage dumps; small inputs only).
+/// What a run keeps beyond the result: every random start's partition (FindClusters), the full
+/// residual matrix (for the `full` stage dumps; small inputs only), and purity's neighbour lists
+/// (for the `standard` and `full` stage dumps).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Options {
     pub keep_partitions: bool,
     pub keep_residuals: bool,
+    pub keep_purity_lists: bool,
 }
 
 /// Wall-clock seconds of each stage the run made (0 for stages it started after).
@@ -131,6 +138,7 @@ pub struct Timings {
     pub neighbors: f64,
     pub cluster: f64,
     pub silhouette: f64,
+    pub purity: f64,
 }
 
 /// The chain's result: the clustering and the scores. The stages before it were seen by the
@@ -142,6 +150,8 @@ pub struct Chain {
     /// `None` when not asked for, or when the chain started from the SNN graph without
     /// embeddings.
     pub silhouette: Option<Silhouette>,
+    /// Likewise.
+    pub purity: Option<Purity>,
     /// The embeddings' columns (the PCA's components).
     pub n_components: Option<usize>,
     pub timings: Timings,
@@ -244,12 +254,28 @@ pub fn from_snn(snn: &CscMatrix, emb: Option<(&[f64], usize)>, params: &ChainPar
         _ => None,
     };
     let silhouette_s = t1.elapsed().as_secs_f64();
+    let t2 = Instant::now();
+    let purity = match (params.stats.purity, emb) {
+        (true, Some((e, ncol))) => {
+            if e.len() != n * ncol {
+                return Err(ChainError::Purity(format!("embeddings of {} values for {n} cells x {ncol} columns", e.len())));
+            }
+            let st = &params.stats;
+            let p = neighbor_purity(e, n, ncol, &params.neighbors.dims, &clusters.seurat_clusters, st.purity_k, st.purity_weighted, opts.keep_purity_lists, threads).map_err(ChainError::Purity)?;
+            obs.purity(&p)?;
+            obs.phase("purity");
+            Some(p)
+        }
+        _ => None,
+    };
+    let purity_s = t2.elapsed().as_secs_f64();
     Ok(Chain {
         n_cells: n,
         clusters,
         silhouette,
+        purity,
         n_components: emb.map(|(_, c)| c),
-        timings: Timings { cluster: cluster_s, silhouette: silhouette_s, ..Timings::default() },
+        timings: Timings { cluster: cluster_s, silhouette: silhouette_s, purity: purity_s, ..Timings::default() },
     })
 }
 

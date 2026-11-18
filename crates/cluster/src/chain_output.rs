@@ -6,14 +6,15 @@
 //! - the labels' files (`seurat_clusters.tsv`, `clusters.tsv`, the levels, `cluster_ids.txt`,
 //!   `nclusters.txt`, `optimizer_ids.tsv`; [`crate::output`]);
 //! - `metadata.tsv`: `barcode`, `nCount_RNA` and `nFeature_RNA` (when known), each `res.`
-//!   column, `seurat_clusters`, `silhouette_width` and `silhouette_other` (when computed), then
-//!   the columns of `--metadata`;
+//!   column, `seurat_clusters`, `silhouette_width` and `silhouette_other`, `neighborhood_purity`
+//!   and `purity_maximum` (when computed), then the columns of `--metadata`;
 //! - with `--keep-stages`: `sct/` in `scrust sctransform`'s layout (`sctransform::output`), and
 //!   every random start's partition (`stages/<column>_partitions.npy`);
 //! - with `--dump-stages <level>`: `stages/`, the stage dumps of M8's instrumented runs in their
-//!   layout (context `chain`): S2a-S2d, S3, K3 (Annoy's items), K4 (`annoy.ann`), K5, K7, K8, the
-//!   `.Random.seed` checkpoints and the scalars, so `scrust validate cluster` compares them block
-//!   by block.
+//!   layout (context `chain`): S2a-S2d, S3, K3 (Annoy's items), K4 (`annoy.ann`), K5, K7, K8, K9
+//!   (purity; its neighbour lists with `purity_lists`; the certificate's flagged pairs, which R
+//!   has not), the `.Random.seed` checkpoints and the scalars, so `scrust validate cluster`
+//!   compares them block by block.
 //!
 //! Each staged start writes what its stages make, and copies what it was given (`pca/` and
 //! `neighbors/` from `scrust pca`'s and `scrust neighbors`' directories), so every route writes
@@ -22,6 +23,7 @@
 use crate::chain::Observer;
 use crate::find_clusters::FindClusters;
 use crate::metadata::RnaMetadata;
+use crate::purity::Purity;
 use crate::silhouette::Silhouette;
 use neighbors::Neighbors;
 use pca::Pca;
@@ -52,6 +54,8 @@ pub struct Writer {
     pub extra: Option<(Vec<String>, Vec<Vec<String>>)>,
     pub keep_stages: bool,
     pub annoy: bool,
+    /// Purity's neighbour lists in the stage dumps (R's `--purity-lists`).
+    pub purity_lists: bool,
     pub threads: usize,
     /// FindNeighbors' parameters, for the stage dumps' scalars.
     pub neighbor_params: Option<neighbors::NeighborParams>,
@@ -63,6 +67,7 @@ pub struct Writer {
     pub pca_result: Option<Json>,
     pub neighbors_result: Option<Json>,
     pub silhouette_result: Option<Json>,
+    pub purity_result: Option<Json>,
     /// R's digests of `.Random.seed` after SCTransform and after RunPCA, and of `scale.data`.
     pub rng_after_sct: Option<String>,
     pub rng_after_pca: Option<String>,
@@ -95,6 +100,7 @@ impl Writer {
             extra: None,
             keep_stages: false,
             annoy: false,
+            purity_lists: false,
             threads,
             neighbor_params: None,
             levels: Vec::new(),
@@ -103,6 +109,7 @@ impl Writer {
             pca_result: None,
             neighbors_result: None,
             silhouette_result: None,
+            purity_result: None,
             rng_after_sct: None,
             rng_after_pca: None,
             scale_data_sha256: None,
@@ -146,11 +153,11 @@ impl Writer {
     }
 
     /// The labels' files and `metadata.tsv`, once the clustering (and the scores) are done.
-    pub fn finish_labels(&mut self, r: &FindClusters, s: Option<&Silhouette>) -> io::Result<()> {
+    pub fn finish_labels(&mut self, r: &FindClusters, s: Option<&Silhouette>, p: Option<&Purity>) -> io::Result<()> {
         mkdir(&self.out)?;
         let written = crate::output::write_labels(&self.out, &self.barcodes, r)?;
         self.files.extend(written.into_iter().filter(|f| f != "metadata.tsv"));
-        self.write_metadata(r, s)?;
+        self.write_metadata(r, s, p)?;
         if self.keep_stages {
             let st = self.out.join("stages");
             mkdir(&st)?;
@@ -159,7 +166,7 @@ impl Writer {
         Ok(())
     }
 
-    fn write_metadata(&mut self, r: &FindClusters, s: Option<&Silhouette>) -> io::Result<()> {
+    fn write_metadata(&mut self, r: &FindClusters, s: Option<&Silhouette>, p: Option<&Purity>) -> io::Result<()> {
         let n = self.barcodes.len();
         let mut names: Vec<String> = Vec::new();
         let mut cols: Vec<Vec<String>> = Vec::new();
@@ -181,6 +188,12 @@ impl Writer {
             cols.push(s.width.iter().map(|&w| if w.is_nan() && !s.computed { "NA".to_string() } else { fmt17(w) }).collect());
             names.push("silhouette_other".into());
             cols.push(s.other_labels(&r.seurat_clusters));
+        }
+        if let Some(p) = p {
+            names.push("neighborhood_purity".into());
+            cols.push(p.purity.iter().map(|&v| if v.is_nan() && !p.computed { "NA".to_string() } else { fmt17(v) }).collect());
+            names.push("purity_maximum".into());
+            cols.push(p.maximum_labels(&r.seurat_clusters));
         }
         if let Some((en, ec)) = &self.extra {
             names.extend(en.iter().cloned());
@@ -237,6 +250,7 @@ impl Writer {
         ));
         m.push(("neighbors".into(), opt(&self.neighbors_result)));
         m.push(("silhouette".into(), opt(&self.silhouette_result)));
+        m.push(("purity".into(), opt(&self.purity_result)));
         Json::Object(m)
     }
 
@@ -422,10 +436,155 @@ impl Observer for Writer {
         Ok(())
     }
 
+    fn purity(&mut self, p: &Purity) -> io::Result<()> {
+        let levels = self.levels.clone();
+        self.purity_result = Some(purity_json(p, &levels, &self.barcodes));
+        let lists = self.purity_lists;
+        if let Some(rec) = self.rec() {
+            if p.computed {
+                let n = p.purity.len();
+                let nk = p.uclust.len();
+                rec.writer.add_f64("K9_dist50", CTX, p.dist_k.clone(), n, 1, "K9");
+                rec.writer.add_i32("K9_neighbor_count", CTX, p.neighbor_count.iter().map(|&c| c as i32).collect(), n, 1, "K9");
+                if lists {
+                    if let Some((ptr, idx)) = &p.neighbor_lists {
+                        rec.writer.add_i32("K9_neighbors_ptr", CTX, ptr.iter().map(|&v| v as i32).collect(), ptr.len(), 1, "K9");
+                        rec.writer.add_i32("K9_neighbors_idx", CTX, idx.iter().map(|&v| v as i32 + 1).collect(), idx.len(), 1, "K9");
+                    }
+                }
+                rec.writer.add_f64("K9_weights", CTX, p.weights.clone(), n, 1, "K9");
+                // targets: cells x clusters, column-major
+                let mut sums = vec![0.0; n * nk];
+                for i in 0..n {
+                    for c in 0..nk {
+                        sums[i + c * n] = p.sums[i * nk + c];
+                    }
+                }
+                rec.writer.add_f64("K9_sums", CTX, sums, n, nk, "K9");
+                rec.writer.add_f64("K9_totals", CTX, p.totals.clone(), n, 1, "K9");
+                rec.writer.add_f64("K9_purity", CTX, p.purity.clone(), n, 1, "K9");
+                rec.writer.add_i32("K9_maximum", CTX, p.maximum.iter().map(|o| o.map_or(-1, |v| v as i32)).collect(), n, 1, "K9");
+                // the certificate's flagged pairs (R has none): 1-based cells, the step (1:
+                // findDistance, 3: findNeighbors), the kind (1: the median pair, on the radius by
+                // construction; 2: other), the raw distance and the threshold
+                let fl = &p.certificate.flags;
+                if !fl.is_empty() {
+                    let m = fl.len();
+                    let mut pairs = vec![0i32; m * 2];
+                    for (r, f) in fl.iter().enumerate() {
+                        pairs[r] = f.i as i32 + 1;
+                        pairs[r + m] = f.j as i32 + 1;
+                    }
+                    rec.writer.add_i32("K9_certificate_pairs", CTX, pairs, m, 2, "K9");
+                    rec.writer.add_i32("K9_certificate_step", CTX, fl.iter().map(|f| if f.step == knn::purity::Step::KthDistance { 1 } else { 3 }).collect(), m, 1, "K9");
+                    rec.writer.add_i32("K9_certificate_kind", CTX, fl.iter().map(|f| if f.kind == knn::purity::Kind::MedianPair { 1 } else { 2 }).collect(), m, 1, "K9");
+                    rec.writer.add_f64("K9_certificate_raw", CTX, fl.iter().map(|f| f.raw).collect(), m, 1, "K9");
+                    rec.writer.add_f64("K9_certificate_threshold", CTX, fl.iter().map(|f| f.threshold).collect(), m, 1, "K9");
+                }
+                rec.scalar(CTX, "purity_k", Json::Int(p.k_requested as i64));
+                rec.scalar(CTX, "purity_radius", Json::Num(p.radius));
+                rec.scalar(CTX, "purity_radius_is_median_of_dist50", Json::Bool(rcompat::quantile::median(&p.dist_k).to_bits() == p.radius.to_bits()));
+                let lv: Vec<String> = p.uclust.iter().map(|&c| levels.get(c as usize).cloned().unwrap_or_default()).collect();
+                rec.scalar(CTX, "purity_levels", Json::strs(&lv));
+                rec.scalar(CTX, "purity_neighbor_lists", Json::Bool(lists && p.neighbor_lists.is_some()));
+                rec.scalar(CTX, "purity_mean_neighbors", Json::Num(p.mean_neighbors()));
+                rec.scalar(CTX, "purity_search", Json::Str("exhaustive, with knncolle's arithmetic".into()));
+                rec.scalar(CTX, "purity_k_used", Json::Int(p.k as i64));
+                rec.scalar(CTX, "purity_certificate_flagged", Json::Int(fl.len() as i64));
+                rec.scalar(CTX, "purity_certificate_flagged_median_pair", Json::Int(p.certificate.n_flagged_kind(knn::purity::Kind::MedianPair) as i64));
+                rec.scalar(CTX, "purity_certificate_flagged_other", Json::Int(p.certificate.n_flagged_kind(knn::purity::Kind::Other) as i64));
+            }
+        }
+        Ok(())
+    }
+
     fn phase(&mut self, name: &str) {
         self.phases.push((name.to_string(), self.start.elapsed().as_secs_f64(), peak_rss_kib()));
     }
 
+}
+
+/// `summary.json`'s `result.purity`: what was computed, its summary, and the certificate (every
+/// flagged pair, with how close it lies to its threshold).
+pub fn purity_json(p: &Purity, levels: &[String], barcodes: &[String]) -> Json {
+    let num = |v: f64| if v.is_finite() { Json::Num(v) } else { Json::Null };
+    let opt = |v: Option<f64>| v.map(num).unwrap_or(Json::Null);
+    let c = &p.certificate;
+    let mut items = vec![
+        ("computed", Json::Bool(p.computed)),
+        ("dims", Json::Vector(p.dims.iter().map(|&d| Json::Int(d as i64)).collect())),
+        ("k", Json::Int(p.k_requested as i64)),
+        ("k_used", Json::Int(p.k as i64)),
+        ("weighted", Json::Bool(p.weighted)),
+        ("n_clusters", Json::Int(p.uclust.len() as i64)),
+        ("levels", Json::strs(&p.uclust.iter().map(|&c| levels.get(c as usize).cloned().unwrap_or_default()).collect::<Vec<_>>())),
+    ];
+    if p.computed {
+        let flags: Vec<Json> = c
+            .flags
+            .iter()
+            .map(|f| {
+                let bc = |i: u32| Json::Str(barcodes.get(i as usize).cloned().unwrap_or_default());
+                Json::obj(vec![
+                    ("step", Json::Str(f.step.name().into())),
+                    ("kind", Json::Str(f.kind.name().into())),
+                    ("cell", Json::Int(f.i as i64 + 1)),
+                    ("other", Json::Int(f.j as i64 + 1)),
+                    ("cell_barcode", bc(f.i)),
+                    ("other_barcode", bc(f.j)),
+                    ("raw", Json::Num(f.raw)),
+                    ("threshold", Json::Num(f.threshold)),
+                    ("ulps_from_threshold", Json::Num(f.ulps())),
+                    ("band_end", Json::Num(f.band)),
+                    ("distance_minus_radius", if f.step == knn::purity::Step::Radius { Json::Num(f.raw.sqrt() - p.radius) } else { Json::Null }),
+                ])
+            })
+            .collect();
+        let mg = p.margin.as_ref();
+        let t2 = p.radius * p.radius;
+        items.extend([
+            ("radius", Json::Num(p.radius)),
+            ("radius_raw", Json::Num(t2)),
+            ("mean_neighbors", Json::Num(p.mean_neighbors())),
+            ("search", Json::Str("exhaustive, with knncolle's arithmetic (the result is KMKNN's unless the certificate flags a pair)".into())),
+            ("purities_sha256", Json::Str(scio::sha256::hex(&p.purity.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>()))),
+            (
+                "certificate",
+                Json::obj(vec![
+                    ("flagged_pairs", Json::Int(c.n_flagged() as i64)),
+                    ("flagged_kth_distance", Json::Int(c.n_flagged_step(knn::purity::Step::KthDistance) as i64)),
+                    ("flagged_radius", Json::Int(c.n_flagged_step(knn::purity::Step::Radius) as i64)),
+                    ("flagged_median_pair", Json::Int(c.n_flagged_kind(knn::purity::Kind::MedianPair) as i64)),
+                    ("flagged_other", Json::Int(c.n_flagged_kind(knn::purity::Kind::Other) as i64)),
+                    (
+                        "treatment",
+                        Json::Str("reported, not failing: the exhaustive result is kept (M12's decision); a median pair lies on the radius by construction, and R's KMKNN kept every one M12 measured".into()),
+                    ),
+                    ("flagged_cells", Json::Int({
+                        let mut v: Vec<u32> = c.flags.iter().flat_map(|f| [f.i, f.j]).collect();
+                        v.sort_unstable();
+                        v.dedup();
+                        v.len() as i64
+                    })),
+                    ("pairs", Json::List(flags)),
+                    ("dims", mg.map(|m| Json::Int(m.dims as i64)).unwrap_or(Json::Null)),
+                    ("gamma", mg.map(|m| Json::Num(m.gamma)).unwrap_or(Json::Null)),
+                    ("eps", mg.map(|m| Json::Num(m.eps)).unwrap_or(Json::Null)),
+                    ("kappa", mg.map(|m| Json::Num(m.kappa)).unwrap_or(Json::Null)),
+                    ("bound", mg.map(|m| Json::Num(m.bound)).unwrap_or(Json::Null)),
+                    ("radius_band_raw", num(c.radius_band)),
+                    ("radius_band_ulps", num(c.radius_band / knn::purity::ulp(t2.max(f64::MIN_POSITIVE)))),
+                    ("radius_gap_below_raw", opt(c.radius_gap_below)),
+                    ("radius_gap_below_ulps", opt(c.radius_gap_below.map(|g| g / knn::purity::ulp(t2.max(f64::MIN_POSITIVE))))),
+                    ("radius_gap_above_raw", opt(c.radius_gap_above)),
+                    ("kth_band_max_raw", num(c.kth_band_max)),
+                    ("kth_band_min_raw", num(c.kth_band_min)),
+                    ("kth_gap_ratio", opt(c.kth_gap_ratio)),
+                ]),
+            ),
+        ]);
+    }
+    Json::obj(items)
 }
 
 #[cfg(test)]

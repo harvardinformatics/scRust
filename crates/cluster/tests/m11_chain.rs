@@ -78,10 +78,11 @@ fn run(object: &str, dir: &Path, threads: usize) -> cluster::Chain {
     w.features = Some(features.iter().map(|f| (f.id.clone(), f.name.clone())).collect());
     w.rna = Some(RnaMetadata::of(&counts));
     w.annoy = true;
+    w.purity_lists = true;
     let params = ChainParams::workflow();
     w.neighbor_params = Some(params.neighbors.clone());
-    let r = chain::from_counts(counts, &params, threads, Options { keep_partitions: false, keep_residuals: true }, &mut w).unwrap();
-    w.finish_labels(&r.clusters, r.silhouette.as_ref()).unwrap();
+    let r = chain::from_counts(counts, &params, threads, Options { keep_partitions: false, keep_residuals: true, keep_purity_lists: true }, &mut w).unwrap();
+    w.finish_labels(&r.clusters, r.silhouette.as_ref(), r.purity.as_ref()).unwrap();
     w.finish_dumps().unwrap();
     r
 }
@@ -238,6 +239,7 @@ fn the_chain_reports_its_stages_in_order() {
     let emb = npy(&rdir.join("pca/embeddings.npy"));
     let mut o = Order(Vec::new());
     let r = chain::from_snn(&snn, Some((&emb.block_f64(0, emb.nrow()), emb.ncol())), &ChainParams::workflow(), 2, Options::default(), &mut o).unwrap();
-    assert_eq!(o.0, vec!["cluster", "silhouette"]);
+    assert_eq!(o.0, vec!["cluster", "silhouette", "purity"]);
     assert!(r.silhouette.unwrap().computed);
+    assert!(r.purity.unwrap().computed);
 }

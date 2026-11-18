@@ -18,6 +18,7 @@ Usage: scrust validate doubletfinder --candidate <Rust output dir> [--reference 
                                  [--json <file>] [--markdown <file>]
        scrust validate cluster --reference <R run dir> --candidate <Rust output dir>
                                [--optimizer <dir>] [--panel <tsv> --object <name>]
+                               [--saved <dir>] [--saved-kernel <name>]
                                [--json <file>] [--markdown <file>]
 
 doubletfinder: compares a Rust run with an R reference run (--reference): cells.tsv,
@@ -49,22 +50,29 @@ candidate's annoy.ann) and the index file byte for byte (K3, K4); every cell's n
 float distances (K5); SCT_nn and SCT_snn, every stored entry in order and every value bitwise
 (K6). No BLAS is involved, so the comparison is exact on any machine.
 
-cluster: compares a `scrust cluster --snn` run with an R run of FindClusters on the same SNN
-graph (an instrumented clustering run of M8, a direct run, or a FindClusters reference run in
-the same layout), resolution by resolution (K7): the settings; the optimizer's ids before
-GroupSingletons (stages/K7_optimizer_ids.npy) and the final ids (K7_final_ids.npy); each
-column's labels (metadata.tsv) and levels (<column>_levels.txt, byte for byte); every line
-FindClusters printed but the elapsed time (nodes, edges, the maximum modularity as %.4f,
-communities) and GroupSingletons' messages; the singletons in order; R's .Random.seed after
-GroupSingletons (stages/rng.npy); seurat_clusters with its levels, idents_levels.txt,
-cluster_ids.txt and nclusters.txt. With --optimizer (the instrumented optimizer's output: a
-directory holding starts.tsv, or one per column or res.<r>), every start's iterations and
-modularity as a double, the best start, ids.txt, and each start's partition when the candidate
-ran with --keep-stages. With --panel (validation/clustering_panel.tsv) and --object, the
-numbers the workflow job logged. No BLAS is involved, so the comparison is exact on any
+cluster: compares a `scrust cluster` run with an R run of the workflow's chain (an
+instrumented clustering run of M8, a direct run, or a FindClusters reference run in the same
+layout), kernel-gated (exact when both runs recorded the same OpenBLAS kernel, otherwise the
+BLAS-dependent checks within the R-vs-R floor): K1-K9 from the stage dumps (SCTransform, RunPCA,
+Annoy, the neighbours, FindClusters, the silhouette, neighbourhood purity), Annoy's index, both
+graphs, the files (metadata.tsv's columns, pca/, the result section), the purity certificate (its
+flagged pairs reported), the saved object with --saved (its labels, levels, silhouette widths and
+purities, under --saved-kernel, SapphireRapids by default), and the silhouette and purity
+teacher-forced on R's own embeddings and labels. FindClusters, resolution by resolution (K7):
+the settings; the optimizer's ids before GroupSingletons (stages/K7_optimizer_ids.npy) and the
+final ids (K7_final_ids.npy); each column's labels (metadata.tsv) and levels
+(<column>_levels.txt, byte for byte); every line FindClusters printed but the elapsed time
+(nodes, edges, the maximum modularity as %.4f, communities) and GroupSingletons' messages; the
+singletons in order; R's .Random.seed after GroupSingletons (stages/rng.npy); seurat_clusters
+with its levels, idents_levels.txt, cluster_ids.txt and nclusters.txt. With --optimizer (the
+instrumented optimizer's output: a directory holding starts.tsv, or one per column or
+res.<r>), every start's iterations and modularity as a double, the best start, ids.txt, and
+each start's partition when the candidate ran with --keep-stages. With --panel
+(validation/clustering_panel.tsv) and --object, the numbers the workflow job logged. A run
+started from R's own embeddings or SNN graph uses no BLAS, so its comparison is exact on any
 machine.
 
-Exit status 0 when nothing differs, 1 otherwise.
+Exit status 0 when nothing differs beyond what the grading allows, 1 otherwise.
 ";
 
 pub fn main(argv: &[String]) -> Result<bool, String> {
@@ -186,6 +194,10 @@ fn cluster_report(argv: &[String]) -> Result<bool, String> {
     };
     if report.pass() && within_saved > 0 {
         verdict.push_str(&format!("; against the saved object (made under another kernel), {within_saved} checks within the floor"));
+    }
+    let reported = report.checks.iter().filter(|c| c.status == S::Reported).count();
+    if report.pass() && reported > 0 {
+        verdict.push_str(&format!("; {reported} purity certificate(s) flag pairs, reported (M12's decision)"));
     }
     eprintln!("{verdict}");
     Ok(report.pass())

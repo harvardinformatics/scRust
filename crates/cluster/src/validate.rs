@@ -1,19 +1,21 @@
 //! Comparison of a `scrust cluster` run with an R run of the workflow's chain (docs/PLAN.md C5:
-//! K1-K8; milestones M10 and M11), on plain files, with kernel-gated grading (A5b mechanism 3,
-//! [`scio::grade`]).
+//! K1-K9; milestones M10, M11 and M12), on plain files, with kernel-gated grading (A5b
+//! mechanism 3, [`scio::grade`]).
 //!
 //! The R side is an instrumented clustering run (`validation/R/instrumented_clustering.R`, M8,
 //! with its stage dumps), a direct run (its final files), or a FindClusters reference run in the
 //! same layout (`validation/R/cluster_references.R`, M10). What is compared depends on what both
 //! sides hold:
 //!
-//! - **K1, K2, K3, K5, K7, K8: the stage dumps**, when both runs have `stages/`: every block of
-//!   every array R dumped (S2a-S2d: SCTransform; S3: RunPCA; K3: Annoy's items; K5: the
+//! - **K1, K2, K3, K5, K7, K8, K9: the stage dumps**, when both runs have `stages/`: every block
+//!   of every array R dumped (S2a-S2d: SCTransform; S3: RunPCA; K3: Annoy's items; K5: the
 //!   neighbours; K7: the optimizer's and the final ids; K8: approxSilhouette's widths, closest
-//!   clusters, centroids and within-cluster variances), every `.Random.seed` checkpoint both
-//!   recorded, and every scalar both recorded. For runs that kept `scale.data` only as a digest
-//!   (level light), its digest (`result.scale_data_sha256`). Arrays of later milestones (K9:
-//!   purity, M12; K10: the corrected counts, M13) are listed as not compared;
+//!   clusters, centroids and within-cluster variances; K9: neighborPurity's k-th distances,
+//!   neighbour counts, neighbour lists (cell by cell, where R kept them), weights, sums, totals,
+//!   purities and maxima), every `.Random.seed` checkpoint both recorded, and every scalar both
+//!   recorded (the radius among them). For runs that kept `scale.data` only as a digest (level
+//!   light), its digest (`result.scale_data_sha256`). Arrays of later milestones (K10: the
+//!   corrected counts, M13) are listed as not compared;
 //! - **K4: Annoy's index** (`stages/annoy.ann`), byte for byte;
 //! - **K6: the graphs**, R's `graphs/` against the candidate's `neighbors/`: dimensions, every
 //!   stored entry in order, every value;
@@ -22,18 +24,26 @@
 //!   levels, what FindClusters printed, GroupSingletons' singletons, messages and R's
 //!   `.Random.seed` after it, every start against the instrumented optimizer (`--optimizer`),
 //!   `seurat_clusters` and the workflow's files, the workflow job's logged numbers (`--panel`);
-//! - **K8: the files**, against R's final files: `metadata.tsv`'s columns (`nCount_RNA`,
-//!   `nFeature_RNA`, the labels, `silhouette_width`, and the candidate's `silhouette_other`
-//!   against R's `K8_silhouette_other`); `pca/` (embeddings, loadings and their features,
-//!   standard deviations, total variance); the `result` section's numbers (cells, clusters and
-//!   their sizes, `scale.data`'s shape and digest, the variable features, the optimizer's
-//!   numbers, the digests of `.Random.seed` after SCTransform and RunPCA). Columns of later
-//!   milestones (`neighborhood_purity`: M12; `nCount_SCT`, `nFeature_SCT`: M13) are left out;
-//! - **the saved object** (`--saved`): the labels and levels, and the silhouette widths, graded
-//!   under the saved object's kernel (`--saved-kernel`, SapphireRapids: M8 found it on every
-//!   production job);
-//! - **silhouette, teacher-forced**: approxSilhouette on R's own embeddings and labels, against
-//!   R's `K8_*` arrays and `silhouette_width` column. BLAS-free, so exact on any machine.
+//! - **K8 and K9: the files**, against R's final files: `metadata.tsv`'s columns (`nCount_RNA`,
+//!   `nFeature_RNA`, the labels, `silhouette_width`, `neighborhood_purity`, and the candidate's
+//!   `silhouette_other` and `purity_maximum` against R's `K8_silhouette_other` and `K9_maximum`);
+//!   `pca/` (embeddings, loadings and their features, standard deviations, total variance); the
+//!   `result` section's numbers (cells, clusters and their sizes, `scale.data`'s shape and digest,
+//!   the variable features, the optimizer's numbers, the digests of `.Random.seed` after
+//!   SCTransform and RunPCA). Columns of later milestones (`nCount_SCT`, `nFeature_SCT`: M13) are
+//!   left out;
+//! - **K9: the certificate** of the candidate's purity search (`result.purity.certificate`): the
+//!   pairs close enough to a threshold for KMKNN's floating-point bounds to treat them
+//!   differently, each labelled by kind (the median pair, on the radius by construction, or
+//!   other). Flagged pairs are reported, not failed ([`Status::Reported`]): the user's decision at
+//!   M12 keeps the exhaustive result, and M17's saved purities check every flagged pair;
+//! - **the saved object** (`--saved`): the labels and levels, and the silhouette widths and
+//!   purities, graded under the saved object's kernel (`--saved-kernel`, SapphireRapids: M8 found
+//!   it on every production job);
+//! - **silhouette and purity, teacher-forced**: approxSilhouette and neighborPurity on R's own
+//!   embeddings and labels, against R's `K8_*` and `K9_*` arrays, the radius, and the
+//!   `silhouette_width` and `neighborhood_purity` columns, with the certificate of that search.
+//!   BLAS-free, so exact on any machine.
 //!
 //! **Grading.** Each check is BLAS-free or BLAS-dependent ([`Class`]): BLAS-dependent when any of
 //! its inputs passed through a BLAS product in the candidate's run. From the counts, that is
@@ -45,6 +55,7 @@
 //! report says so.
 
 use crate::find_clusters::Factor;
+use crate::purity::neighbor_purity;
 use crate::silhouette::approx_silhouette;
 use scio::grade::{self, Class, Floor, Mode, Outcome, Stats};
 use scio::stages::{RngCheckpoints, StageDir};
@@ -70,6 +81,8 @@ pub enum Status {
     Missing,
     /// The check does not apply (a direct run has no stage dumps; a later milestone's output).
     NotApplicable,
+    /// Flagged and reported, not failed: the purity certificate's flagged pairs (M12's decision).
+    Reported,
 }
 
 impl Status {
@@ -80,6 +93,7 @@ impl Status {
             Status::Differ => "differ",
             Status::Missing => "missing",
             Status::NotApplicable => "n/a",
+            Status::Reported => "flagged, reported",
         }
     }
 }
@@ -111,20 +125,20 @@ pub struct Report {
 }
 
 impl Report {
-    /// True when every check is identical, within the floor, or not applicable (a missing file
-    /// fails).
+    /// True when every check is identical, within the floor, not applicable, or reported (the
+    /// purity certificate's flagged pairs); a missing file fails.
     pub fn pass(&self) -> bool {
-        self.checks.iter().all(|c| matches!(c.status, Status::Identical | Status::WithinFloor | Status::NotApplicable))
+        self.checks.iter().all(|c| matches!(c.status, Status::Identical | Status::WithinFloor | Status::NotApplicable | Status::Reported))
     }
 
-    /// Checks per stage: (stage, identical, within floor, differing, missing, n/a).
-    pub fn by_stage(&self) -> Vec<(&'static str, [usize; 5])> {
-        let mut out: Vec<(&'static str, [usize; 5])> = Vec::new();
+    /// Checks per stage: (stage, identical, within floor, differing, missing, n/a, reported).
+    pub fn by_stage(&self) -> Vec<(&'static str, [usize; 6])> {
+        let mut out: Vec<(&'static str, [usize; 6])> = Vec::new();
         for c in &self.checks {
             let i = match out.iter().position(|o| o.0 == c.stage) {
                 Some(i) => i,
                 None => {
-                    out.push((c.stage, [0; 5]));
+                    out.push((c.stage, [0; 6]));
                     out.len() - 1
                 }
             };
@@ -134,6 +148,7 @@ impl Report {
                 Status::Differ => 2,
                 Status::Missing => 3,
                 Status::NotApplicable => 4,
+                Status::Reported => 5,
             };
             out[i].1[k] += 1;
         }
@@ -161,6 +176,7 @@ impl Report {
                                 ("differing", Json::Int(k[2] as i64)),
                                 ("missing", Json::Int(k[3] as i64)),
                                 ("not_applicable", Json::Int(k[4] as i64)),
+                                ("reported", Json::Int(k[5] as i64)),
                             ])
                         })
                         .collect(),
@@ -201,9 +217,9 @@ impl Report {
         if let Some(m) = &self.saved_mode {
             s.push_str(&format!("Against the saved object: **{} mode**: {}.\n", m.name(), m.reason()));
         }
-        s.push_str("\n| stage | identical | within floor | differing | missing | n/a |\n|---|---|---|---|---|---|\n");
+        s.push_str("\n| stage | identical | within floor | differing | missing | n/a | flagged, reported |\n|---|---|---|---|---|---|---|\n");
         for (st, k) in self.by_stage() {
-            s.push_str(&format!("| {st} | {} | {} | {} | {} | {} |\n", k[0], k[1], k[2], k[3], k[4]));
+            s.push_str(&format!("| {st} | {} | {} | {} | {} | {} | {} |\n", k[0], k[1], k[2], k[3], k[4], k[5]));
         }
         s.push_str("\n| stage | check | class | criterion | status | compared | differing | detail |\n|---|---|---|---|---|---|---|---|\n");
         for c in &self.checks {
@@ -524,6 +540,7 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
         None => None,
     };
     teacher_forced_silhouette(&mut g, reference, &r_meta, r_scalars.as_ref())?;
+    teacher_forced_purity(&mut g, reference, &r_meta, r_scalars.as_ref())?;
     Ok(Report { reference: reference.to_path_buf(), candidate: candidate.to_path_buf(), mode: g.mode, saved_mode, checks: g.checks })
 }
 
@@ -813,6 +830,7 @@ fn array_kind(array: &str) -> Option<(&'static str, Inputs, String, bool)> {
         "K5" => "K5",
         "K7" => "K7",
         "K8" => "K8",
+        "K9" => "K9",
         _ => return None,
     };
     let inputs = if array.starts_with("S2a") { Inputs::Free } else if stage == "K1" { Inputs::Sct } else { Inputs::Pca };
@@ -823,16 +841,14 @@ fn array_kind(array: &str) -> Option<(&'static str, Inputs, String, bool)> {
 
 /// The later milestones' arrays, and what supplies them.
 fn later_milestone(array: &str) -> Option<&'static str> {
-    if array.starts_with("K9") {
-        Some("neighbourhood purity, milestone M12")
-    } else if array.starts_with("K10") {
+    if array.starts_with("K10") {
         Some("the corrected counts, milestone M13")
     } else {
         None
     }
 }
 
-/// K1-K8 from the stage dumps: every block of every array R dumped against the candidate's,
+/// K1-K9 from the stage dumps: every block of every array R dumped against the candidate's,
 /// every RNG checkpoint and scalar both recorded, Annoy's index, and (light references) the
 /// digest of scale.data.
 fn compare_stages(g: &mut Grader, reference: &Path, candidate: &Path, r_summary: &Option<Json>, c_result: &Json) -> Result<(), String> {
@@ -852,6 +868,10 @@ fn compare_stages(g: &mut Grader, reference: &Path, candidate: &Path, r_summary:
             let array = file.trim_end_matches(".npy").trim_end_matches(&format!(".{}", rb.ctx)).to_string();
             if let Some(m) = later_milestone(&array) {
                 later.push(format!("{array} ({m})"));
+                continue;
+            }
+            if array == "K9_neighbors_ptr" || array == "K9_neighbors_idx" {
+                // compared cell by cell, below
                 continue;
             }
             let Some((stage, inputs, key, align)) = array_kind(&array) else {
@@ -874,6 +894,14 @@ fn compare_stages(g: &mut Grader, reference: &Path, candidate: &Path, r_summary:
             let ra = rs.read(file).map_err(|e| e.to_string())?;
             let ca = cs.read(file).map_err(|e| e.to_string())?;
             if rb.dtype.contains('i') {
+                if g.floor.get(&key).is_some() {
+                    // integers the floor bounds (K9's neighbour counts): graded as numbers
+                    let a: Vec<f64> = (0..rb.ncol).flat_map(|c| (0..rb.nrow).map(move |r| (c, r))).map(|(c, r)| ra.get_i32(rb.row_start + r, c) as f64).collect();
+                    let b: Vec<f64> = (0..cb.ncol).flat_map(|c| (0..cb.nrow).map(move |r| (c, r))).map(|(c, r)| ca.get_i32(cb.row_start + r, c) as f64).collect();
+                    let s = grade::stats(&a, &b, rb.nrow, rb.ncol, false);
+                    g.numeric(stage, &name, inputs, &key, &s, &format!("{} x {}", rb.nrow, rb.ncol));
+                    continue;
+                }
                 let mut nd = 0usize;
                 for c in 0..rb.ncol {
                     for r in 0..rb.nrow {
@@ -902,6 +930,15 @@ fn compare_stages(g: &mut Grader, reference: &Path, candidate: &Path, r_summary:
     if !later.is_empty() {
         later.dedup();
         g.not_applicable("later", "arrays of later milestones", Inputs::Free, format!("not compared: {}", later.join(", ")));
+    }
+    // K9: purity's neighbour lists, cell by cell (where R kept them)
+    if rs.has("K9_neighbors_ptr.npy", "chain") && rs.has("K9_neighbors_idx.npy", "chain") {
+        let r_lists = read_lists(&rs)?;
+        let c_lists = if cs.has("K9_neighbors_ptr.npy", "chain") && cs.has("K9_neighbors_idx.npy", "chain") { Some(read_lists(&cs)?) } else { None };
+        match c_lists {
+            Some(c) => compare_lists(g, "K9", "chain: K9_neighbors (cell by cell)", Inputs::Pca, &r_lists, &c),
+            None => g.missing("K9", "chain: K9_neighbors (cell by cell)", Inputs::Pca, "not in the candidate's dumps (scrust cluster --purity-lists yes)".into()),
+        }
     }
     // scale.data as a digest where R kept no copy (level light)
     if !rs.has("S2d_scale_data.chain.npy", "chain") {
@@ -933,7 +970,7 @@ fn compare_stages(g: &mut Grader, reference: &Path, candidate: &Path, r_summary:
             "irlba_exit" | "pca_exit" => ("K2", Inputs::Pca, None),
             "groupsingletons_exit" => ("K7", Inputs::Pca, Some("compared under K7")),
             "correct_entry" => ("later", Inputs::Free, Some("correct(): milestone M13")),
-            "chain_exit" => ("later", Inputs::Free, Some("after neighborPurity: milestone M12")),
+            "chain_exit" => ("K9", Inputs::Free, Some("after neighborPurity, which draws nothing from R's stream (Rcpp's rng = false; KMKNN has its own generator): R's state after GroupSingletons where it drew, compared under K7, else after RunUMAP")),
             _ => ("K2", Inputs::Free, Some("after RunUMAP, which draws from R's stream and is not ported; nothing later reads these states (GroupSingletons reseeds)")),
         };
         if let Some(w) = why_na {
@@ -969,6 +1006,7 @@ fn compare_stages(g: &mut Grader, reference: &Path, candidate: &Path, r_summary:
                 Inputs::Pca if key.starts_with("annoy") => "K4",
                 Inputs::Pca if key.starts_with("knn") => "K5",
                 Inputs::Pca if key.starts_with("optimizer") || key.contains("singleton") => "K7",
+                Inputs::Pca if key.starts_with("purity") => "K9",
                 _ => "K8",
             };
             // numbers, graded (the floor lists irlba's iterations and products); the rest as text
@@ -1087,9 +1125,34 @@ fn compare_files(g: &mut Grader, reference: &Path, candidate: &Path, r_summary: 
             g.exact("K8", "metadata.tsv: silhouette_other = K8_silhouette_other", Inputs::Pca, n, nd, format!("{} levels", levels.len()));
         }
     }
-    let later: Vec<&str> = ["neighborhood_purity", "nCount_SCT", "nFeature_SCT"].into_iter().filter(|c| r_meta.col(c).is_some()).collect();
+    match (r_meta.col("neighborhood_purity"), c_meta.col("neighborhood_purity")) {
+        (Some(a), Some(b)) if same_n => {
+            let s = grade::stats(&meta_numbers(r_meta, a), &meta_numbers(c_meta, b), n, 1, false);
+            g.numeric("K9", "metadata.tsv: neighborhood_purity", Inputs::Pca, "K9_purity", &s, "");
+        }
+        (Some(_), _) if !stats_computed.iter().any(|s| s == "purity") => {
+            g.not_applicable("K9", "metadata.tsv: neighborhood_purity", Inputs::Pca, "the candidate did not compute purities".into())
+        }
+        (Some(_), _) => g.missing("K9", "metadata.tsv: neighborhood_purity", Inputs::Pca, "not in the candidate's metadata.tsv".into()),
+        _ => {}
+    }
+    // purity_maximum against R's K9_maximum and the levels neighborPurity saw
+    if let (Ok(o), Some(cc)) = (read_npy(&reference.join("stages/K9_maximum.npy")), c_meta.col("purity_maximum")) {
+        let levels: Vec<String> = read_json(&reference.join("stages/stages.json"))
+            .ok()
+            .and_then(|j| j.get("scalars").and_then(|s| s.get("chain")).map(|c| str_list(c.get("purity_levels"))))
+            .unwrap_or_default();
+        if same_n && o.nrow() == n && !levels.is_empty() {
+            let nd = (0..n).filter(|&i| c_meta.rows[i].get(cc).map(String::as_str) != levels.get(o.get_i32(i, 0) as usize).map(String::as_str)).count();
+            // the floor found the maxima identical across kernels
+            g.exact("K9", "metadata.tsv: purity_maximum = K9_maximum", Inputs::Pca, n, nd, format!("{} levels", levels.len()));
+        }
+    }
+    // the candidate's certificate (C5: no flagged pair)
+    certificate_check(g, "K9", "certificate of the candidate's purity search", Inputs::Free, c_result.get("purity"));
+    let later: Vec<&str> = ["nCount_SCT", "nFeature_SCT"].into_iter().filter(|c| r_meta.col(c).is_some()).collect();
     if !later.is_empty() {
-        g.not_applicable("later", "metadata.tsv: columns of later milestones", Inputs::Free, format!("not compared: {} (neighborhood_purity: M12; nCount_SCT, nFeature_SCT: M13)", later.join(", ")));
+        g.not_applicable("later", "metadata.tsv: columns of later milestones", Inputs::Free, format!("not compared: {} (M13)", later.join(", ")));
     }
 
     // pca/: R's embeddings.npy, loadings.npy, loadings_features.tsv, stdev.npy, pca.json against
@@ -1289,9 +1352,19 @@ fn compare_saved(g: &mut Grader, saved: &Path, saved_kernel: &str, c_summary: &J
         (Some(_), _) => g.not_applicable("saved", "silhouette_width", Inputs::Pca, "the candidate did not compute silhouette widths".into()),
         _ => {}
     }
-    let later: Vec<&str> = ["neighborhood_purity", "nCount_SCT", "nFeature_SCT"].into_iter().filter(|c| s_meta.col(c).is_some()).collect();
+    match (s_meta.col("neighborhood_purity"), c_meta.col("neighborhood_purity")) {
+        (Some(a), Some(b)) if same_n => {
+            let s = grade::stats(&meta_numbers(&s_meta, a), &meta_numbers(c_meta, b), n, 1, false);
+            let keep = std::mem::replace(&mut g.mode, mode.clone());
+            g.numeric("saved", "neighborhood_purity", Inputs::Pca, "K9_purity", &s, &format!("saved under {saved_kernel}"));
+            g.mode = keep;
+        }
+        (Some(_), _) => g.not_applicable("saved", "neighborhood_purity", Inputs::Pca, "the candidate did not compute purities".into()),
+        _ => {}
+    }
+    let later: Vec<&str> = ["nCount_SCT", "nFeature_SCT"].into_iter().filter(|c| s_meta.col(c).is_some()).collect();
     if !later.is_empty() {
-        g.not_applicable("later", "saved: columns of later milestones", Inputs::Free, format!("not compared: {} (M12, M13)", later.join(", ")));
+        g.not_applicable("later", "saved: columns of later milestones", Inputs::Free, format!("not compared: {} (M13)", later.join(", ")));
     }
     Ok(mode)
 }
@@ -1348,5 +1421,194 @@ fn teacher_forced_silhouette(g: &mut Grader, reference: &Path, r_meta: &Table, r
         let st = grade::stats(&meta_numbers(r_meta, c), &s.width, n, 1, false);
         g.numeric("teacher", "approxSilhouette width = R's metadata.tsv silhouette_width", free, "K8_silhouette_width", &st, "");
     }
+    Ok(())
+}
+
+/// Neighbour lists from a stage directory's `K9_neighbors_ptr` and `K9_neighbors_idx` (1-based
+/// indices, as R writes them): one list per cell.
+fn read_lists(d: &StageDir) -> Result<Vec<Vec<i32>>, String> {
+    let ptr = d.read("K9_neighbors_ptr.npy").map_err(|e| e.to_string())?;
+    let idx = d.read("K9_neighbors_idx.npy").map_err(|e| e.to_string())?;
+    split_lists(&ptr, &idx).map_err(|e| format!("{}: {e}", d.dir.display()))
+}
+
+/// One list per cell from a pointer array and the indices.
+fn split_lists(ptr: &Npy, idx: &Npy) -> Result<Vec<Vec<i32>>, String> {
+    let n = ptr.nrow().saturating_sub(1);
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        let (a, b) = (ptr.get_i32(i, 0) as usize, ptr.get_i32(i + 1, 0) as usize);
+        if a > b || b > idx.nrow() {
+            return Err(format!("K9_neighbors_ptr is not a pointer array at cell {}", i + 1));
+        }
+        out.push((a..b).map(|r| idx.get_i32(r, 0)).collect());
+    }
+    Ok(out)
+}
+
+/// Compares two sets of neighbour lists cell by cell, in order: graded on the cells whose list
+/// differs (floor key `K9_neighbors`). A list that holds the same cells in another order is
+/// counted apart in the detail: BiocNeighbors orders equal raw distances by KMKNN's internal
+/// index, the port by the cell's index.
+fn compare_lists(g: &mut Grader, stage: &'static str, name: &str, inputs: Inputs, a: &[Vec<i32>], b: &[Vec<i32>]) {
+    if a.len() != b.len() {
+        g.exact(stage, name, inputs, a.len().max(b.len()), a.len().max(b.len()), format!("{} cells in R's lists, {} in the candidate's", a.len(), b.len()));
+        return;
+    }
+    let (mut differ, mut reordered, mut first) = (0usize, 0usize, None);
+    let mut entries = 0usize;
+    for (i, (x, y)) in a.iter().zip(b).enumerate() {
+        entries += x.len();
+        if x == y {
+            continue;
+        }
+        differ += 1;
+        let (mut xs, mut ys) = (x.clone(), y.clone());
+        xs.sort_unstable();
+        ys.sort_unstable();
+        if xs == ys {
+            reordered += 1;
+        }
+        if first.is_none() {
+            first = Some(format!("first at cell {}: {} neighbours in R's, {} in the candidate's", i + 1, x.len(), y.len()));
+        }
+    }
+    let s = Stats { n: a.len(), n_differ: differ, rows_differ: differ, ..Stats::default() };
+    let mut detail = format!("{} cells, {entries} neighbours in R's lists", a.len());
+    if differ > 0 {
+        detail.push_str(&format!("; {differ} cells' lists differ ({reordered} only in the order of their cells)"));
+    }
+    if let Some(f) = first {
+        detail.push_str("; ");
+        detail.push_str(&f);
+    }
+    g.numeric(stage, name, inputs, "K9_neighbors", &s, &detail);
+}
+
+/// The certificate of a purity search (`result.purity` of a summary): identical when nothing is
+/// flagged; otherwise the flagged pairs are reported, with their kinds, and the check passes
+/// (C5's K9 criterion as M12's decision settled it).
+fn certificate_check(g: &mut Grader, stage: &'static str, name: &str, inputs: Inputs, purity: Option<&Json>) {
+    let Some(p) = purity.filter(|p| !matches!(p, Json::Null)) else {
+        return;
+    };
+    if !matches!(p.get("computed"), Some(Json::Bool(true))) {
+        g.not_applicable(stage, name, inputs, "purity not computed (the workflow's guard: fewer than 2 cells or clusters)".into());
+        return;
+    }
+    let Some(c) = p.get("certificate") else {
+        g.missing(stage, name, inputs, "no certificate in the candidate's summary.json".into());
+        return;
+    };
+    let flagged = jnum(c, "flagged_pairs").unwrap_or(f64::NAN) as usize;
+    let mut detail = format!(
+        "{} pair(s) flagged ({} the median pair, {} other; {} near a k-th distance, {} near the radius); step 3's band {} ulps of the radius squared",
+        flagged,
+        jnum(c, "flagged_median_pair").unwrap_or(0.0) as usize,
+        jnum(c, "flagged_other").unwrap_or(0.0) as usize,
+        jnum(c, "flagged_kth_distance").unwrap_or(0.0) as usize,
+        jnum(c, "flagged_radius").unwrap_or(0.0) as usize,
+        jnum(c, "radius_band_ulps").map(|v| format!("{v:.0}")).unwrap_or_else(|| "-".into())
+    );
+    if let Some(Json::List(pairs) | Json::Vector(pairs)) = c.get("pairs") {
+        let shown: Vec<String> = pairs
+            .iter()
+            .take(6)
+            .map(|q| {
+                format!(
+                    "{} {} cells {}-{} at {} ulps",
+                    q.get("kind").and_then(Json::as_str).unwrap_or("?"),
+                    q.get("step").and_then(Json::as_str).unwrap_or("?"),
+                    jnum(q, "cell").unwrap_or(0.0) as i64,
+                    jnum(q, "other").unwrap_or(0.0) as i64,
+                    jnum(q, "ulps_from_threshold").map(|v| format!("{v:.0}")).unwrap_or_else(|| "?".into())
+                )
+            })
+            .collect();
+        if !shown.is_empty() {
+            detail.push_str(&format!(": {}{}", shown.join(", "), if pairs.len() > 6 { ", ..." } else { "" }));
+        }
+    }
+    // a property of the search, not a comparison: the same in any mode
+    let status = if flagged == 0 { Status::Identical } else { Status::Reported };
+    g.push(stage, name, Class::BlasFree, "no flagged pair; flagged pairs are reported, not failed (M12's decision)".into(), status, 1, (flagged > 0) as usize, detail);
+}
+
+/// neighborPurity on R's own embeddings and labels (teacher forcing): exact on any machine.
+fn teacher_forced_purity(g: &mut Grader, reference: &Path, r_meta: &Table, r_scalars: Option<&Json>) -> Result<(), String> {
+    let emb_path = reference.join("pca/embeddings.npy");
+    let d_path = reference.join("stages/K9_dist50.npy");
+    if !exists_any(&emb_path) || !exists_any(&d_path) {
+        return Ok(());
+    }
+    let emb = read_npy(&emb_path)?;
+    let (n, ncol) = (emb.nrow(), emb.ncol());
+    let e = emb.block_f64(0, n);
+    let col = r_meta.col("seurat_clusters").ok_or("R's metadata.tsv: no seurat_clusters")?;
+    let levels: Vec<String> = read_text(&reference.join("seurat_clusters_levels.txt"))?.lines().map(String::from).collect();
+    let mut codes = Vec::with_capacity(n);
+    for r in &r_meta.rows {
+        let l = r.get(col).ok_or("seurat_clusters: short row")?;
+        codes.push(levels.iter().position(|v| v == l).ok_or_else(|| format!("label {l} is not a level"))? as u32);
+    }
+    let f = Factor { name: "seurat_clusters".into(), levels, codes };
+    let nd = r_scalars.and_then(|s| jnum(s, "silhouette_dims")).map(|v| v as usize).unwrap_or(30);
+    let dims: Vec<usize> = (1..=nd).collect();
+    let k = r_scalars.and_then(|s| jnum(s, "purity_k")).map(|v| v as usize).unwrap_or(50);
+    let has_lists = exists_any(&reference.join("stages/K9_neighbors_ptr.npy"));
+    let threads = std::thread::available_parallelism().map(|v| v.get()).unwrap_or(1);
+    let p = neighbor_purity(&e, n, ncol, &dims, &f, k, true, has_lists, threads)?;
+    let free = Inputs::Free;
+    let st = |name: &str| -> Result<Npy, String> { read_npy(&reference.join(format!("stages/{name}.npy"))) };
+    let s = grade::stats(&st("K9_dist50")?.f64s(), &p.dist_k, n, 1, false);
+    g.numeric("teacher", "neighborPurity k-th distances (R's embeddings)", free, "K9_dist50", &s, "");
+    if let Some(r) = r_scalars.and_then(|sc| jnum(sc, "purity_radius")) {
+        let s = grade::stats(&[r], &[p.radius], 1, 1, false);
+        g.numeric("teacher", "neighborPurity radius (R's embeddings)", free, "purity_radius", &s, &scio::fmt17(r));
+    }
+    if let Ok(c) = st("K9_neighbor_count") {
+        let a: Vec<f64> = (0..c.nrow()).map(|i| c.get_i32(i, 0) as f64).collect();
+        let b: Vec<f64> = p.neighbor_count.iter().map(|&v| v as f64).collect();
+        let s = grade::stats(&a, &b, n, 1, false);
+        g.numeric("teacher", "neighborPurity neighbour counts (R's embeddings)", free, "K9_neighbor_count", &s, "");
+    }
+    if has_lists {
+        let r_lists = split_lists(&st("K9_neighbors_ptr")?, &st("K9_neighbors_idx")?)?;
+        let (ptr, idx) = p.neighbor_lists.clone().unwrap_or_default();
+        let c_lists: Vec<Vec<i32>> = (0..n).map(|i| idx[ptr[i] as usize..ptr[i + 1] as usize].iter().map(|&j| j as i32 + 1).collect()).collect();
+        compare_lists(g, "teacher", "neighborPurity neighbour lists (R's embeddings)", free, &r_lists, &c_lists);
+    }
+    for (name, got) in [("K9_weights", &p.weights), ("K9_totals", &p.totals), ("K9_purity", &p.purity)] {
+        if let Ok(a) = st(name) {
+            let s = grade::stats(&a.f64s(), got, n, 1, false);
+            g.numeric("teacher", &format!("neighborPurity {} (R's embeddings and labels)", name.trim_start_matches("K9_")), free, name, &s, "");
+        }
+    }
+    if let Ok(a) = st("K9_sums") {
+        let nk = p.uclust.len();
+        let mut got = vec![0.0; n * nk];
+        if p.sums.len() == n * nk {
+            for i in 0..n {
+                for c in 0..nk {
+                    got[i + c * n] = p.sums[i * nk + c];
+                }
+            }
+        }
+        let s = grade::stats(&a.block_f64(0, a.nrow()), &got, a.nrow(), a.ncol(), false);
+        g.numeric("teacher", "neighborPurity sums (R's embeddings and labels)", free, "K9_sums", &s, &format!("{} x {}", a.nrow(), a.ncol()));
+    }
+    if let Ok(o) = st("K9_maximum") {
+        let want: Vec<i64> = (0..o.nrow()).map(|i| o.get_i32(i, 0) as i64).collect();
+        let got: Vec<i64> = p.maximum.iter().map(|x| x.map_or(-1, |v| v as i64)).collect();
+        let nd = if want.len() != got.len() { want.len().max(got.len()) } else { want.iter().zip(&got).filter(|(a, b)| a != b).count() };
+        g.exact("teacher", "neighborPurity maximum (R's embeddings and labels)", free, want.len(), nd, String::new());
+    }
+    if let Some(c) = r_meta.col("neighborhood_purity") {
+        let s = grade::stats(&meta_numbers(r_meta, c), &p.purity, n, 1, false);
+        g.numeric("teacher", "neighborPurity purity = R's metadata.tsv neighborhood_purity", free, "K9_purity", &s, "");
+    }
+    let levels: Vec<String> = p.uclust.iter().map(|&c| f.levels[c as usize].clone()).collect();
+    let pj = crate::chain_output::purity_json(&p, &levels, &[]);
+    certificate_check(g, "teacher", "certificate of the search on R's embeddings", free, Some(&pj));
     Ok(())
 }
