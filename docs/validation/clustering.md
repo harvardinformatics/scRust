@@ -28,7 +28,7 @@ This is Step 2's main report, as [doubletfinder.md](doubletfinder.md) is Step 1'
 | K14 (d): without the options, M15's outputs | **120 of 120 routes byte-identical** to M15's final label on T and P in both profiles: DoubletFinder given the labels, the re-clustering in process and in two commands (with and without the export), clustering on the fly, `scrust cluster --counts` ([Without the options](#without-the-options)). |
 | K14 (e): `scrust doubletfinder` with the options; the in-memory rule | **20 of 20:** in process equal to the commands run one after the other, clustering on the fly equal to `scrust cluster --counts` with the same file, DoubletFinder's own files equal to M15's; and in cargo test, the entry point given the covariates in memory writes the command's files ([scrust doubletfinder with the options](#scrust-doubletfinder-with-the-options)). |
 | The loaders carry `percent.mt` | **Done:** a double column, exactly as written, in Seurat (after `nFeature_RNA`, as the workflow's objects hold it), SingleCellExperiment and AnnData; listed among what the loaders do not rebuild when the output did not compute it ([The loaders](#the-loaders)). |
-| Benchmark (A7 step 6) | <!-- M15b: benchmark outcome --> |
+| Benchmark (A7 step 6) | **New rows** on the seven tier-P clustering objects, three repeats at 1 and 32 threads, against R's scripts as they ran with the regression ([M15b benchmark](#m15b-benchmark); `docs/benchmarks.md`, findings and date updated): 2.7–6.7× less CPU time at one thread (2.1–3.7× with `--export`), 8.8–44× less memory, 14–20× sooner at 32 threads. The regression costs Rust nothing measurable (0.98–1.01× on the same node); it raises R's peak by up to 12%. |
 | Plan corrections | A3, A5, A5b, C1, C3 (the refused list, the commands, the outputs, C3g, C3h, a new C3j), C5 (K14), C6 (M15b's row, the order, Step 2) ([M15b corrections](#m15b-corrections-to-the-plan)). |
 | User documentation | **For M14b:** M14b has not landed on main; it will document M15b's options with M15's. The commands' `--help` and the README describe them. |
 | Documentation | This report and [clustering_m15b.tsv](clustering_m15b.tsv); `[clustering.K14]` and `[clustering.floor.kernel_regressed]` in `validation/tolerances.toml`; M15b's section of `validation/manifest.toml`; `docs/output_manifest.md`; the README; the commands' `--help`; NOTICE; `docs/benchmarks.md`. |
@@ -1975,6 +1975,24 @@ The regressions they made: clustering on the fly regressed `percent.mt` and `nCo
 #### The loaders
 
 `percent.mt` loads as a double, exactly as written (`load_seurat()`, `load_sce()`, `add_scrust()` and `load_anndata()`), from `scrust cluster --export` and from `scrust sctransform`'s `cell_metadata.tsv`. The Seurat loader puts it after `nFeature_RNA`, before the SCT assay's columns, where the workflow's objects hold it, since their scripts call `PercentageFeatureSet()` before SCTransform. The loaders' tests ([`m15b_tests.sbatch`](../../validation/slurm/m15b_tests.sbatch), job 62086880): R 87 (82 in M15), Python 14 (13), all passing. The first run (job 62086529) failed that column-order test: the loader had added `percent.mt` after the SCT assay's columns, and now adds it with the RNA assay.
+
+### M15b benchmark
+
+On the seven tier-P clustering objects, by `docs/benchmarks.md`'s method: three repeats, Xeon 8480CL nodes, cold reads, the production profile, 1 and 32 threads. R ran the workflow's scripts as they were before its commit 8d34de1, when they still regressed `percent.mt` (21 runs, each reproducing the clusters and cluster ids of M15b's R reference run). Rust ran `scrust cluster --counts --preset workflow --vars-to-regress percent.mt`, without and with `--export`, and the same binary without the regression (`b`). Every Rust run's files equal M15b's validation run of the case (126 runs, all the same). The full tables are in [docs/benchmarks.md](../benchmarks.md#the-chain-with-sctransforms-varstoregress-m15b). CPU seconds / peak GiB at one thread:
+
+| object | input cells | R with the regression | R ÷ without: CPU, peak | Rust with the regression | Rust ÷ without: CPU, peak | Rust with `--export` | R ÷ Rust: CPU · peak (with `--export`) |
+|---|---|---|---|---|---|---|---|
+| soupx_tenx_SRR18256555 | 3,108 | 54.5 / 2.98 | 0.891, 0.977 | 11.2 / 0.154 | 1.040, 1.041 | 14.6 / 0.155 | 4.9× · 19× (3.7× · 19×) |
+| soupx_tenx_10xmousebrain | 11,831 | 251 / 12.7 | 0.982, 1.049 | 37.7 / 1.45 | 1.059, 1.006 | 78.0 / 1.45 | 6.7× · 8.8× (3.2× · 8.8×) |
+| filtered_seurat_tenx_10xmousebrain | 11,831 | 206 / 13.2 | 1.036, 1.054 | 38.2 / 1.45 | 1.022, 1.006 | 78.6 / 1.45 | 5.4× · 9.1× (2.6× · 9.1×) |
+| soupx_emptydrops_4500871lane | 26,598 | 302 / 25.3 | 1.045, 1.057 | 80.1 / 1.49 | 0.992, 1.006 | 101 / 1.49 | 3.8× · 17× (3.0× · 17×) |
+| soupx_emptydrops_sscovelli | 79,409 | 813 / 67.7 | 1.153, 1.087 | 301 / 3.15 | 1.120, 1.001 | 353 / 3.34 | 2.7× · 21× (2.3× · 20×) |
+| filtered_seurat_emptydrops_sscovelli | 79,409 | 842 / 62.5 | 1.085, 1.068 | 268 / 3.15 | 0.994, 1.001 | 328 / 3.35 | 3.1× · 20× (2.6× · 19×) |
+| cellbender_fromraw_ghirsutum2 | 59,323 | 835 / 118.1 | 1.056, 1.122 | 310 / 2.66 | 1.070, 1.002 | 398 / 3.06 | 2.7× · 44× (2.1× · 39×) |
+
+- **Against R with the regression:** 2.7–6.7× less CPU time at one thread (2.1–3.7× with `--export`), 8.8–44× less memory, and 14–20× sooner at 32 threads (12–17× with `--export`).
+- **The regression costs Rust nothing measurable:** run on the same node, the regressed chain took 0.98–1.01× the CPU time of the chain without it (seven pairs of repeats). The medians, 0.99–1.12×, mix nodes: soupx_emptydrops_sscovelli's 1.12 comes from two repeats on a slower node (301 s, against 263 s for its third repeat and 268 s without the regression on that node). The peak is the same (1.000–1.006×; 1.04× on the smallest object, 6 MB).
+- **R's peak rises with it,** by up to 12% (cellbender_fromraw_ghirsutum2: 118 against 105 GiB). R's CPU time moves by −11% to +15%, within its repeats' spread; its runs without the regression are the first benchmark's.
 
 ### M15b tests
 

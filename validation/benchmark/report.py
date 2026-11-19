@@ -179,6 +179,10 @@ def m15b_table(tab, t):
     def div(a, b):
         return a / b if a == a and b == b and b else float("nan")
 
+    def f_r(v):
+        # what the regression costs: a ratio near 1, to three decimals
+        return "–" if v != v else "%.3f" % v
+
     out = ["| object | R with vars.to.regress: CPU s / peak GiB | R: ÷ without (CPU, peak) | Rust with: CPU s / wall s / peak GiB | Rust: ÷ without (CPU, peak) "
            "| with --export: CPU s / peak GiB | R ÷ Rust, with: CPU · peak | R ÷ Rust with --export: CPU · peak |",
            "|" + "---|" * 8]
@@ -191,8 +195,8 @@ def m15b_table(tab, t):
         x_cpu, x_peak = get(rx, side, "cpu_total_s"), get(rx, side, "peak_gib")
         bn_cpu, bn_peak = get(bn, side, "cpu_total_s"), get(bn, side, "peak_gib")
         out.append("| %s | %s / %s | %s, %s | %s / %s / %s | %s, %s | %s / %s | %s · %s | %s · %s |" % (
-            obj, f_s(r_cpu), f_gib(r_peak), f_x(div(r_cpu, b_cpu)), f_x(div(r_peak, b_peak)),
-            f_s(n_cpu), f_s(n_wall), f_gib(n_peak), f_x(div(n_cpu, bn_cpu)), f_x(div(n_peak, bn_peak)),
+            obj, f_s(r_cpu), f_gib(r_peak), f_r(div(r_cpu, b_cpu)), f_r(div(r_peak, b_peak)),
+            f_s(n_cpu), f_s(n_wall), f_gib(n_peak), f_r(div(n_cpu, bn_cpu)), f_r(div(n_peak, bn_peak)),
             f_s(x_cpu), f_gib(x_peak), f_x(div(r_cpu, n_cpu)), f_x(div(r_peak, n_peak)), f_x(div(r_cpu, x_cpu)), f_x(div(r_peak, x_peak))))
     return "\n".join(out)
 

@@ -4,9 +4,9 @@ This page compares each Rust port with the workflow's R step it replaces. It rep
 
 It grows with the ports. Each new tool adds its rows, with the same method and columns, and the findings are updated (docs/PLAN.md, A7's cycle, step 6).
 
-**Last updated:** 2026-11-18. The first benchmark covers DoubletFinder (Step 1) and the clustering chain (M11–M13). M15 added DoubletFinder clustering its own input, and its whole rule in one process.
+**Last updated:** 2026-11-19. The first benchmark covers DoubletFinder (Step 1) and the clustering chain (M11–M13). M15 added DoubletFinder clustering its own input, and its whole rule in one process. M15b added the chain with SCTransform's `vars.to.regress`.
 
-## Findings (2026-11-18)
+## Findings (2026-11-19)
 
 - **CPU time:** at one thread, Rust uses 2.1–7.1× less CPU time than R:
   - the clustering chain: 2.6–7.1× without `--export`, 2.1–4.6× with it;
@@ -29,19 +29,20 @@ It grows with the ports. Each new tool adds its rows, with the same method and c
   - The hand-off saves the second command's start and its reading of `singlets/`. That is under 2% of the rule, within the spread of DoubletFinder's own runs.
   - At 32 threads it finishes 3–12% sooner.
   - Against R's whole rule: 2.7–3.0× less CPU time, 9–38× less memory.
+- **The chain with `vars.to.regress` (M15b):** against R's scripts as they ran with the regression, Rust takes 2.7–6.7× less CPU time at one thread (2.1–3.7× with `--export`), 8.8–44× less memory, and finishes 14–20× sooner at 32 threads. The regression costs Rust nothing measurable (0.98–1.01× on the same node) and raises R's peak by up to 12%.
 
 ## Method
 
-- **R** runs copies of the workflow's own scripts, with phase-marker lines added and nothing else changed (checked byte for byte; sources at pipeline commit `ea053fa`).
+- **R** runs copies of the workflow's own scripts, with phase-marker lines added and nothing else changed (checked byte for byte; sources at pipeline commit `ea053fa`; for M15b's rows, at `8d34de1^`, when they still regressed `percent.mt`).
   - It runs as the workflow's jobs do: 1 CPU, the six `*_NUM_THREADS` set to 1, the production R env, seed 12345, the production inputs.
   - Steps not yet ported are timed but left out of the comparison: SoupX, emptyDrops with `logNormCounts` and `as.Seurat`, and RunUMAP. Their cost is in the [last table](#workflow-steps-not-yet-ported).
-- **Rust** runs `scrust` (binary built from `b6f6e4e`; M15's rows, `8ab8fc8` and `49e8be7`, [below](#doubletfinder-clustering-its-own-input-and-the-whole-rule-in-one-process-m15)) in the production profile, at `--threads 1` and `--threads 32`.
+- **Rust** runs `scrust` (binary built from `b6f6e4e`; M15's rows, `8ab8fc8` and `49e8be7`, [below](#doubletfinder-clustering-its-own-input-and-the-whole-rule-in-one-process-m15); M15b's, `25fe846`, [below](#the-chain-with-sctransforms-varstoregress-m15b)) in the production profile, at `--threads 1` and `--threads 32`.
 - **Repeats and nodes:** each case runs 3 times, and the tables give the median. All runs are on Xeon Platinum 8480CL nodes of the `sapphire` partition.
   - Inputs are evicted from the page cache before each run, so every read is cold.
   - Most R runs shared a node with other benchmark runs, as the workflow's 1-CPU jobs do. Repeats vary by up to 25% in CPU time for R and 13% for Rust.
 - **Checks:** every run was checked before it was counted.
   - Every Rust output is byte-identical to the reference runs.
-  - Every R run reproduces the workflow's number of clusters, and its `.rds` is within 10 bytes of the workflow's saved one.
+  - Every R run reproduces the workflow's number of clusters, and its `.rds` is within 10 bytes of the workflow's saved one. M15b's R runs, which have no saved object, reproduce the clusters and cluster ids of M15b's R reference runs of the same chain.
 - **The harness** is in [`validation/benchmark/`](../validation/benchmark/README.md) (since M15): the sampler `procmon.py`, the R script copies, the jobs (`run_r.sbatch`, `run_rust.sbatch`, with the binary as `SCRUST_BIN`), and the analysis and report scripts. Moved from `data/benchmarks/scripts/` and run again over the first benchmark's runs, it gives the first tables, `checks.tsv` and `benchmark.md`'s tables byte for byte (the notes `report.py` appends are now the harness's README); the copy in `data/benchmarks/scripts/` is kept as it ran.
 - **Data** are in `data/benchmarks/`, which is not in git:
   - `benchmark.md`: the full tables, with ranges, the read and write parts and the 32-thread columns;
@@ -145,6 +146,41 @@ Elapsed seconds at 1 / 32 threads:
 - **Clustering its own input** adds the clustering's CPU time: 1.13–1.64× the CPU time with the labels given. It adds no memory: the peak stays DoubletFinder's own, or below it on the smallest object (0.89×), where settling the allocator after the clustering also lowers DoubletFinder's peak.
 - **The whole rule in one process** takes the same CPU time as the two commands at one thread (0.98–1.04×), at the same peak, which DoubletFinder sets. The hand-off saves the second command's start and its reading of `singlets/`. The in-process re-clustering takes 0.93–0.98× the separate command's CPU time (the median of each object's three repeats). That is under 2% of the rule, less than the spread of DoubletFinder's own phases between the two routes within a repeat: they are the same code, and took 0.93–1.06× as long at one thread. At 32 threads, where reading is a larger share of the elapsed time, the one process finishes 3–12% sooner.
 - **Against R's whole rule,** the one process takes 2.7–3.0× less CPU time and 9–38× less memory at one thread, and finishes 15–20× sooner at 32 threads.
+
+### The chain with SCTransform's `vars.to.regress` (M15b)
+
+The clustering chain with SCTransform's `vars.to.regress = "percent.mt"`, on the seven tier-P clustering objects, three repeats, as above.
+
+- **R** runs the same rules' scripts as they were before the pipeline's commit 8d34de1 (2026-10-30), which still passed `vars.to.regress = "percent.mt"` to SCTransform (`validation/benchmark/workflow_regress/`). They differ from the current scripts in that argument and a comment only, so against the clustering table's R runs they show what the regression costs R. Each run's clusters and cluster ids equal M15b's R reference run of the same chain.
+- **Rust** runs `scrust cluster --counts <input> --preset workflow --vars-to-regress percent.mt` (binary `scrust-25fe846`, M15b's validation binary), without and with `--export`. Where the workflow's pattern finds no mitochondrial feature (soupx_emptydrops_sscovelli, filtered_seurat_emptydrops_sscovelli, cellbender_fromraw_ghirsutum2), R regresses an all-zero `percent.mt`, which scrust refuses by default; scrust is given the same all-zero column through `--mt-genes` with features that have no counts, as in M15b's validation. Every run's files equal M15b's validation run of the same case, byte for byte. The same binary without the regression (`b`) is the like for like for what the regression costs Rust; its files equal M13's benchmark run's.
+
+At one thread (CPU seconds / peak GiB; the ratios to the chain without the regression to three decimals):
+
+| object | R with vars.to.regress: CPU s / peak GiB | R: ÷ without (CPU, peak) | Rust with: CPU s / wall s / peak GiB | Rust: ÷ without (CPU, peak) | with --export: CPU s / peak GiB | R ÷ Rust, with: CPU · peak | R ÷ Rust with --export: CPU · peak |
+|---|---|---|---|---|---|---|---|
+| soupx_tenx_SRR18256555 | 54.5 / 2.98 | 0.891, 0.977 | 11.2 / 11.4 / 0.154 | 1.040, 1.041 | 14.6 / 0.155 | 4.9× · 19× | 3.7× · 19× |
+| soupx_tenx_10xmousebrain | 251 / 12.7 | 0.982, 1.049 | 37.7 / 37.9 / 1.45 | 1.059, 1.006 | 78.0 / 1.45 | 6.7× · 8.8× | 3.2× · 8.8× |
+| filtered_seurat_tenx_10xmousebrain | 206 / 13.2 | 1.036, 1.054 | 38.2 / 38.5 / 1.45 | 1.022, 1.006 | 78.6 / 1.45 | 5.4× · 9.1× | 2.6× · 9.1× |
+| soupx_emptydrops_4500871lane | 302 / 25.3 | 1.045, 1.057 | 80.1 / 80.6 / 1.49 | 0.992, 1.006 | 101 / 1.49 | 3.8× · 17× | 3.0× · 17× |
+| soupx_emptydrops_sscovelli | 813 / 67.7 | 1.153, 1.087 | 301 / 303 / 3.15 | 1.120, 1.001 | 353 / 3.34 | 2.7× · 21× | 2.3× · 20× |
+| filtered_seurat_emptydrops_sscovelli | 842 / 62.5 | 1.085, 1.068 | 268 / 269 / 3.15 | 0.994, 1.001 | 328 / 3.35 | 3.1× · 20× | 2.6× · 19× |
+| cellbender_fromraw_ghirsutum2 | 835 / 118.1 | 1.056, 1.122 | 310 / 312 / 2.66 | 1.070, 1.002 | 398 / 3.06 | 2.7× · 44× | 2.1× · 39× |
+
+At 32 threads (Rust's columns; R runs on 1 CPU):
+
+| object | R with vars.to.regress: CPU s / peak GiB | R: ÷ without (CPU, peak) | Rust with: CPU s / wall s / peak GiB | Rust: ÷ without (CPU, peak) | with --export: CPU s / peak GiB | R ÷ Rust, with: CPU · peak | R ÷ Rust with --export: CPU · peak |
+|---|---|---|---|---|---|---|---|
+| soupx_tenx_SRR18256555 | 54.5 / 2.98 | 0.891, 0.977 | 11.4 / 2.89 / 0.186 | 1.033, 1.032 | 14.2 / 0.322 | 4.8× · 16× | 3.8× · 9.3× |
+| soupx_tenx_10xmousebrain | 251 / 12.7 | 0.982, 1.049 | 41.3 / 13.1 / 1.45 | 1.094, 1.006 | 81.4 / 1.45 | 6.1× · 8.8× | 3.1× · 8.8× |
+| filtered_seurat_tenx_10xmousebrain | 206 / 13.2 | 1.036, 1.054 | 42.6 / 13.5 / 1.45 | 1.077, 1.006 | 81.6 / 1.45 | 4.8× · 9.1× | 2.5× · 9.1× |
+| soupx_emptydrops_4500871lane | 302 / 25.3 | 1.045, 1.057 | 97.5 / 21.2 / 1.49 | 1.060, 1.006 | 113 / 1.49 | 3.1× · 17× | 2.7× · 17× |
+| soupx_emptydrops_sscovelli | 813 / 67.7 | 1.153, 1.087 | 336 / 55.8 / 3.20 | 1.043, 1.001 | 379 / 3.41 | 2.4× · 21× | 2.1× · 20× |
+| filtered_seurat_emptydrops_sscovelli | 842 / 62.5 | 1.085, 1.068 | 311 / 52.0 / 3.20 | 1.010, 1.000 | 362 / 3.42 | 2.7× · 20× | 2.3× · 18× |
+| cellbender_fromraw_ghirsutum2 | 835 / 118.1 | 1.056, 1.122 | 376 / 52.3 / 2.69 | 1.178, 1.003 | 445 / 3.11 | 2.2× · 44× | 1.9× · 38× |
+
+- **Against R with the regression,** at one thread Rust takes 2.7–6.7× less CPU time without `--export` and 2.1–3.7× less with it, and 8.8–44× less memory. At 32 threads it finishes 14–20× sooner without `--export` and 12–17× sooner with it (R's elapsed time against Rust's).
+- **What the regression costs Rust: nothing measurable.** Run on the same node, the regressed chain took 0.98–1.01× the CPU time of the same binary's chain without it (seven pairs of repeats). The medians across nodes, 0.99–1.12× at one thread and 1.01–1.18× at 32 threads, reflect the nodes: repeats of one variant on different nodes differ by up to 15% (soupx_emptydrops_sscovelli's 1.12 comes from two repeats on a slower node, 301 s against 263 s for the third). The peak is the same (1.000–1.006×; 1.04× on the smallest object, 6 MB). The regression itself is one QR and a few passes over `scale.data`'s rows, against SCTransform's model fits.
+- **What it costs R:** R's peak rises by up to 12% with the regression (cellbender_fromraw_ghirsutum2: 118 GiB against 105 GiB; 1.05–1.09× on the five medium and large objects; 0.98× on the smallest). R's CPU time moves by −11% to +15%, within its repeats' spread (up to 25%); its runs without the regression are the first benchmark's.
 
 ### Workflow steps not yet ported
 
