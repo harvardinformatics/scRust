@@ -1,4 +1,4 @@
-# Clustering in Rust (Step 2; milestones M11, M12, M13 and M14)
+# Clustering in Rust (Step 2; milestones M11 to M15)
 
 M11 runs the workflow's clustering chain end to end in Rust, from the counts to the labels and the silhouette widths (docs/PLAN.md C1, C3, C5, C6): SCTransform at seed 12345, the workflow's PCA guard, RunPCA with 50 PCs, FindNeighbors (Annoy, k = 20, dims 1:30), FindClusters (Louvain, resolution 0.8, seed 12345, singletons grouped) and bluster's `approxSilhouette`. It chains the `sctransform` and `pca` crates of Step 1 with M9's `neighbors` and M10's `cluster`, and adds the silhouette widths, `scrust cluster --counts` with its staged starts, parameters, preset and TOML file, and `scrust validate cluster` for the whole chain. It also adds kernel-gated grading (A5b mechanism 3) to both validators and a kernel check to the fixture tests.
 
@@ -6,9 +6,33 @@ M12 adds the workflow's second score, neighbourhood purity: bluster's `neighborP
 
 M13 adds the rest of the SCT assay, the corrected counts of sctransform's `correct()`, and the export: the input counts, SCTransform's normalised data and the per-cell metadata as plain files that no 10x reader takes for raw counts, with a manifest of every file in every command's `summary.json`. Its outcome comes after M14's ([M13 outcome](#m13-outcome)), its details after M12's ([M13: the corrected counts and the export](#m13-the-corrected-counts-and-the-export)).
 
-M14 adds the loaders: an R package (Seurat, SingleCellExperiment) and a Python package (AnnData) that read any scrust output through its manifest and put each matrix only into a slot meant for its scale. Each loader's object is compared with the saved workflow object (K11), and the workflow's own marker steps run on the Seurat loader's object (K13). Its outcome comes first ([M14 outcome](#m14-outcome)), its details last ([M14: the loaders](#m14-the-loaders)).
+M14 adds the loaders: an R package (Seurat, SingleCellExperiment) and a Python package (AnnData) that read any scrust output through its manifest and put each matrix only into a slot meant for its scale. Each loader's object is compared with the saved workflow object (K11), and the workflow's own marker steps run on the Seurat loader's object (K13). Its outcome comes after M15's ([M14 outcome](#m14-outcome)), its details after M13's ([M14: the loaders](#m14-the-loaders)).
+
+M15 makes the chain one library entry point and runs it inside `scrust doubletfinder`: to cluster an input given no labels (K12, on all 150 DoubletFinder inputs) and, when asked, to re-cluster the singlets as the workflow's rule does before saving them, the singlets handed over in memory. Its outcome comes first ([M15 outcome](#m15-outcome)), its details last ([M15: clustering on the fly and the singlets' re-clustering](#m15-clustering-on-the-fly-and-the-singlets-re-clustering)).
 
 This is Step 2's main report, as [doubletfinder.md](doubletfinder.md) is Step 1's; M13 to M17 extend it. The milestones before it have their own: [clustering_m8.md](clustering_m8.md) (the R reference data and the R-vs-R floor), [clustering_m9.md](clustering_m9.md) (Annoy and the SNN graph), [clustering_m10.md](clustering_m10.md) (FindClusters).
+
+## M15 outcome
+
+| Done when (plan C6's M15 row, and the brief) | Result |
+|---|---|
+| The chain as one library entry point, for later ports too (C3h; A3's in-memory rule) | **Built.** `cluster::chain::cluster_counts`: `scio::Counts` (borrowed or taken) and `ChainParams` in, a complete `Clustered` out (the labels with their levels; the scores when asked; every stage's summary for `summary.json`; what the files and the export need, as `Options` asks); no file I/O inside; each stage freed once the next has what it needs; the corrected counts computed only for the export. The hand-off types (`Counts`, `Factor`) are in `scio`. `scrust cluster --counts` is read–call–write over it; the staged starts keep their observer-only form, as they start from files ([The entry point](#the-entry-point)). |
+| The in-memory rule's test | **Passes** in cargo test: the entry point's result, written by the library's writer, gives `scrust cluster --counts --export`'s files byte for byte and its `result`; the in-process re-clustering gives the two-command route's files ([M15 tests](#m15-tests)). |
+| `scrust doubletfinder` without `--clusters` | **Built:** `--cluster-preset` (default `workflow`), `--cluster-params`, `--cluster-stats`; `clusters/`, a nested output: the labels in `--clusters`' layout with their levels, the scores when asked, and its own `summary.json` with the clustering's numbers, each file as `scrust cluster --counts <input>` writes it, without `pca/` and `neighbors/`; the run's `summary.json` points to it (`result.clustering`: its directory, cells, clusters and levels). `--clusters` stays, and with it every output, byte for byte ([Clustering on the fly](#clustering-on-the-fly)). |
+| The singlets' re-clustering, off by default | **Built:** `--recluster` (with `--recluster-preset`, `--recluster-params`, `--recluster-export`) writes `singlets_clusters/`, what `scrust cluster --counts <out>/singlets` writes, as a nested output. The singlets go to the entry point from memory, `singlets/` is not read back, and DoubletFinder's stages are freed first ([The re-clustering](#the-re-clustering)). |
+| K12 on all 150 DoubletFinder inputs | **Identical, all 150** (label `m15-a5de5e3`, production profile, each object on its workflow job's CPU type): the labels and levels computed on the fly equal every input's `seurat_clusters` (2,571,090 cells); DoubletFinder's files equal M7's runs byte for byte and its `result` member by member, `clusters/` and `result.clustering` aside; M7's nine checks against the saved outputs, 1,350 of 1,350, 3,295,570,596 values; the numbers each input's workflow job logged; and `clusters/` is `scrust cluster --counts <input>`'s output, 1,350 files, `pca/` and `neighbors/` aside ([M15 results](#m15-results)). |
+| Re-clustering (a): against the two-command route | **Byte-identical** apart from the timings and the command line in `summary.json`: the 150 without the export (3,600 files), and T and P with and without the export in both profiles (20 runs of 24 and 31 files). On T and P in both profiles, `clusters/` with both scores is `scrust cluster --counts <input> --stats silhouette,purity`'s output too (20 runs of 9 files). |
+| Re-clustering (b): against the saved DoubletFinder objects | **Identical on all 150 and T's five** in the production profile: the labels and levels (`seurat_clusters`, `SCT_snn_res.0.8`, the identities), the silhouette widths, the purities and the RNA columns (8,869,312 values on the 150), with the export `nCount_SCT` and `nFeature_SCT` (T and P), and every job's logged numbers. In the portable profile, within `[clustering.floor.kernel]`: silhouette widths in their last bits, and four purities, the cells of two median pairs. |
+| Re-clustering (c): Step 1 unchanged without the new options | **Byte-identical** to M7's files on all 150. |
+| The memory peak against M7's runs | **At most 2.9% above:** clustering on the fly ÷ M7's run 0.626 to 1.029 (median 0.996), none above 10%; DoubletFinder's own phases set every peak. It takes settling glibc's allocator at the hand-off (`scio::memory::settle`, 1 to 4 ms; up to 0.9 s more system time on the largest object, none more wall time). Without it, the same computation peaked up to 16.4% above (label `m15-429a636`: median 1.012, three objects above 10%; cellbender_fromraw_aaegypti 1.164 before, 1.013 after) ([Memory and time](#memory-and-time)). |
+| Memory and time, in process against two commands | **The larger peak, not the sum:** the in-process peak is 0.607 to 0.792 of the two commands' sum (median 0.662). On none of the 150 did the re-clustering raise it; its ratio to the larger of the two (0.847 to 1.159, median 1.000) is DoubletFinder's own spread between runs. Settling the allocator before the re-clustering too, measured with a trial build, changed no peak, so it is not done. Wall time 0.965 of the two commands' sum (median); clustering on the fly adds the clustering's time (1.207 times `--clusters`', median). |
+| Benchmark (A7 step 6) | **New rows** on the five P DoubletFinder objects, three repeats at 1 and 32 threads ([M15 benchmark](#m15-benchmark); `docs/benchmarks.md`, findings and date updated). Clustering its own input costs the clustering's CPU time (1.13–1.64× the run given the labels) and no memory. The whole rule in one process takes the two commands' CPU time (0.98–1.04×) at the same peak, and finishes 3–12% sooner at 32 threads. Against R's whole rule it takes 2.7–3.0× less CPU time and 9–38× less memory. |
+| The harness moved | **`validation/benchmark/`**, with the data's location and the binary as parameters and the workflow scripts' copies in NOTICE; run again over the first benchmark's runs, it gives the four tables, `checks.tsv` and `benchmark.md`'s tables byte for byte; only the notes `report.py` appends (the harness's README) are new. |
+| The user's decisions (2026-11-18) | **Both implemented as decided, with their conditions met:** nested outputs (the role `nested_output`, schema version 1 kept; [Nested outputs](#nested-outputs)), and settling the allocator at in-process hand-offs only (`scio::memory::settle`, Linux with glibc, no environment switch; runs given `--clusters` without the re-clustering unchanged, memory included; [Memory and time](#memory-and-time)). None is open. |
+| Plan corrections | A1, A3, A7, B3, C3f, C3h, C5's K12, C6's M15 ([M15 corrections](#m15-corrections-to-the-plan)). |
+| User documentation | **For M14b:** M14b has not landed on main, so it will cover M15's options; the commands' `--help` and the README describe them. |
+| Documentation | This report and [clustering_m15.tsv](clustering_m15.tsv); `docs/output_manifest.md` (nested outputs); `[clustering.K12]` and `[clustering.K12_recluster]` in `validation/tolerances.toml`; M15's section of `validation/manifest.toml`; the README's status and usage; the commands' `--help`; NOTICE; `docs/benchmarks.md`. |
+| Tests | `cargo test --workspace`: 292 tests in 43 suites, debug and release, none failing, no warnings; the loaders' tests: R 82, Python 13, all passing ([M15 tests](#m15-tests)). |
 
 ## M14 outcome
 
@@ -88,6 +112,7 @@ This is Step 2's main report, as [doubletfinder.md](doubletfinder.md) is Step 1'
 | M12 | `neighborPurity`: the exhaustive search with knncolle's arithmetic and its certificate, the weights and sums, purity in `scrust cluster` and its validation; at the decision point the user chose to keep the exhaustive result and report the flagged pairs (the median pair of every odd-sized object) | this report |
 | M13 | sctransform's `correct()` (the corrected counts, their log1p, `nCount_SCT`, `nFeature_SCT`), `scrust sctransform --corrected-counts` and `scrust cluster --export`, the guards against reading normalised data as raw counts, the output manifest of every command (`docs/output_manifest.md`) | this report |
 | M14 | the loaders, `loaders/R/scrustio` (Seurat, SingleCellExperiment) and `loaders/python/scrustio` (AnnData): the manifest's rules, the slots and their guard, the SCT assay and its SCTModel as SCTransform makes them, the one-line `.rds` and `.h5ad` commands; K11 and K13 on T and P in both profiles; the R loader's comparison for M17 | this report |
+| M15 | the chain as one library entry point (`cluster_counts`, A3's in-memory rule) and `scrust cluster --counts` as read–call–write over it; clustering on the fly in `scrust doubletfinder` (K12: all 150 inputs identical) and the singlets' re-clustering in process (`--recluster`: identical to the two-command route and to the saved objects); nested outputs; the benchmark's harness in `validation/benchmark/` | this report |
 
 ## What was built
 
@@ -1410,10 +1435,10 @@ M15 makes the clustering chain one library entry point and runs it inside `scrus
 | Where | Contents |
 |---|---|
 | `crates/cluster` | `chain::cluster_counts`, the entry point: `scio::Counts` (borrowed or taken) and `ChainParams` in, `Clustered` out; `Options::keep_reductions`, `keep_sct` and `guard_context`; `chain_output::Writer::write_clustered`, which writes the result through the observer's own code, and `clustered_result_json`. `from_counts` keeps its observer-only form on the same code; the staged starts are unchanged. |
-| `crates/scio` | `Counts` (a count matrix with its barcodes and feature lines: `read`, `keep_cells` in place, `write`, `features`) and `Factor` (labels with their levels, moved from `cluster`, which re-exports it); `tenx::write_columns` digests each file as it writes it (`Written::files`); `Manifest::fill_digests` keeps a digest it is given; nested outputs (`NESTED_OUTPUT`) in `Manifest::check`. |
+| `crates/scio` | `Counts` (a count matrix with its barcodes and feature lines: `read`, `keep_cells` in place, `write`, `features`) and `Factor` (labels with their levels, moved from `cluster`, which re-exports it); `tenx::write_columns` digests each file as it writes it (`Written::files`); `Manifest::fill_digests` keeps a digest it is given; nested outputs (`NESTED_OUTPUT`) in `Manifest::check`, recursively, with the path rule (`path_inside`); `memory::settle`, the allocator at in-process hand-offs (below). |
 | `crates/doubletfinder` | `singlets::singlets` (the singlets kept in memory) and `write_counts`; `write_singlets` is the two. |
-| `crates/scrust` | `scrust cluster --counts` as read–call–write (`run_counts`; the output's tail `finish_run` shared by every route); `scrust doubletfinder` without `--clusters` (`--cluster-preset`, `--cluster-params`, `--cluster-stats`; `clusters/`) and with `--recluster` (`--recluster-preset`, `--recluster-params`, `--recluster-export`; `recluster/`); the in-process clusterings' stages on the command's clock; `cli::settle_memory` (below). |
-| `loaders/` | `nested_output` in both role lists; tests that a DoubletFinder output with nested outputs loads as before, and that each nested output loads on its own. |
+| `crates/scrust` | `scrust cluster --counts` as read–call–write (`run_counts`; the output's tail `finish_run` shared by every route); `scrust doubletfinder` without `--clusters` (`--cluster-preset`, `--cluster-params`, `--cluster-stats`; `clusters/`) and with `--recluster` (`--recluster-preset`, `--recluster-params`, `--recluster-export`; `singlets_clusters/`); the in-process clusterings' stages on the command's clock; the settle at the hook's hand-off (below). |
+| `loaders/` | `nested_output` in both role lists; tests that a DoubletFinder output with nested outputs loads as before, and that each nested output loads on its own (in R `load_seurat()` on `singlets_clusters/` and `add_scrust()` with `clusters/`; in Python `load_anndata()` on `singlets_clusters/` and `clusters/`' labels, levels and scores). |
 | `validation/` | `python/compare_runs.py`, `python/compare_saved_clustering.py`, `python/report_m15.py`; `slurm/m15_export.sbatch`, `m15_panel.sbatch`, `m15_recluster.sbatch`, `m15_memory.sbatch`, `m15_tests.sbatch`, `m15_cargo_tests.sbatch`, `m15_manifest.sh`; `benchmark/`, the benchmark's harness, moved from `data/benchmarks/scripts/` and extended. |
 
 ### The entry point
@@ -1431,8 +1456,8 @@ M15 makes the clustering chain one library entry point and runs it inside `scrus
 
 `scrust doubletfinder --counts <dir> --out <dir>` without `--clusters` reads the counts once, clusters them with the entry point (borrowed; the workflow preset by default), and hands the labels and their levels to DoubletFinder in memory. DoubletFinder then takes the counts. Only the labels are kept, with the scores when `--cluster-stats` asks for them.
 
-- **`clusters/`** is a nested scrust output (below): `seurat_clusters.tsv` and `seurat_clusters_levels.txt` in `--clusters`' layout, `clusters.tsv` and its levels, `cluster_ids.txt`, `nclusters.txt`, `optimizer_ids.tsv` and `metadata.tsv`, as `scrust cluster` writes them, with its own `summary.json`. No `pca/`, `neighbors/` or `sct/`: only the labels are kept. Its manifest's `command` is `scrust cluster --counts <dir> --preset workflow --stats none`, whose values it reproduces.
-- **The DoubletFinder run's `summary.json`** gains `result.clustering` (the `result` section `scrust cluster` writes) and `run.parameters.clustering`; `run.clusters` names `clusters/`.
+- **`clusters/`** is a nested scrust output (below): `seurat_clusters.tsv` and `seurat_clusters_levels.txt` in `--clusters`' layout, `clusters.tsv` and its levels, `cluster_ids.txt`, `nclusters.txt`, `optimizer_ids.tsv` and `metadata.tsv`, with its own `summary.json` holding the clustering's numbers. Each is what `scrust cluster --counts <input>` writes, byte for byte, and its `summary.json` is that command's, apart from the timings, the command line and the entries of `pca/` and `neighbors/`: no `pca/`, `neighbors/` or `sct/`, as only the labels are kept (`k12_alone` checks this on the 150). Its manifest's `command` is `scrust cluster --counts <dir> --preset workflow --stats none`, whose values it reproduces.
+- **The DoubletFinder run's `summary.json`** points to it: `result.clustering` gives its directory, cells, clusters and levels, as `result.recluster` does for the re-clustering; `run.parameters.clustering` holds the options; `run.clusters` names `clusters/`.
 - **`--clusters` stays,** and with it every output, byte for byte (check (c)).
 
 ### The re-clustering
@@ -1440,10 +1465,294 @@ M15 makes the clustering chain one library entry point and runs it inside `scrus
 `--recluster` re-clusters the singlets after the calls, as `doubletfinder.R` (lines 56–69) does before saving: SCTransform at the workflow's seed, `require_min_cells_for_pca(context = "doubletfinder")`, RunPCA, FindNeighbors, FindClusters, silhouette and purity (RunUMAP changes nothing downstream, C1). The chain's parameters match the script's calls, which are the workflow preset's.
 
 - **In memory.** The counts are read again after the calls, as since M6b (they were freed for the final run); the singlets are kept in memory, in place (`Counts::keep_cells`), and written as `singlets/`, each file digested as it is written; then they go to the entry point, taken. `singlets/` is not read back: the provenance takes the written files' digests. With `--recluster-export`, the export's `counts/` is a copy of `singlets/` (the export's definition: the input counts, copied byte for byte with their checksums).
-- **`recluster/`** holds what `scrust cluster --counts <out>/singlets --preset workflow [--export]` writes, through the same code (`run_counts`), as a nested output. Its `summary.json` differs from that command's only in the timings and the provenance's `command_line`, the one given; its `command`, which the normalised matrices' comment lines give, is that `scrust cluster` command, whose values it reproduces.
+- **`singlets_clusters/`** holds what `scrust cluster --counts <out>/singlets --preset workflow [--export]` writes, through the same code (`run_counts`), as a nested output. Its `summary.json` differs from that command's only in the timings and the provenance's `command_line`, the one given; its `command`, which the normalised matrices' comment lines give, is that `scrust cluster` command, whose values it reproduces.
 - **The guard** names `doubletfinder`'s context in its message, as R's does; should it stop the re-clustering, DoubletFinder's own files are already written and the command fails with R's message, as the workflow's rule would.
 - **Memory.** DoubletFinder's stages are freed before the re-clustering starts, so the run's peak is the larger of DoubletFinder's and the chain's, not their sum.
 
 ### Nested outputs
 
-A subdirectory that is itself a scrust output (`clusters/`, `recluster/`) keeps its own `summary.json` and manifest. The parent's manifest lists that `summary.json` with the role `nested_output` and its size and SHA-256; the checks recurse into it (`docs/output_manifest.md`, "Nested outputs"). Listed file by file under their own roles, the re-clustering's files would have broken the loaders, which take one file per role: two `raw_counts` with `--recluster-export` (`singlets/` and `recluster/counts/`), and the singlets' metadata, PCA and graphs offered to the DoubletFinder object. The loaders read the parent's own files as before and load a nested output on their own (`load_seurat("<out>/recluster")`, `add_scrust(obj, "<out>/clusters")`); their tests show both.
+The user chose nested outputs on 2026-11-18, for both `clusters/` and `singlets_clusters/`, with the schema kept at version 1 (`docs/output_manifest.md`, "Nested outputs"). Listed file by file under their own roles, the re-clustering's files would have broken the loaders, which take one file per role: two `raw_counts` with `--recluster-export` (`singlets/` and `singlets_clusters/counts/`), and the singlets' metadata, PCA and graphs offered to the DoubletFinder object. The user's conditions, and how each is met:
+
+- **Each nested directory is a complete scrust output,** with its own `summary.json` and manifest, as the standalone command writes it. `singlets_clusters/` is `scrust cluster --counts <out>/singlets`' output byte for byte, apart from the timings and the command line (check (a)). `clusters/` is `scrust cluster --counts <input>`'s, apart from those and from `pca/` and `neighbors/`, which it does not write (`k12_alone` on the 150, `hook_alone` on T and P in both profiles, and cargo test).
+- **The parent's entry:** the parent's manifest lists the nested `summary.json` alone, with the role `nested_output` (format `json`, scale `none`), its size and its SHA-256. Every other file of the nested directory is in the nested manifest, none in the parent's; the check fails a parent that lists one (cargo test).
+- **Validation recurses:** `Manifest::check`, and so `scrust validate manifest` and every command's check of its own manifest, checks a nested output against its own manifest (sizes and checksums too), recursively up to eight levels, and reports a nested problem under the nested directory's name. A listed path that is absolute or has a `..` (or `.`, or an empty component) is refused and not followed, so no nested output can escape its parent. The unit tests cover each case; the panel's `manifests` check ran `scrust validate manifest` on every output.
+- **Loaders:** the DoubletFinder output loads exactly as before (the loaders ignore `nested_output`), and each nested output loads on its own: `load_seurat("<out>/singlets_clusters")` and `add_scrust(obj, "<out>/clusters")` in R, `load_anndata("<out>/singlets_clusters")` and `clusters/`' metadata in Python. The loaders' tests do both, in R and in Python ([M15 tests](#m15-tests)).
+- **Docs:** `docs/output_manifest.md` describes the role, the recursion and the path rule, and that readers ignore the roles they do not use, this one included; the plan's corrections list it.
+- **The clustering's numbers** are in the nested `summary.json`. The DoubletFinder run's `summary.json` gives four fields for each (`result.clustering`, `result.recluster`: the directory, cells, clusters and levels).
+
+The option as the user chose it named the re-clustering's directory `singlets_clusters/`; the first build had called it `recluster/` (labels `m15-429a636` and `m15-49e8be7`).
+
+### How the checks work
+
+- **The panel** ([`validation/slurm/m15_panel.sbatch`](../../validation/slurm/m15_panel.sbatch), one array task per object of [`validation/doubletfinder_panel.tsv`](../../validation/doubletfinder_panel.tsv); array job 61996174, label `m15-a5de5e3`): in the production profile, on a node with the CPU type of the object's workflow job, OpenBLAS left to detect it (`SapphireRapids`), 8 threads, as M7. Five runs per object, each in a working directory of its own with the same relative paths (`--out run`), so that the paths a run records are the same in every directory:
+  - `given/`: M7's command, `scrust doubletfinder --counts <input> --clusters <input>/seurat_clusters.tsv`; then the two-command route's second command, `scrust cluster --counts run/singlets --preset workflow --out run/singlets_clusters`;
+  - `hook/`: `scrust doubletfinder --counts <input>`, clustering on the fly;
+  - `inprocess/`: `scrust doubletfinder --counts <input> --clusters ... --recluster`, the whole rule in one process;
+  - `alone/`: `scrust cluster --counts <input> --preset workflow --stats none --out run/clusters`, the command whose output the hook's `clusters/` is, `pca/` and `neighbors/` aside (the hook computes no scores unless `--cluster-stats` asks; the workflow preset's own `[stats]` computes both).
+- **The checks,** each recorded in `checks/`:
+  - **(c) Step 1 unchanged** (`c_step1`): `given/run` against M7's run (label `m7-b8c8a8c`): `cells.tsv`, the sweep tables and `singlets/` byte for byte, and `summary.json`'s `result` member by member (M7's runs record another command line and paths);
+  - **K12:** the hook's `clusters/seurat_clusters.tsv` and `seurat_clusters_levels.txt` against the input's exported ones, byte for byte (`k12_labels`); `hook/run` against M7's run as in (c), `clusters/` and `result.clustering` aside (`k12_files`); M7's nine checks against the saved workflow output, `scrust validate doubletfinder --saved`, nine of nine made and identical (`k12_saved`); the hook's nodes, edges, maximum modularity (`%.4f`), communities, singletons and final clusters against the numbers the input's workflow job logged (`k12_logged`, from [`validation/clustering_panel.tsv`](../../validation/clustering_panel.tsv)); the hook's `clusters/` against `alone/run/clusters`, every file it has byte for byte and its `summary.json` as JSON, with the timings, the command line and the manifest's entries and `run.files` of `pca/` and `neighbors/` aside (`k12_alone`);
+  - **(a)** (`a_files`): `inprocess/run` against `given/run`, every file byte for byte, `singlets_clusters/summary.json` as JSON with its timings and the provenance's command line aside ([`compare_runs.py`](../../validation/python/compare_runs.py)); the top `summary.json`, which records the re-clustering, aside;
+  - **(b)** (`b_saved`): `inprocess/run/singlets_clusters` against the export of the saved DoubletFinder object ([`m15_export.sbatch`](../../validation/slurm/m15_export.sbatch): `export_clustering.R --level labels`): the barcodes; `seurat_clusters` and `SCT_snn_res.0.8` with their levels, and `idents_levels.txt`; `silhouette_width`, `neighborhood_purity`, `nCount_RNA`, `nFeature_RNA` as `%.17g` text, so bit for bit; and the numbers the object's workflow job logged ([`compare_saved_clustering.py`](../../validation/python/compare_saved_clustering.py));
+  - **the manifests:** `scrust validate manifest` on `hook/run` and `inprocess/run`, nested outputs included.
+- **Tier T and P** ([`validation/slurm/m15_recluster.sbatch`](../../validation/slurm/m15_recluster.sbatch), array jobs 61996197 in the production profile and 61996199 in the portable one): (a) with and without the export (the export's second command reads `singlets/` through a link at the same relative path); (b) with the export, so `nCount_SCT` and `nFeature_SCT` too, against M8's exports of the saved T objects and M15's of the P objects; clustering on the fly, with both scores, against `scrust cluster --counts <input> --stats silhouette,purity`'s output as in `k12_alone` (`hook_alone`, held to (a)'s standard in both profiles) and against M8's exports of the saved inputs. The saved objects were made under the SapphireRapids kernel: in the portable profile (b) is graded against `[clustering.floor.kernel]`, the floor M11 and M12 measured.
+- **The exports** of the 150 saved DoubletFinder objects read each `.rds` in a batch job (job 61946955; at most 11.4 GiB); their counts link to M7's export of the saved singlets, and the export checks the object's counts against it, slot for slot. No R run: the workflow made these objects.
+
+### M15 results
+
+#### The panel
+
+Label `m15-a5de5e3`: 150 of 150 objects, every check identical. Per object, with each check's detail, the peaks, the wall times and where each peak was reached: [clustering_m15.tsv](clustering_m15.tsv).
+
+| check | objects | identical | compared |
+|---|---|---|---|
+| (c) `c_step1` | 150 | 150 | `cells.tsv`, the sweep tables, `singlets/` and `result`, against M7's runs |
+| K12 `k12_labels` | 150 | 150 | `seurat_clusters.tsv` and its levels, against the input's: 2,571,090 cells |
+| K12 `k12_files` | 150 | 150 | DoubletFinder's files and `result`, against M7's runs |
+| K12 `k12_saved` | 150 | 150 | M7's nine checks against the saved outputs, 1,350 of 1,350: 3,295,570,596 values |
+| K12 `k12_logged` | 150 | 150 | the numbers each input's workflow job logged |
+| K12 `k12_alone` | 150 | 150 | `clusters/` against `scrust cluster --counts <input> --stats none`: 1,350 files, `pca/` and `neighbors/` aside |
+| (a) `a_files` | 150 | 150 | in process against two commands: 3,600 files |
+| (b) `b_saved` | 150 | 150 | the saved re-clustering: 8,869,312 labels, silhouette widths and purities, and the RNA columns, levels and logged numbers |
+| `manifests` | 150 | 150 | `scrust validate manifest` on `hook/run` and `inprocess/run`, nested outputs included |
+
+| arm | objects | passing | cells | singlets | clusters on the fly (the input's) | clusters, re-clustering |
+|---|---|---|---|---|---|---|
+| soupx_tenx | 30 | 30 | 2,676 to 34,421 | 2,307 to 29,572 | 15 to 43 | 15 to 40 |
+| soupx_emptydrops | 30 | 30 | 1,122 to 79,409 | 975 to 69,500 | 10 to 51 | 8 to 54 |
+| decontx_raw_tenx | 30 | 30 | 2,673 to 34,419 | 2,301 to 29,570 | 15 to 44 | 13 to 45 |
+| decontx_raw_emptydrops | 30 | 30 | 1,120 to 78,687 | 975 to 69,639 | 9 to 53 | 9 to 50 |
+| cellbender_fromraw | 30 | 30 | 4,314 to 60,329 | 3,699 to 52,554 | 11 to 45 | 13 to 44 |
+
+- **2,571,090 cells, 2,217,328 singlets.** Clustering on the fly found 9 to 53 clusters, each input's own; the re-clustering 8 to 54.
+- **Singletons:** clustering on the fly grouped 84 singletons in 10 inputs, the re-clustering 42 in 7 objects, each as the saved object did.
+- **Purity's certificate** flags pairs in 72 of the 150 re-clusterings; every purity is the saved object's ([M15 findings](#m15-findings)).
+- **Nodes:** 36 Sapphire Rapids nodes (Xeon Platinum 8480+ and 8480CL), each object on its workflow job's CPU type, OpenBLAS's kernel `SapphireRapids` on every one.
+- **The earlier labels** passed every check they had on every object too: `m15-429a636` (array job 61949383, without the allocator's settling) and `m15-49e8be7` (array job 61960675, before the user's decision on nested outputs: `recluster/`, the whole clustering result in `result.clustering`, no `k12_alone`). The certificate's flags and the singletons above are the same in both ([notes](#m15-deviations-and-notes)).
+
+#### Tier T and P
+
+| object | profile | (a) in process ÷ two commands | (a) with the export | clusters/ ÷ scrust cluster --counts | (b) against the saved re-clustering | clustering on the fly against the saved input |
+|---|---|---|---|---|---|---|
+| soupx_tenx_test | production | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | identical, 12 checks | identical, 10 checks |
+| soupx_tenx_test | portable | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | differs: silhouette_width | differs: silhouette_width |
+| soupx_emptydrops_test | production | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | identical, 12 checks | identical, 10 checks |
+| soupx_emptydrops_test | portable | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | differs: silhouette_width | differs: silhouette_width |
+| decontx_raw_tenx_test | production | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | identical, 12 checks | identical, 10 checks |
+| decontx_raw_tenx_test | portable | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | differs: silhouette_width | differs: silhouette_width |
+| decontx_raw_emptydrops_test | production | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | identical, 12 checks | identical, 10 checks |
+| decontx_raw_emptydrops_test | portable | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | differs: silhouette_width | differs: silhouette_width |
+| cellbender_fromraw_test | production | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | identical, 12 checks | identical, 10 checks |
+| cellbender_fromraw_test | portable | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | differs: silhouette_width, neighborhood_purity | differs: silhouette_width |
+| soupx_tenx_SRR18256555 | production | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | identical, 13 checks | identical, 11 checks |
+| soupx_tenx_SRR18256555 | portable | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | differs: silhouette_width | differs: silhouette_width |
+| soupx_tenx_10xmousebrain | production | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | identical, 13 checks | identical, 11 checks |
+| soupx_tenx_10xmousebrain | portable | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | differs: silhouette_width, neighborhood_purity | differs: silhouette_width |
+| soupx_emptydrops_4500871lane | production | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | identical, 13 checks | identical, 11 checks |
+| soupx_emptydrops_4500871lane | portable | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | differs: silhouette_width | differs: silhouette_width |
+| soupx_emptydrops_sscovelli | production | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | identical, 13 checks | identical, 11 checks |
+| soupx_emptydrops_sscovelli | portable | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | differs: silhouette_width | differs: silhouette_width, neighborhood_purity |
+| cellbender_fromraw_ghirsutum2 | production | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | identical, 13 checks | identical, 11 checks |
+| cellbender_fromraw_ghirsutum2 | portable | identical, 24 of 24 files | identical, 31 of 31 files | identical, 9 of 9 files | differs: silhouette_width | differs: silhouette_width, neighborhood_purity |
+
+In the production profile every check is identical: 20 runs of (a), 24 and 31 files each; `clusters/` against `scrust cluster --counts <input> --stats silhouette,purity`, 9 files each; (b) on all ten objects (12 checks on tier T, 13 on tier P with the logged numbers); and clustering on the fly with both scores against the saved inputs. In the portable profile, (a) and the check of `clusters/` are byte-identical too: both routes compute under the same kernel. Against the saved objects, made under the SapphireRapids kernel, the labels, levels, RNA and SCT columns are identical, and the differences are those of `[clustering.floor.kernel]`, the same as with the earlier label:
+
+| portable profile, against the saved objects | cells | differing | largest difference | the floor |
+|---|---|---|---|---|
+| re-clustering, `silhouette_width` | 159,436 | 156,908 | 6.1e-14 | `K8_silhouette_width`, 3.3e-13 |
+| re-clustering, `neighborhood_purity` | 159,436 | 4, in 2 objects | 0.0128 | `K9_purity`: 19 cells in 10 objects, 0.019 |
+| on the fly, `silhouette_width` | 181,681 | 180,406 | 3.26e-13 | 3.3e-13 |
+| on the fly, `neighborhood_purity` | 181,681 | 4, in 2 objects | 0.0056 | 0.019 |
+| labels and levels, `nCount_SCT`, `nFeature_SCT`, the RNA columns | all | 0 | | exact |
+
+The eight purities that differ are the two cells of the median pair in four odd-sized objects, each pair flagged by the run's certificate: the median cell's 50th neighbour lies on the radius, and the kernel decides whether it is within it, as M12 found.
+
+### Memory and time
+
+All in the production profile at 8 threads, as M7. On the panel each object's runs were made one after another on one node, once each. The repeated measurements ([`m15_memory.sbatch`](../../validation/slurm/m15_memory.sbatch), jobs 61996200 and 61996203, binary `scrust-m15-a5de5e3`) ran each mode three times on one node, interleaved, with the trial builds of [`m15_trial_bins.sh`](../../validation/slurm/m15_trial_bins.sh) for the unsettled and extra-settled runs.
+
+| measure, the panel (label `m15-a5de5e3`) | smallest, largest, median |
+|---|---|
+| peak RSS, clustering on the fly ÷ M7's run | 0.626 (cellbender_fromraw_nvectensis) to 1.029 (decontx_raw_emptydrops_eberryi), median 0.996 |
+| peak RSS, clustering on the fly ÷ `--clusters` (the same binary and node) | 0.592 (cellbender_fromraw_nvectensis) to 1.030 (decontx_raw_emptydrops_eberryi), median 0.996 |
+| peak RSS, the whole rule in process ÷ the larger of the two commands' | 0.847 (cellbender_fromraw_nvectensis) to 1.159 (decontx_raw_tenx_nvectensis), median 1.000 |
+| peak RSS, the whole rule in process ÷ the sum of the two commands' | 0.607 (decontx_raw_emptydrops_chickenamygdala) to 0.792 (decontx_raw_tenx_nvectensis), median 0.662 |
+| peak RSS, the in-process run's DoubletFinder phases (to the end of `singlets`) ÷ the `--clusters` run | 0.847 (cellbender_fromraw_nvectensis) to 1.159 (decontx_raw_tenx_nvectensis), median 1.000 |
+| wall time, clustering on the fly ÷ `--clusters` | 1.021 (cellbender_fromraw_drerio) to 2.037 (decontx_raw_emptydrops_chickenamygdala), median 1.207 |
+| wall time, the whole rule in process ÷ the two commands' sum | 0.861 (soupx_tenx_pvitticeps) to 1.556 (soupx_tenx_amillepora), median 0.965 |
+| objects whose peak with clustering on the fly is more than 10% above M7's | 0 |
+| objects whose peak with clustering on the fly was reached in the clustering's phases | 0 |
+| objects whose in-process peak rose during the re-clustering | 0 |
+
+The largest peaks: M7 6.64 GiB, `--clusters` 6.64, clustering on the fly 6.67, the singlets' clustering alone 3.38, the whole rule in process 6.64 (the 79,409-cell objects). Wall time over the 150: M7's runs 6,829 s, `--clusters` 7,323 s, clustering on the fly 9,274 s, the two commands 9,737 s, in process 9,428 s. Single runs on shared nodes vary: the largest wall-time ratios above come from one node each (decontx_raw_emptydrops_chickenamygdala's ran its `--clusters` run with three times the system time it took in the other labels).
+
+**Clustering on the fly stays within M7's peak.** On no object did the clustering's phases set the run's peak (`summary.json` records the peak at the end of each phase): DoubletFinder's SCTransform on the cells and the artificial doublets sets it, as C3h expected. That takes settling the allocator at the hand-off.
+
+- **The cause: glibc's mmap threshold.** glibc's malloc serves blocks above its mmap threshold (128 KiB at first) with `mmap`, which go back to the system when freed, and smaller ones from its heaps, which keep freed pages for reuse. Each time an mmapped block is freed, glibc raises the threshold to that block's size, up to 32 MiB. After the clustering freed its large buffers, DoubletFinder's medium-sized blocks (128 KiB to 32 MiB) therefore came from the heaps, and their pages stayed resident between uses. On cellbender_fromraw_aaegypti, a diagnostic run (job 61953989) held 210 MB when DoubletFinder began, where the run given the labels held 56 MB, and peaked at 714 MB against 579 MB. `malloc_trim` alone, tried first, returned a third of it (210 to 134 MB) but left the peak at 662 MB: the next blocks still came from the heaps.
+- **The helper, `scio::memory::settle`** (the user's decision of 2026-11-18): it fixes the threshold at its default, 128 KiB (`mallopt(M_MMAP_THRESHOLD)`, which also ends the adjustment), and returns the heaps' free pages (`malloc_trim(0)`). It is compiled for Linux with glibc only and does nothing elsewhere; no environment variable changes it; it changes no output. `scrust doubletfinder` calls it at one in-process hand-off, after clustering on the fly, before DoubletFinder; it takes 1 to 4 ms (the `clustering: settle` phase). Runs given `--clusters` never call it, so M7's command runs as before, memory included.
+- **Not before the re-clustering.** The decision asked for it there too if it helps. It does not help the peak: below, a trial build settling before the re-clustering reached the same peaks, and on the 150 and in all 30 repeated in-process runs the peak was reached before the re-clustering began. Its effect on time is small and mixed. So the final code does not call it there.
+
+Before and after, on the panel: clustering on the fly ÷ M7's run.
+
+| | median | largest | above 1.10 | the hook's system time minus `--clusters`', the same node (median) |
+|---|---|---|---|---|
+| before: label `m15-429a636`, without the settle | 1.012 | 1.164 (cellbender_fromraw_aaegypti) | 3 | 0.33 s |
+| after: label `m15-a5de5e3` | 0.996 | 1.029 (decontx_raw_emptydrops_eberryi) | 0 | 0.54 s |
+
+cellbender_fromraw_aaegypti, the worst before: 0.642 GiB with clustering on the fly against M7's 0.551 (1.164) before, 0.558 (1.013) after. Three runs of each on one node, peak GiB (job 61996200; "not settled" is the trial build without the call; M7's run as on the panel):
+
+| object | cells | M7's run | `--clusters` | clustering on the fly | on the fly, not settled |
+|---|---|---|---|---|---|
+| cellbender_fromraw_aaegypti | 7,717 | 0.551 | 0.551 to 0.552 | 0.533 to 0.555 | 0.628 to 0.644 |
+| decontx_raw_tenx_zmaysGSM5552419 | 2,673 | 0.494 | 0.496 to 0.522 | 0.437 to 0.442 | 0.548 to 0.556 |
+| soupx_emptydrops_nvectensis | 4,255 | 0.467 | 0.417 to 0.519 | 0.335 to 0.344 | 0.456 to 0.555 |
+| soupx_tenx_10xmousebrain | 11,831 | 2.545 | 2.546 to 2.553 | 2.536 to 2.560 | 2.554 to 2.554 |
+| soupx_emptydrops_amellifera | 72,702 | 6.636 | 6.636 to 6.637 | 6.664 to 6.719 | 6.663 to 6.679 |
+
+Settled, clustering on the fly peaks within 1.3% of M7's run on every object, and below it on the two smallest. Not settled, it peaks up to 19% above it: 0.555 GiB on soupx_emptydrops_nvectensis, and 17% (0.644 GiB) on cellbender_fromraw_aaegypti. On the largest object both stay within 1.3% of M7's: there the large blocks are mapped either way, and the peak is DoubletFinder's own.
+
+The same runs' wall, user and system seconds (medians of three):
+
+| object | `--clusters` | clustering on the fly | on the fly, not settled | settled minus not settled |
+|---|---|---|---|---|
+| cellbender_fromraw_aaegypti | 26.35 / 119.12 / 1.82 | 32.64 / 139.38 / 2.27 | 32.58 / 139.60 / 2.09 | +0.06 / −0.22 / +0.18 |
+| decontx_raw_tenx_zmaysGSM5552419 | 20.46 / 75.31 / 1.41 | 23.51 / 86.96 / 1.50 | 23.38 / 86.62 / 1.56 | +0.13 / +0.34 / −0.06 |
+| soupx_emptydrops_nvectensis | 21.62 / 99.88 / 1.50 | 25.70 / 115.16 / 1.87 | 25.71 / 115.36 / 1.86 | −0.01 / −0.20 / +0.01 |
+| soupx_tenx_10xmousebrain | 72.95 / 241.68 / 4.83 | 82.57 / 273.22 / 5.30 | 88.01 / 278.69 / 5.59 | −5.44 / −5.47 / −0.29 |
+| soupx_emptydrops_amellifera | 114.80 / 383.09 / 7.46 | 179.37 / 559.05 / 9.89 | 184.83 / 565.44 / 8.99 | −5.46 / −6.39 / +0.90 |
+
+The settle costs no measurable wall or user time. With the threshold fixed, DoubletFinder maps and unmaps its blocks of 128 KiB or more as they come and go, which costs up to 0.9 s of system time on the largest object, none measurable on the small ones. On the panel, the hook's runs took a median 0.54 s more system time than `--clusters`' on the same node, against 0.33 s before the settle. The diagnostic job 61954639, which fixed the threshold for M7's whole command through glibc's environment, found the same: 0.5 to 1.5 s more system time, the same user time.
+
+**The whole rule in one process: the larger of the two peaks, not their sum.** On none of the 150 objects did the re-clustering raise the run's peak: every in-process run had reached its final peak by the end of the `singlets` phase, before the re-clustering began. Its ratio to the larger of the two commands' peaks (0.847 to 1.159) is therefore the ratio of two runs of the same DoubletFinder code: the in-process run's DoubletFinder phases against the `--clusters` run give the same span and median. That spread is DoubletFinder's own from run to run at 8 threads, largest on small objects, where medium-sized blocks make up more of the peak. The repeated runs show it (job 61996203, label `m15-a5de5e3-rc`; "settled before the re-clustering" is the trial build with the call added). Three runs of each, peak GiB:
+
+| object | cells | `--clusters` | `scrust cluster` on its `singlets/` | in process | in process, settled before the re-clustering | peak reached in the re-clustering |
+|---|---|---|---|---|---|---|
+| decontx_raw_tenx_SRR18256555 | 3,107 | 0.390 to 0.407 | 0.161 to 0.163 | 0.392 to 0.429 | 0.358 to 0.410 | 0 of 3; 0 of 3 |
+| soupx_emptydrops_nvectensis | 4,255 | 0.513 to 0.533 | 0.183 to 0.183 | 0.457 to 0.517 | 0.485 to 0.489 | 0 of 3; 0 of 3 |
+| decontx_raw_tenx_zmaysGSM5552419 | 2,673 | 0.474 to 0.499 | 0.179 to 0.180 | 0.497 to 0.499 | 0.478 to 0.519 | 0 of 3; 0 of 3 |
+| soupx_tenx_10xmousebrain | 11,831 | 2.546 to 2.546 | 1.252 to 1.252 | 2.545 to 2.546 | 2.546 to 2.553 | 0 of 3; 0 of 3 |
+| soupx_emptydrops_amellifera | 72,702 | 6.635 to 6.637 | 3.382 to 3.382 | 6.636 to 6.638 | 6.636 to 6.637 | 0 of 3; 0 of 3 |
+
+In all 30 in-process runs, settled before the re-clustering or not, the peak was reached by the end of `singlets`, and on every object the in-process peaks overlap the `--clusters` runs' range. The extra settle changed neither the peaks nor the wall time: the medians differ by at most 2 s (1.1%), within the repeats' spread. It lowered the system time on the largest object, from 15.9–17.6 s to 14.1–14.8 s, and raised it by up to 0.4 s on the others. The re-clustering's own peak, about half of DoubletFinder's, stays below it either way.
+
+**Time.** Clustering on the fly adds the clustering's own time (wall time 1.207 times `--clusters`', median). In one process the whole rule saves the second command's start and its reading of `singlets/` (0.965 times the two commands' sum, median), within the spread of single runs at 8 threads; the benchmark measures both at 1 and 32 threads, three times each ([M15 benchmark](#m15-benchmark)).
+
+### M15 benchmark
+
+On the five tier-P DoubletFinder objects, by `docs/benchmarks.md`'s method: three repeats, Xeon 8480CL nodes, cold reads, the production profile, 1 and 32 threads; R's whole rule from the first benchmark, no new R runs. The harness's checks found every run's files equal to the reference's (210 checks, all the same). The full tables, with the elapsed times at 1 and 32 threads, are in [docs/benchmarks.md](../benchmarks.md#doubletfinder-clustering-its-own-input-and-the-whole-rule-in-one-process-m15). CPU seconds / peak GiB at one thread:
+
+| object | input cells | labels given | clustering its own input | rule, two commands | rule, one process | R's rule | own input ÷ labels given: CPU · peak | one process ÷ two commands: CPU · peak | R ÷ one process: CPU · peak |
+|---|---|---|---|---|---|---|---|---|---|
+| soupx_tenx_SRR18256555 | 3,108 | 64.7 / 0.27 | 73.2 / 0.24 | 76.8 / 0.27 | 76.4 / 0.27 | 228 / 5.13 | 1.13 · 0.89 | 0.994 · 1.00 | 3.0× · 19× |
+| soupx_tenx_10xmousebrain | 11,831 | 209 / 2.53 | 237 / 2.52 | 275 / 2.53 | 270 / 2.53 | 793 / 23.25 | 1.13 · 1.00 | 0.982 · 1.00 | 2.9× · 9× |
+| soupx_emptydrops_4500871lane | 26,598 | 246 / 2.40 | 326 / 2.40 | 333 / 2.40 | 330 / 2.40 | 879 / 36.98 | 1.33 · 1.00 | 0.991 · 1.00 | 2.7× · 15× |
+| soupx_emptydrops_sscovelli | 79,409 | 408 / 4.41 | 671 / 4.40 | 696 / 4.41 | 721 / 4.41 | 1,973 / 128 | 1.64 · 1.00 | 1.036 · 1.00 | 2.7× · 29× |
+| cellbender_fromraw_ghirsutum2 | 59,323 | 569 / 4.02 | 835 / 4.03 | 918 / 4.02 | 916 / 4.02 | 2,481 / 153 | 1.47 · 1.00 | 0.997 · 1.00 | 2.7× · 38× |
+
+- **Clustering its own input** adds the clustering's CPU time (1.13–1.64× the run given the labels) and no memory: the peak stays DoubletFinder's, or below it on the smallest object (0.89×), as settling the allocator also lowers DoubletFinder's own peak there.
+- **The whole rule in one process** takes the two commands' CPU time at one thread (0.98–1.04×), at the same peak. The hand-off saves the second command's start and its reading of `singlets/`. The in-process re-clustering takes 0.93–0.98× the separate command's CPU time (each object's median), under 2% of the rule. At 32 threads it finishes 3–12% sooner.
+- **Against R's whole rule:** 2.7–3.0× less CPU time and 9–38× less memory at one thread; 15–20× sooner at 32 threads.
+
+### M15 tests
+
+`cargo test --workspace` passes in debug and in release, 292 tests in 43 suites each, none failing or ignored, no compiler warnings (job 61969344, commit `dcc96c6`, under env.sh's Haswell kernel, [`m15_cargo_tests.sbatch`](../../validation/slurm/m15_cargo_tests.sbatch); also job 61960683 at `49e8be7`, the panel's binary). Eleven are new:
+
+- `scio`: `Counts` (keeping cells in place equals selecting columns, explicit zeros included; written and read back, the same), `Factor` (codes, labels, the files' text), the manifest's nested outputs (the parent lists the nested `summary.json` alone, the check recurses, a given digest is kept), and the 10x writer's digests (each file's size and SHA-256 as written);
+- `cluster` (`tests/m15_entry_point.rs`): counts taken or borrowed give the same result, and borrowed counts are left as they were; the result that keeps only the labels computes what the complete one does; the observer-only form agrees; the guard's message names its context;
+- `scrust` (`tests/m15.rs`): the in-memory rule (the entry point's result, written by the library's writer, is `scrust cluster --counts --export`'s files and `result`); clustering on the fly (DoubletFinder's files equal a run given the labels it computed; `clusters/`; the manifests); its labels and levels are R's (kernel-gated, on three tier-T objects); the re-clustering in process against the two-command route, with and without the export; the refusals.
+
+The loaders' tests ([`m15_tests.sbatch`](../../validation/slurm/m15_tests.sbatch), job 61969347, the release binary of `dcc96c6`; also job 61960696 with `49e8be7`'s): R 82 (78 in M14), Python 13 (12), all passing. The new ones load a DoubletFinder output with both nested outputs as before, and each nested output on its own.
+
+### M15 findings
+
+- **Purity's certificate flags more than median pairs on real data.** M12's certificate flags every pair where KMKNN's arithmetic, which R uses, could order neighbours differently from the exhaustive search. On M12's objects it flagged only the median pair of each odd-sized object. The 150 re-clusterings flag 706 pairs in 72 objects: the median pair in all 72 (144 flags), and 562 others, all at the step that finds each cell's 50th-neighbour distance, on three objects (560 on decontx_raw_emptydrops_pvitticeps, one each on cellbender_fromraw_SRR18256506 and decontx_raw_emptydrops_sscovelli). The exhaustive result is kept (M12's decision), and every purity of the three equals the saved object's: KMKNN could have differed there and did not.
+- **glibc's malloc after a large stage.** Freeing large buffers raises glibc's mmap threshold for the rest of the process, so a later stage's medium-sized blocks stay resident: a chain of stages in one process can peak above the same stages run as separate commands. `scio::memory::settle` puts it back; any later in-process hand-off after a step that freed large buffers (the driver, the decontX and SoupX ports' clustering) calls it, as PLAN A3's in-memory rule now says.
+- **DoubletFinder's peak varies from run to run at 8 threads** on small objects, with the same results: which thread's heap a freed block goes back to depends on timing. On decontx_raw_tenx_SRR18256555 six runs of its code on one node peaked between 0.368 and 0.417 GiB (13%), and two single runs on the panel differed by 18%. Peaks of single runs of small objects should be compared with that in mind.
+- **A fixed threshold lowers DoubletFinder's own peak on small objects.** With clustering on the fly, which settles the allocator first, the run peaked below the `--clusters` run on many small objects (down to 0.586 of it), its DoubletFinder phases included. A diagnostic (job 61954639, two runs each) fixed the threshold for the whole process through glibc's environment (`MALLOC_MMAP_THRESHOLD_=131072`): M7's command then peaked 10% lower on cellbender_fromraw_aaegypti (520 against 581 MB), 1% lower on soupx_tenx_10xmousebrain and 0.3% on soupx_emptydrops_amellifera, at the same user CPU time and 0.5 to 1.5 s more system time; clustering on the fly then added at most 0.5% to the peak. Users can set that variable today. Settling at the start of every `scrust doubletfinder` run would do the same for everyone, but it would change every command's memory profile and the benchmark's rows; the user decided against it (2026-11-18): runs given `--clusters` stay exactly as M7's, memory included.
+- **Two runs of the same DoubletFinder code differ by up to 7% in CPU time within one benchmark repeat** (the in-process rule's DoubletFinder phases against the run given the labels: 0.93–1.06 at one thread). That is more than the in-process hand-off saves, under 2% of the rule. Comparing an in-process route with separate commands needs repeats, and the per-phase records to tell the steps apart.
+
+### M15 corrections to the plan
+
+Corrected in [docs/PLAN.md](../PLAN.md) on this branch:
+
+- **A1:** `scio` holds the types tools hand each other in memory (`Counts`, `Factor`); `validation/benchmark/` holds the benchmark's harness.
+- **A3:** DoubletFinder's row: its labels may be none (it then clusters its input), and it outputs the labels it computed (`clusters/`) and, with `--recluster`, the singlets' re-clustering (`singlets_clusters/`), each a nested output. The in-memory rule's bullet: M15 made the chain one entry point, and `scrust cluster --counts` read–call–write over it. Its "Memory" line: a chain's peak is its largest step's only if freed memory goes back to the system, which glibc's dynamic mmap threshold prevents after a large step; a hand-off after such a step calls `scio::memory::settle`, and a command's own path never does.
+- **A7, step 6:** the benchmark's harness is in `validation/benchmark/`.
+- **B3:** the singlets are kept in memory as they are written, for the re-clustering.
+- **C3f:** nested outputs, as the user decided on 2026-11-18 (the role `nested_output`, schema version 1 kept): each a complete scrust output; the parent lists its `summary.json` alone (json, scale none, size and SHA-256); the checks recurse and refuse absolute paths and `..`; readers ignore the roles they do not use, this one included; a nested output loads on its own.
+- **C3h,** rewritten: the entry point (what goes in, what comes out, no file I/O, the observer, writing through the same code); the hook's options (`--cluster-stats`); the memory (only the labels kept; glibc's mmap threshold and the settle at the hand-off, `scio::memory::settle`, with the measured figures); the outputs (C3h's outputs now live in `clusters/`, a nested output with its own `summary.json`, which holds the clustering's numbers, each file as `scrust cluster --counts` writes it; `result.clustering` in the DoubletFinder run's summary points to it); K12 with the logged numbers; the re-clustering (`--recluster` and its options, the singlets in memory, `singlets_clusters/`, the peak, measured).
+- **C5:** K12 on the fly compares the logged numbers too, and `clusters/` against `scrust cluster --counts <input>`'s output, and names the clustering's own outputs; a new row, K12 re-clustering, with checks (a), (b) and (c).
+- **C6:** M15's row: the entry point, read–call–write, the re-clustering, the harness; done when K12, the re-clustering's checks, the in-memory rule's test, the memory against M7 and against the two-command route, and the benchmark's rows.
+
+### M15 deviations and notes
+
+- **The allocator, decided.** Without settling the allocator after clustering on the fly, the first label peaked up to 16% above M7's runs, beyond the brief's 10%. The user chose (2026-11-18) the helper this session recommended, under conditions: a small documented helper in `scio`, called at in-process hand-offs only (after the hook's clustering; between DoubletFinder and the re-clustering only if it helps, measured: it does not, so it is not called there); Linux with glibc only, a no-op elsewhere; no environment switch (`SCRUST_NO_SETTLE`, which the first implementation had for measuring, is gone: trial builds measure instead, `m15_trial_bins.sh`); no global change, so runs given `--clusters` without the re-clustering stay exactly as M7's, memory included; the cause and the measurements reported ([Memory and time](#memory-and-time)), and one line in PLAN A3's in-memory rule.
+- **Nested outputs, decided.** The user chose nested outputs on 2026-11-18 (the role `nested_output`, schema version 1), for `clusters/` and the re-clustering's directory, with six conditions; [Nested outputs](#nested-outputs) shows how each is met. Implementing the decision renamed `recluster/` to `singlets_clusters/`, the name in the option the user chose; cut `result.clustering` from the whole clustering result to four fields; and added the path rule, the depth limit, and the checks of `clusters/` against `scrust cluster --counts` (`k12_alone`, `hook_alone`).
+- **Four labels.** The panel and the T and P checks ran with four binaries:
+  - `m15-429a636`, the first;
+  - `m15-49e8be7`, which adds the run's phase records, drops the hook's result once `clusters/` is written, and settles the allocator after clustering on the fly;
+  - `m15-3fc8b25`, which implements the user's decision on nested outputs. Its panel was cancelled when its new `k12_alone` check differed on every object: the panel's script ran the standalone clustering with the workflow preset's scores, where the hook's default is none. A fix to the script, not the code (`--stats none`). Its T and P runs passed every check, `hook_alone` included;
+  - `m15-a5de5e3`, the final one, which implements the user's decision on the allocator (`scio::memory::settle`, no environment switch).
+
+  `m15-429a636`, `m15-49e8be7` and `m15-a5de5e3` passed every check they had on every object; this report gives `m15-a5de5e3`'s. The earlier labels' run directories were removed afterwards; their check records, summary rows and time records are kept. The repeated memory runs of `m15-49e8be7` (jobs 61960681 and 61965453, made with `SCRUST_NO_SETTLE`, since removed) are superseded by the final label's (jobs 61996200 and 61996203), with the same results.
+- **The diagnostics** (binaries `scrust-m15trim`: `malloc_trim` alone; `scrust-m15settle`: the settle before it was committed; `scrust-m15settle2`: also settling before the re-clustering; and the diagnostic jobs 61953540, 61953548, 61953989 and 61954639) were trials, not commits. Their binaries and run directories were removed; their peak tables (`memory/memory.tsv` under labels `m15trim`, `m15settle` and `m15settle2`) and logs (`data/doubletfinder/logs/m15/`, `memdiag/`) are kept, outside the manifest. The figures quoted from them above are in those logs.
+- **The benchmark's binaries.** Its `d`, `r` and `p` variants ran with `scrust-8ab8fc8`, its `h` variant again with `scrust-49e8be7` (`VARIANTS=h`): that commit changes only the code `h` runs, the allocator's settling after clustering on the fly. M15's last commits change nothing these runs compute or allocate. They rename the re-clustering's directory, give `result.clustering` four fields, and move the settling into `scio`. So the rows stand, and the harness reads both names of the re-clustering's directory.
+- **The exports at level labels.** The 150 exports of the saved DoubletFinder objects hold their metadata and levels, not their SCT layers, PCA or graphs; M17 can reuse them and add the rest (C4).
+- **`data/benchmarks/scripts/`** stays where it was, as it ran for the first tables; the harness in `validation/benchmark/` is its moved and extended copy.
+- **User documentation.** M14b has not landed on main, so there are no command pages to update; M14b will cover M15's options (`--cluster-preset`, `--cluster-params`, `--cluster-stats`, `--recluster` and its options, `clusters/`, `singlets_clusters/`, nested outputs). The commands' `--help` and the README describe them.
+
+### Reproducing M15
+
+From the repository's top directory, after `source env.sh` and `cargo build --release -p scrust`, with M7's runs (label `m7-b8c8a8c`), M8's exports and the DoubletFinder inputs as M7's report describes. Copy the binary so that later builds do not change it under the jobs:
+
+```bash
+cp target/release/scrust data/doubletfinder/logs/bin/scrust-m15-$(git rev-parse --short HEAD)
+```
+
+The two trial builds for the memory measurements (the commit without the hook's settle, and with one more before the re-clustering):
+
+```bash
+bash validation/slurm/m15_trial_bins.sh $(git rev-parse --short HEAD)
+```
+
+```bash
+sbatch --array=1-150%50 validation/slurm/m15_export.sbatch
+```
+
+```bash
+SCRUST_BIN=data/doubletfinder/logs/bin/scrust-m15-<commit> sbatch --array=1-150%50 validation/slurm/m15_panel.sbatch m15-<commit>
+```
+
+```bash
+SCRUST_BIN=data/doubletfinder/logs/bin/scrust-m15-<commit> sbatch --array=1-10 validation/slurm/m15_recluster.sbatch m15-<commit> production
+```
+
+```bash
+SCRUST_BIN=data/doubletfinder/logs/bin/scrust-m15-<commit> sbatch --array=1-10 --partition=shared validation/slurm/m15_recluster.sbatch m15-<commit> portable
+```
+
+```bash
+SCRUST_BIN=data/doubletfinder/logs/bin/scrust-m15-<commit> NOSETTLE_BIN=data/doubletfinder/logs/bin/scrust-m15-<commit>-nosettle sbatch validation/slurm/m15_memory.sbatch m15-<commit> 3 cellbender_fromraw_aaegypti decontx_raw_tenx_zmaysGSM5552419 soupx_emptydrops_nvectensis soupx_tenx_10xmousebrain soupx_emptydrops_amellifera
+```
+
+```bash
+MODES="given recluster2 inprocess inprocess_settled" SCRUST_BIN=data/doubletfinder/logs/bin/scrust-m15-<commit> SETTLE2_BIN=data/doubletfinder/logs/bin/scrust-m15-<commit>-settle2 sbatch validation/slurm/m15_memory.sbatch m15-<commit>-rc 3 decontx_raw_tenx_SRR18256555 soupx_emptydrops_nvectensis decontx_raw_tenx_zmaysGSM5552419 soupx_tenx_10xmousebrain soupx_emptydrops_amellifera
+```
+
+```bash
+sbatch validation/slurm/m15_cargo_tests.sbatch
+```
+
+```bash
+SCRUST_BIN=data/doubletfinder/logs/bin/scrust-m15-<commit> sbatch validation/slurm/m15_tests.sbatch
+```
+
+```bash
+PYTHONNOUSERSITE=1 python -I validation/python/report_m15.py m15-<commit> --tsv docs/validation/clustering_m15.tsv
+```
+
+```bash
+bash validation/slurm/m15_manifest.sh m15-<commit> <cargo tests job> <loaders' tests job>
+```
+
+The benchmark: [docs/benchmarks.md](../benchmarks.md), "Updating this page".

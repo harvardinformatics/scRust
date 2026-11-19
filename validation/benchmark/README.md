@@ -34,6 +34,10 @@ The benchmark's harness (docs/benchmarks.md describes the method; this file is a
   - At 32 threads, writing the neighbour graphs and the export's matrices costs 8–22 s of system CPU time on the large objects, against at most 2 s at one thread.
   - That is most of the extra CPU time its writing takes at 32 threads (`sys_write_s` in `benchmark_kinds.tsv`). It is kernel time from the threads' memory handling, not waiting for the disk.
   - This is room for improvement in the writer, not a measurement artefact.
+- **M15: DoubletFinder clustering its own input, and the whole rule in one process** (`doubletfinder_m15`; docs/benchmarks.md has the tables):
+  - Clustering its own input (`h`) adds the clustering's CPU time, 1.13–1.64× `d`'s at one thread, and no memory: its peak stays DoubletFinder's, or below it on the smallest object (0.89×).
+  - The whole rule in one process (`p`) takes `d` + `r`'s CPU time at one thread (0.98–1.04×) at the same peak. The in-process re-clustering takes 0.93–0.98× `r`'s CPU time (each object's median): the second command's start and its reading of `singlets/`. That is under 2% of the rule. At 32 threads `p` finishes 3–12% sooner.
+  - Within one repeat, `p`'s DoubletFinder phases took 0.93–1.06× `d`'s CPU time, the same code run twice. That is more than the hand-off saves, so such comparisons need the repeats and the per-phase records.
 
 ### What each side runs (like for like)
 

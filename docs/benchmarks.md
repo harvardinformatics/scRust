@@ -4,7 +4,7 @@ This page compares each Rust port with the workflow's R step it replaces. It rep
 
 It grows with the ports. Each new tool adds its rows, with the same method and columns, and the findings are updated (docs/PLAN.md, A7's cycle, step 6).
 
-**Last updated:** 2026-11-18, the first benchmark, covering DoubletFinder (Step 1) and the clustering chain (M11–M13).
+**Last updated:** 2026-11-18. The first benchmark covers DoubletFinder (Step 1) and the clustering chain (M11–M13). M15 added DoubletFinder clustering its own input, and its whole rule in one process.
 
 ## Findings (2026-11-18)
 
@@ -23,24 +23,31 @@ It grows with the ports. Each new tool adds its rows, with the same method and c
   - With `--export`, they take 13–53%, mostly writing the corrected counts as gzipped text.
   - Reading the counts sets much of Rust's small peak: 35–81% of it is reached by the end of reading.
 - **To fix:** at 32 threads, Rust's parallel `.mtx.gz` writer spends 8–22 s of kernel (system) CPU time on the large objects, against at most 2 s at one thread.
+- **Clustering on the fly (M15):** `scrust doubletfinder` without labels adds the clustering's CPU time (1.13–1.64× the run given the labels, at one thread) and no memory: its peak stays DoubletFinder's.
+- **The whole DoubletFinder rule in one process (M15):**
+  - It takes the same CPU time and peak as the two commands at one thread (0.98–1.04× the CPU time).
+  - The hand-off saves the second command's start and its reading of `singlets/`. That is under 2% of the rule, within the spread of DoubletFinder's own runs.
+  - At 32 threads it finishes 3–12% sooner.
+  - Against R's whole rule: 2.7–3.0× less CPU time, 9–38× less memory.
 
 ## Method
 
 - **R** runs copies of the workflow's own scripts, with phase-marker lines added and nothing else changed (checked byte for byte; sources at pipeline commit `ea053fa`).
   - It runs as the workflow's jobs do: 1 CPU, the six `*_NUM_THREADS` set to 1, the production R env, seed 12345, the production inputs.
   - Steps not yet ported are timed but left out of the comparison: SoupX, emptyDrops with `logNormCounts` and `as.Seurat`, and RunUMAP. Their cost is in the [last table](#workflow-steps-not-yet-ported).
-- **Rust** runs `scrust` (binary built from `b6f6e4e`) in the production profile, at `--threads 1` and `--threads 32`.
+- **Rust** runs `scrust` (binary built from `b6f6e4e`; M15's rows, `8ab8fc8` and `49e8be7`, [below](#doubletfinder-clustering-its-own-input-and-the-whole-rule-in-one-process-m15)) in the production profile, at `--threads 1` and `--threads 32`.
 - **Repeats and nodes:** each case runs 3 times, and the tables give the median. All runs are on Xeon Platinum 8480CL nodes of the `sapphire` partition.
   - Inputs are evicted from the page cache before each run, so every read is cold.
   - Most R runs shared a node with other benchmark runs, as the workflow's 1-CPU jobs do. Repeats vary by up to 25% in CPU time for R and 13% for Rust.
 - **Checks:** every run was checked before it was counted.
   - Every Rust output is byte-identical to the reference runs.
   - Every R run reproduces the workflow's number of clusters, and its `.rds` is within 10 bytes of the workflow's saved one.
-- **Data and scripts** are in `data/benchmarks/`, which is not in git:
+- **The harness** is in [`validation/benchmark/`](../validation/benchmark/README.md) (since M15): the sampler `procmon.py`, the R script copies, the jobs (`run_r.sbatch`, `run_rust.sbatch`, with the binary as `SCRUST_BIN`), and the analysis and report scripts. Moved from `data/benchmarks/scripts/` and run again over the first benchmark's runs, it gives the first tables, `checks.tsv` and `benchmark.md`'s tables byte for byte (the notes `report.py` appends are now the harness's README); the copy in `data/benchmarks/scripts/` is kept as it ran.
+- **Data** are in `data/benchmarks/`, which is not in git:
   - `benchmark.md`: the full tables, with ranges, the read and write parts and the 32-thread columns;
   - `benchmark_table.tsv`, `benchmark_runs.tsv` and `benchmark_kinds.tsv`: the numbers;
   - `checks.tsv`: the checks;
-  - `scripts/`: the harness, including the sampler `procmon.py`, the R script copies, and the analysis and report scripts.
+  - `runs/`: every run's records, and `bin/`: the binaries.
 
 ## How to read the tables
 
@@ -106,6 +113,39 @@ Wall-clock seconds, start to exit. R always runs on 1 CPU. At 32 threads Rust's 
 | | soupx_emptydrops_sscovelli | 1,452 / 1,981 | 406 / 685 | 52.2 / 109 | 28× / 18× |
 | | cellbender_fromraw_ghirsutum2 | 1,844 / 2,491 | 569 / 897 | 62.1 / 116 | 30× / 22× |
 
+### DoubletFinder clustering its own input, and the whole rule in one process (M15)
+
+R's whole rule is the one in the DoubletFinder table above; there are no new R runs. Rust runs each of its four rows three times, at 1 and 32 threads, all with the same code on these paths: `scrust-8ab8fc8` for the rows given the labels and both rule rows, and `scrust-49e8be7` for clustering its own input. `scrust-49e8be7` changes only that row's path: it settles the allocator after clustering on the fly. M15's later commits change nothing these runs compute or allocate. They rename the re-clustering's directory, shorten `result.clustering`, and move the settling into `scio`.
+
+- **Labels given:** `scrust doubletfinder --clusters`, as in the DoubletFinder table, measured again with M15's binary.
+- **Clustering its own input:** `scrust doubletfinder` without `--clusters`. The workflow's chain clusters the input in the same process first, keeping only the labels; then DoubletFinder runs as with the labels given.
+- **Rule, two commands:** `scrust doubletfinder --clusters`, then `scrust cluster --counts <its singlets/> --preset workflow --export`, as in the DoubletFinder table. CPU times are added; the peak is the larger of the two.
+- **Rule, one process:** `scrust doubletfinder --clusters ... --recluster --recluster-export`. The singlets go to the clustering in memory, and the files are the two commands' files: every run was checked against them.
+
+CPU seconds / peak GiB at one thread:
+
+| object | input cells | labels given | clustering its own input | rule, two commands | rule, one process | R's rule | own input ÷ labels given: CPU · peak | one process ÷ two commands: CPU · peak | R ÷ one process: CPU · peak |
+|---|---|---|---|---|---|---|---|---|---|
+| soupx_tenx_SRR18256555 | 3,108 | 64.7 / 0.27 | 73.2 / 0.24 | 76.8 / 0.27 | 76.4 / 0.27 | 228 / 5.13 | 1.13 · 0.89 | 0.994 · 1.00 | 3.0× · 19× |
+| soupx_tenx_10xmousebrain | 11,831 | 209 / 2.53 | 237 / 2.52 | 275 / 2.53 | 270 / 2.53 | 793 / 23.25 | 1.13 · 1.00 | 0.982 · 1.00 | 2.9× · 9× |
+| soupx_emptydrops_4500871lane | 26,598 | 246 / 2.40 | 326 / 2.40 | 333 / 2.40 | 330 / 2.40 | 879 / 36.98 | 1.33 · 1.00 | 0.991 · 1.00 | 2.7× · 15× |
+| soupx_emptydrops_sscovelli | 79,409 | 408 / 4.41 | 671 / 4.40 | 696 / 4.41 | 721 / 4.41 | 1,973 / 128 | 1.64 · 1.00 | 1.036 · 1.00 | 2.7× · 29× |
+| cellbender_fromraw_ghirsutum2 | 59,323 | 569 / 4.02 | 835 / 4.03 | 918 / 4.02 | 916 / 4.02 | 2,481 / 153 | 1.47 · 1.00 | 0.997 · 1.00 | 2.7× · 38× |
+
+Elapsed seconds at 1 / 32 threads:
+
+| object | labels given | clustering its own input | rule, two commands | rule, one process | R's rule | one process ÷ two commands, 1 / 32 threads | R ÷ one process at 32 threads |
+|---|---|---|---|---|---|---|---|
+| soupx_tenx_SRR18256555 | 65.0 / 9.31 | 73.4 / 10.2 | 77.2 / 12.3 | 76.7 / 11.9 | 229 | 0.994 / 0.967 | 19× |
+| soupx_tenx_10xmousebrain | 210 / 43.5 | 237 / 49.5 | 276 / 58.3 | 271 / 53.5 | 798 | 0.982 / 0.918 | 15× |
+| soupx_emptydrops_4500871lane | 247 / 43.2 | 328 / 62.1 | 334 / 66.0 | 331 / 59.4 | 884 | 0.991 / 0.899 | 15× |
+| soupx_emptydrops_sscovelli | 410 / 54.5 | 674 / 104 | 699 / 120 | 725 / 105 | 1,981 | 1.037 / 0.877 | 19× |
+| cellbender_fromraw_ghirsutum2 | 573 / 72.4 | 838 / 108 | 924 / 131 | 919 / 122 | 2,491 | 0.995 / 0.928 | 20× |
+
+- **Clustering its own input** adds the clustering's CPU time: 1.13–1.64× the CPU time with the labels given. It adds no memory: the peak stays DoubletFinder's own, or below it on the smallest object (0.89×), where settling the allocator after the clustering also lowers DoubletFinder's peak.
+- **The whole rule in one process** takes the same CPU time as the two commands at one thread (0.98–1.04×), at the same peak, which DoubletFinder sets. The hand-off saves the second command's start and its reading of `singlets/`. The in-process re-clustering takes 0.93–0.98× the separate command's CPU time (the median of each object's three repeats). That is under 2% of the rule, less than the spread of DoubletFinder's own phases between the two routes within a repeat: they are the same code, and took 0.93–1.06× as long at one thread. At 32 threads, where reading is a larger share of the elapsed time, the one process finishes 3–12% sooner.
+- **Against R's whole rule,** the one process takes 2.7–3.0× less CPU time and 9–38× less memory at one thread, and finishes 15–20× sooner at 32 threads.
+
 ### Workflow steps not yet ported
 
 R's CPU seconds for the steps inside the benchmarked scripts that no port covers yet (median of the same 3 runs). This is today's cost for the ports still to come; each port moves its rows into a table of its own above.
@@ -127,7 +167,7 @@ Not measured yet: decontX, scDblFinder, CellBender (GPU), the marker steps (Find
   3. Move it out of the not-yet-ported table.
   4. Update the findings and the date.
   5. Record the scrust commit and the R env.
-- **Chained tools:** when M15 runs the singlets' re-clustering inside `scrust doubletfinder`, add its row next to the whole rule's two-command route. That row measures what the in-process hand-off saves.
-- **The harness:** with the next benchmark, review `data/benchmarks/scripts/` and move it into the repository (`validation/benchmark/`), so that later tables are made the same way.
+- **Chained tools:** a tool that hands its result to the next in memory gets a row next to the same tools run as separate commands, with one binary for both, as M15's DoubletFinder rows do. That row measures what the in-process hand-off saves.
+- **The harness** is `validation/benchmark/` (since M15): submit its jobs from the repository's top directory, with the binary as `SCRUST_BIN`; `VARIANTS` re-measures some of a repeat's variants with a later binary, for the variants whose code it changes.
 - **Re-measure** the parallel writer once its kernel time is addressed.
 - **Re-run everything** only if the method changes, such as another node type or R env, and say so here.

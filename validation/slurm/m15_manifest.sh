@@ -33,7 +33,8 @@ cat <<'EOF'
 #               on T and P: the checks (checks/*.json), time_*.txt, the fingerprint
 #   data/doubletfinder/<object>/rust/<label>{,-rc}/memory/memory.tsv   validation/slurm/m15_memory.sbatch
 #               (clustering on the fly; with MODES="given recluster2 inprocess", the re-clustering)
-#   data/doubletfinder/logs/bin/scrust-<label>, data/benchmarks/bin/scrust-<commit>   the binaries
+#   data/doubletfinder/logs/bin/scrust-<label>, its trial builds (-nosettle, -settle2),
+#               data/benchmarks/bin/scrust-<commit>   the binaries
 #   data/clustering/m15/cargo_tests/<job>/results.tsv, data/clustering/m15/tests/<job>/{r,python}.log
 
 EOF
@@ -90,6 +91,10 @@ bins=(data/doubletfinder/logs/bin/scrust-"$label")
 for f in "${bins[@]}" data/benchmarks/bin/scrust-*; do
     case $f in *b6f6e4e) continue ;; esac
     [ -f "$f" ] && entry "$f" run-record "a pinned scrust binary of M15's runs"
+done
+# the trial builds of the memory measurements (validation/slurm/m15_trial_bins.sh), never shipped
+for f in data/doubletfinder/logs/bin/scrust-"$mem_label"-nosettle data/doubletfinder/logs/bin/scrust-"$mem_label"-settle2; do
+    [ -f "$f" ] && entry "$f" run-record "a trial build for measuring the allocator's settling (m15_trial_bins.sh: the commit with one call removed or added), never shipped"
 done
 if [ -n "$cargo_job" ]; then
     f=data/clustering/m15/cargo_tests/$cargo_job/results.tsv

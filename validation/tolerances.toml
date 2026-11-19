@@ -722,18 +722,24 @@ settled = { comparisons = 264, export_comparisons = 204, doubletfinder_compariso
 # exported seurat_clusters and levels (M2's and M7's exports), byte for byte; DoubletFinder's files
 # (cells.tsv, the sweep tables, singlets/) and summary.json's result against M7's runs (label
 # m7-b8c8a8c), byte for byte, the clustering's own outputs (clusters/, result.clustering) aside;
-# M7's nine checks against the saved outputs; and the clustering's numbers against those the
-# inputs' workflow jobs logged. Production profile, on each workflow job's CPU type, 8 threads.
+# M7's nine checks against the saved outputs; the clustering's numbers against those the inputs'
+# workflow jobs logged; and the nested output clusters/ against scrust cluster --counts <input>'s
+# output (every file it has byte for byte, its summary.json but the timings, the command line and
+# the entries of pca/ and neighbors/, which it does not write). Production profile, on each
+# workflow job's CPU type, 8 threads.
 [clustering.K12]
 criterion = "exact"
-compare = "labels and levels byte for byte; DoubletFinder's files byte for byte and its result member by member; M7's saved-output checks; the logged numbers"
-# Settled (M15, label m15-49e8be7; validation/slurm/m15_panel.sbatch, array job 61960675; the first
-# label, m15-429a636, array job 61949383, gave the same): all 150 objects, every check identical:
-# the labels and levels of all 150 inputs (2,571,090 cells); DoubletFinder's files and result as
-# M7's; M7's nine checks against the saved outputs, 1,350 of 1,350, 3,295,570,596 values (M7's own
-# count); the logged nodes, edges, maximum modularity, communities, singletons and clusters of all
-# 150 inputs. Memory: at most 1.027 times M7's peak (docs/validation/clustering.md, "M15").
-settled = { objects = 150, labels_identical = 150, files_identical = 150, saved_checks = 1350, saved_checks_identical = 1350, saved_values = 3295570596, logged_identical = 150 }
+compare = "labels and levels byte for byte; DoubletFinder's files byte for byte and its result member by member; M7's saved-output checks; the logged numbers; clusters/ against scrust cluster --counts' files"
+# Settled (M15, label m15-a5de5e3; validation/slurm/m15_panel.sbatch, array job 61996174; the
+# earlier labels m15-429a636 and m15-49e8be7, array jobs 61949383 and 61960675, gave the same on
+# the checks they had): all 150 objects, every check identical: the labels and levels of all 150
+# inputs (2,571,090 cells); DoubletFinder's files and result as M7's; M7's nine checks against the
+# saved outputs, 1,350 of 1,350, 3,295,570,596 values (M7's own count); the logged nodes, edges,
+# maximum modularity, communities, singletons and clusters of all 150 inputs; clusters/ as scrust
+# cluster's output, 1,350 files, and with both scores on T and P in both profiles
+# (validation/slurm/m15_recluster.sbatch, 20 runs of 9 files). Memory: at most 1.029 times M7's
+# peak, with the allocator settled at the hand-off (docs/validation/clustering.md, "M15").
+settled = { objects = 150, labels_identical = 150, files_identical = 150, saved_checks = 1350, saved_checks_identical = 1350, saved_values = 3295570596, logged_identical = 150, alone_identical = 150, alone_files = 1350, alone_tp_runs = 20 }
 
 # The singlets' re-clustering (M15; C3h): scrust doubletfinder --recluster clusters the singlets
 # in process, from memory, as doubletfinder.R does before saving. (a) Against the two-command route
@@ -747,10 +753,10 @@ settled = { objects = 150, labels_identical = 150, files_identical = 150, saved_
 [clustering.K12_recluster]
 criterion = "exact"
 compare = "(a) files byte for byte, summary.json but its timings and command line; (b) metadata columns as %.17g text and levels byte for byte, logged numbers; (c) M7's files byte for byte"
-# Settled (M15, label m15-49e8be7; the first label, m15-429a636, gave the same): (a) on the 150
-# without the export (3,600 files; array job 61960675) and on T and P with and without the export
-# in both profiles (validation/slurm/m15_recluster.sbatch, array jobs 61960678 production and
-# 61960679 portable: 20 runs, 24 and 31 files each); (b) on the 150 and on T in the production
+# Settled (M15, label m15-a5de5e3; the earlier labels, m15-429a636 and m15-49e8be7, gave the
+# same): (a) on the 150 without the export (3,600 files; array job 61996174) and on T and P with
+# and without the export in both profiles (validation/slurm/m15_recluster.sbatch, array jobs
+# 61996197 production and 61996199 portable: 20 runs, 24 and 31 files each); (b) on the 150 and on T in the production
 # profile, identical (8,869,312 labels, widths and purities on the 150); (c) on the 150, identical.
 # In the portable profile (b) is graded against [clustering.floor.kernel], the saved objects being
 # SapphireRapids runs; measured on T and P (portable_b below): the labels, levels, RNA and SCT
