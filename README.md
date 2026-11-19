@@ -52,14 +52,14 @@ target/release/scrust doubletfinder --counts <10x dir> --clusters <seurat_cluste
 
 - **Inputs.** `--counts` is a 10x Matrix Market directory (Cell Ranger v3 layout, gzipped or not), such as the one the workflow's emptyDrops step writes. `--clusters` is a TSV with a header and each cell's barcode and cluster label, in the matrix's column order. The factor's level order is read from `--cluster-levels`, or `seurat_clusters_levels.txt` next to the clusters file.
 - **No labels?** Leave out `--clusters`, and the input is clustered first, in the same process, by the chain `scrust cluster` runs (`--cluster-preset workflow` by default, `--cluster-params <file.toml>`, `--cluster-stats silhouette,purity` for the scores). The labels go to `clusters/`, in `--clusters`' layout.
-- **The workflow's whole step:** `--recluster` then clusters the singlets, from memory, as the workflow's `doubletfinder.R` does before saving them, into `recluster/`: what `scrust cluster --counts <out>/singlets` writes, byte for byte (`--recluster-export` adds the export, `--recluster-preset` and `--recluster-params` set the parameters).
+- **The workflow's whole step:** `--recluster` then clusters the singlets, from memory, as the workflow's `doubletfinder.R` does before saving them, into `singlets_clusters/`: what `scrust cluster --counts <out>/singlets` writes, byte for byte (`--recluster-export` adds the export, `--recluster-preset` and `--recluster-params` set the parameters).
 - **Outputs.**
   - `cells.tsv`: the barcode, pANN and classification of every cell.
   - `sweep_stats.tsv` and `bcmvn.tsv`.
   - `summary.json`: pK, nExp, the column names R writes, timings and peak memory.
   - In addition, `singlets/`: the counts without the doublets, as a new 10x directory (`matrix.mtx.gz`, `barcodes.tsv.gz`, `features.tsv.gz`) that the next tool can read. Each singlet's column is written exactly as stored, and the feature lines are the input's.
 
-  - With clustering on the fly, `clusters/`; with `--recluster`, `recluster/`. Each is a scrust output of its own, with its own `summary.json`, which the run's manifest lists ([docs/output_manifest.md](docs/output_manifest.md)); the loaders read each on its own.
+  - With clustering on the fly, `clusters/`; with `--recluster`, `singlets_clusters/`. Each is a scrust output of its own (a nested output), with its own `summary.json` holding the clustering's numbers and its own manifest; the run's manifest lists that `summary.json` ([docs/output_manifest.md](docs/output_manifest.md)), and `scrust validate manifest` checks both. The loaders read the run's own files as before, and each nested output on its own (`load_seurat("<out>/singlets_clusters")`, `add_scrust(obj, "<out>/clusters")`).
 
   `scrust doubletfinder --help` lists the options: seed, PCs, pN, nExp rate, a fixed pK, threads, stage dumps, and the clustering's.
 - **Every output of the original, plus count data out.** Each port keeps all of the original tool's outputs and adds none at their expense. Every tool here that processes counts also writes its result as a new 10x directory, so the tools chain on plain files ([docs/PLAN.md](docs/PLAN.md) A3).

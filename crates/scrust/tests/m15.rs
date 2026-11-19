@@ -6,7 +6,8 @@
 //!   the same `result` section.
 //! - **Clustering on the fly:** `scrust doubletfinder` given no `--clusters` writes DoubletFinder's
 //!   files exactly as a run given the labels it computed; its own labels and levels are R's (under
-//!   the fixtures' kernel); its manifest, nested outputs included, describes the directory.
+//!   the fixtures' kernel); `clusters/` is what `scrust cluster --counts` writes, but for `pca/`
+//!   and `neighbors/`; its manifest, nested outputs included, describes the directory.
 //! - **Re-clustering the singlets in process** (`--recluster`, with and without the export) gives
 //!   the two-command route's files (`scrust doubletfinder`, then `scrust cluster --counts
 //!   <out>/singlets`), byte for byte, apart from the timings and the command line in its
@@ -60,6 +61,38 @@ fn tree(dir: &Path) -> BTreeMap<String, PathBuf> {
         }
     }
     out
+}
+
+/// `summary.json` without its manifest's entries (`files.entries`) and its list of files written
+/// (`run.files`) under the directories `dirs` (each ending in `/`).
+fn without_entries(j: &Json, dirs: &[&str]) -> Json {
+    let Json::Object(top) = j else { panic!("not an object") };
+    let under = |p: Option<&str>| p.is_some_and(|p| dirs.iter().any(|d| p.starts_with(d)));
+    // the list `key` of the section `s`, without the items under `dirs`
+    let filtered = |s: &Json, key: &str| -> Json {
+        let Json::Object(m) = s else { panic!("not an object") };
+        Json::Object(
+            m.iter()
+                .map(|(k, v)| {
+                    let keep = |xs: &Vec<Json>| -> Vec<Json> { xs.iter().filter(|x| !under(x.as_str().or_else(|| x.get("path").and_then(|p| p.as_str())))).cloned().collect() };
+                    match v {
+                        Json::List(xs) if k == key => (k.clone(), Json::List(keep(xs))),
+                        Json::Vector(xs) if k == key => (k.clone(), Json::Vector(keep(xs))),
+                        _ => (k.clone(), v.clone()),
+                    }
+                })
+                .collect(),
+        )
+    };
+    Json::Object(
+        top.iter()
+            .map(|(k, v)| match k.as_str() {
+                "files" => (k.clone(), filtered(v, "entries")),
+                "run" => (k.clone(), filtered(v, "files")),
+                _ => (k.clone(), v.clone()),
+            })
+            .collect(),
+    )
 }
 
 /// The members of `summary.json` that record how a run went, not what it computed.
@@ -160,8 +193,9 @@ fn the_entry_point_s_result_writes_the_command_s_files() {
 }
 
 /// Clustering on the fly: DoubletFinder's files are those of a run given the labels the hook
-/// computed; `clusters/` holds them in `--clusters`' layout; the manifest, with its nested
-/// output, describes the directory.
+/// computed; `clusters/` holds them in `--clusters`' layout, as `scrust cluster --counts` writes
+/// them, `pca/` and `neighbors/` aside; the manifest, with its nested output, describes the
+/// directory; the parent's summary says where the clustering is, its own has its numbers.
 #[test]
 fn doubletfinder_clusters_its_own_input() {
     let f = fixture("soupx_emptydrops_test");
@@ -189,9 +223,27 @@ fn doubletfinder_clusters_its_own_input() {
     let Some(Json::Object(g)) = rg.get("result") else { panic!("no result") };
     let h_df: Vec<&(String, Json)> = h.iter().filter(|(k, _)| k != "clustering").collect();
     assert_eq!(h_df, g.iter().collect::<Vec<_>>(), "DoubletFinder's result");
+    // the parent's result points to clusters/, whose own summary.json holds the clustering's numbers
     let clustering = h.iter().find(|(k, _)| k == "clustering").map(|(_, v)| v).expect("result.clustering");
-    assert_eq!(Some(clustering), read_json(&hook.join("clusters/summary.json")).get("result"), "the clustering's numbers");
-    assert!(clustering.get("purity").and_then(|p| p.get("computed")) == Some(&Json::Bool(true)));
+    let Json::Object(fields) = clustering else { panic!("result.clustering") };
+    assert_eq!(fields.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>(), ["dir", "n_cells", "n_clusters", "seurat_clusters_levels"], "a few fields");
+    let levels: Vec<String> = std::fs::read_to_string(hook.join("clusters/seurat_clusters_levels.txt")).unwrap().lines().map(String::from).collect();
+    assert_eq!(clustering.get("dir").and_then(|v| v.as_str()), Some("clusters"));
+    assert_eq!(clustering.get("n_clusters").and_then(|v| v.as_f64()), Some(levels.len() as f64));
+    assert_eq!(clustering.get("n_cells").and_then(|v| v.as_f64()), Some(scio::tenx::read_barcodes(&f.join("input")).unwrap().len() as f64));
+    assert_eq!(clustering.get("seurat_clusters_levels"), Some(&Json::strs(&levels)));
+    let numbers = read_json(&hook.join("clusters/summary.json"));
+    assert!(numbers.get("result").and_then(|r| r.get("purity")).and_then(|p| p.get("computed")) == Some(&Json::Bool(true)), "the clustering's numbers");
+    // clusters/ is scrust cluster --counts' output, apart from pca/ and neighbors/ (only the labels
+    // are kept): the same files, and the same summary.json once their entries, the timings and the
+    // command line are set aside
+    let alone = d.join("alone");
+    std::fs::create_dir_all(&alone).unwrap();
+    ok(&alone, &["cluster", "--counts", &input, "--preset", "workflow", "--stats", "silhouette,purity", "--out", "hook/clusters", "--threads", "2"]);
+    assert!(alone.join("hook/clusters/pca").is_dir() && alone.join("hook/clusters/neighbors").is_dir());
+    assert_same_tree(&hook.join("clusters"), &alone.join("hook/clusters"), &[], &["pca/", "neighbors/"], &["summary.json"]);
+    let theirs = without_entries(&read_json(&alone.join("hook/clusters/summary.json")), &["pca/", "neighbors/"]);
+    assert_eq!(settled(&numbers, ""), settled(&theirs, ""), "clusters/summary.json against scrust cluster's, pca/ and neighbors/ aside");
     // the manifests: the nested output listed by its summary.json, every file described
     let v = scrust_in(&d, &["validate", "manifest", "--dir", hook.to_str().unwrap()]);
     assert!(v.status.success(), "{}", String::from_utf8_lossy(&v.stderr));
@@ -203,6 +255,17 @@ fn doubletfinder_clusters_its_own_input() {
     assert_eq!(inner.command, "cluster");
     assert_eq!(inner.entry("seurat_clusters.tsv").map(|e| e.role.as_str()), Some("cluster_labels"));
     assert!(inner.provenance.command.starts_with("scrust cluster --counts ") && inner.provenance.command.ends_with(" --preset workflow --stats silhouette,purity"), "{}", inner.provenance.command);
+    // the check recurses: a problem in clusters/ fails the parent; and a nested output listed
+    // outside its parent is refused, not followed
+    std::fs::write(hook.join("clusters/stray.txt"), "x").unwrap();
+    let v = scrust_in(&d, &["validate", "manifest", "--dir", hook.to_str().unwrap()]);
+    assert!(!v.status.success() && String::from_utf8_lossy(&v.stderr).contains("clusters/: stray.txt: in the directory, not in the manifest"), "{}", String::from_utf8_lossy(&v.stderr));
+    std::fs::remove_file(hook.join("clusters/stray.txt")).unwrap();
+    let text = std::fs::read_to_string(hook.join("summary.json")).unwrap();
+    assert_eq!(text.matches("\"clusters/summary.json\"").count(), 1);
+    std::fs::write(hook.join("summary.json"), text.replace("\"clusters/summary.json\"", "\"../hook/clusters/summary.json\"")).unwrap();
+    let v = scrust_in(&d, &["validate", "manifest", "--dir", hook.to_str().unwrap()]);
+    assert!(!v.status.success() && String::from_utf8_lossy(&v.stderr).contains("../hook/clusters/summary.json: not a relative path inside the output"), "{}", String::from_utf8_lossy(&v.stderr));
 }
 
 /// The labels clustering on the fly computes are R's, with R's levels: the workflow clustered
@@ -247,16 +310,16 @@ fn reclustering_in_process_is_the_two_command_route() {
         ok(&one, &a);
         // the same thread count (run.threads is recorded); the files do not depend on it
         ok(&two, &["doubletfinder", "--counts", &input, "--clusters", &clusters, "--out", "run", "--threads", "3"]);
-        let mut b = vec!["cluster", "--counts", "run/singlets", "--preset", "workflow", "--out", "run/recluster", "--threads", "2"];
+        let mut b = vec!["cluster", "--counts", "run/singlets", "--preset", "workflow", "--out", "run/singlets_clusters", "--threads", "2"];
         if export {
             b.push("--export");
         }
         ok(&two, &b);
-        // recluster/ against the second command's output: every file, its summary.json included
-        assert_same_tree(&one.join("run/recluster"), &two.join("run/recluster"), &[], &[], &[]);
+        // singlets_clusters/ against the second command's output: every file, its summary.json included
+        assert_same_tree(&one.join("run/singlets_clusters"), &two.join("run/singlets_clusters"), &[], &[], &[]);
         // DoubletFinder's own files too; its summary.json records the re-clustering
-        assert_same_tree(&one.join("run"), &two.join("run"), &["recluster/"], &["recluster/"], &["summary.json"]);
-        let s = read_json(&one.join("run/recluster/summary.json"));
+        assert_same_tree(&one.join("run"), &two.join("run"), &["singlets_clusters/"], &["singlets_clusters/"], &["summary.json"]);
+        let s = read_json(&one.join("run/singlets_clusters/summary.json"));
         let p = s.get("files").and_then(|f| f.get("provenance")).unwrap();
         let cl: Vec<&str> = match p.get("command_line") {
             Some(Json::Vector(v) | Json::List(v)) => v.iter().filter_map(|x| x.as_str()).collect(),
@@ -268,7 +331,12 @@ fn reclustering_in_process_is_the_two_command_route() {
         let v = scrust_in(&one, &["validate", "manifest", "--dir", "run"]);
         assert!(v.status.success(), "{}", String::from_utf8_lossy(&v.stderr));
         let top = read_json(&one.join("run/summary.json"));
-        assert_eq!(top.get("result").and_then(|r| r.get("recluster")).and_then(|r| r.get("n_cells")).and_then(|v| v.as_f64()), Some(scio::tenx::read_barcodes(&one.join("run/singlets")).unwrap().len() as f64));
+        let r = top.get("result").and_then(|r| r.get("recluster")).expect("result.recluster");
+        assert_eq!(r.get("dir").and_then(|v| v.as_str()), Some("singlets_clusters"));
+        assert_eq!(r.get("n_cells").and_then(|v| v.as_f64()), Some(scio::tenx::read_barcodes(&one.join("run/singlets")).unwrap().len() as f64));
+        let m = scio::manifest::Manifest::read(&one.join("run")).unwrap();
+        assert_eq!(m.entry("singlets_clusters/summary.json").map(|e| (e.role.as_str(), e.scale.as_str(), e.format.as_str())), Some((scio::manifest::NESTED_OUTPUT, "none", "json")));
+        assert_eq!(m.entries.iter().filter(|e| e.role == "raw_counts").count(), 1, "the parent's one raw_counts");
     }
 }
 

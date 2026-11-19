@@ -13,11 +13,12 @@ import pytest
 import scipy.sparse as sp
 
 import scrustio
+from scrustio.anndata_loader import read_metadata
 from scrustio.cli import main as cli_main
 from scrustio.manifest import ROLES, SCALES, ScrustError
 from scrustio.slots import SLOTS, check_comments, check_slot
 
-from conftest import FIXTURES, tamper
+from conftest import DF_IN, FIXTURES, tamper
 
 FORMATS = ("matrix_market", "tsv", "npy", "json", "text", "annoy")
 
@@ -235,8 +236,9 @@ def test_doubletfinder_output(outputs):
 
 
 def test_nested_outputs(outputs):
-    """M15: scrust doubletfinder's clusters/ and recluster/ are nested outputs. The DoubletFinder
-    output loads as before, by its own files' roles; each nested output loads on its own."""
+    """M15: scrust doubletfinder's clusters/ and singlets_clusters/ are nested outputs. The
+    DoubletFinder output loads as before, by its own files' roles, the nested_output role ignored;
+    each nested output loads on its own."""
     d = outputs["doubletfinder_nested"]
     m = scrustio.read_manifest(d)
     assert len(m.entries_by_role("nested_output")) == 2
@@ -246,11 +248,20 @@ def test_nested_outputs(outputs):
     assert list(a.obs_names) == list(b.obs_names)
     res = m.summary["result"]
     assert (a.obs[res["pANN_column"]].to_numpy() == b.obs[res["pANN_column"]].to_numpy()).all()
-    r = scrustio.load_anndata(os.path.join(d, "recluster"))
+    r = scrustio.load_anndata(os.path.join(d, "singlets_clusters"))
     assert list(r.obs_names) == list(a.obs_names)
     assert "X_pca" in r.obsm and r.X is not None and "seurat_clusters" in r.obs.columns
+    # clustering on the fly: every input cell's labels, in their levels' order, and the scores, read
+    # from clusters/ on its own (what add_scrust adds to a Seurat object in R)
     c = scrustio.read_manifest(os.path.join(d, "clusters"))
-    assert c.command == "cluster" and c.has_role("cell_metadata")
+    assert c.command == "cluster" and c.has_role("cell_metadata") and not c.has_role("raw_counts")
+    obs = read_metadata(c)
+    with gzip.open(os.path.join(DF_IN, "barcodes.tsv.gz"), "rt") as f:
+        assert list(obs.index) == f.read().split()
+    with open(os.path.join(d, "clusters", "seurat_clusters_levels.txt")) as f:
+        levels = f.read().splitlines()
+    assert list(obs["seurat_clusters"].cat.categories) == levels == res["clustering"]["seurat_clusters_levels"]
+    assert {"silhouette_width", "neighborhood_purity"} <= set(obs.columns)
 
 
 def test_cluster_output_without_export_holds_no_matrices(outputs):

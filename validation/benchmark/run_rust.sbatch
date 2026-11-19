@@ -195,7 +195,7 @@ doubletfinder_m15)
             same "p$t" "$out4" "$ref" cells.tsv sweep_stats.tsv bcmvn.tsv
             if want d && want r; then
                 same "p$t" "$out4" "$out" singlets/matrix.mtx.gz
-                same "p$t" "$out4/recluster" "$out2" seurat_clusters.tsv metadata.tsv pca/embeddings.tsv neighbors/snn.mtx.gz \
+                same "p$t" "$out4/singlets_clusters" "$out2" seurat_clusters.tsv metadata.tsv pca/embeddings.tsv neighbors/snn.mtx.gz \
                     sct/corrected_counts.mtx.gz sct/scale_data.npy counts/matrix.mtx.gz
             fi
         fi

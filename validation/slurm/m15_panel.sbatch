@@ -2,14 +2,16 @@
 # Milestone M15 (docs/PLAN.md C3h, C5's K12 and the singlets' re-clustering): `scrust doubletfinder`
 # on each of the 150 production DoubletFinder objects of validation/doubletfinder_panel.tsv, from
 # M7's export of its input, in the production profile on the CPU type of the object's workflow
-# job, as M7 ran (m7_panel.sbatch). Four runs per object, each in a working directory of its own
+# job, as M7 ran (m7_panel.sbatch). Five runs per object, each in a working directory of its own
 # with the same relative paths, so the paths the runs record are the same:
 #   given/       scrust doubletfinder --counts <input> --clusters <input labels> --out run
 #                (M7's command: check (c), Step 1 unchanged), then the two-command route's second
-#                step: scrust cluster --counts run/singlets --preset workflow --out run/recluster
+#                step: scrust cluster --counts run/singlets --preset workflow --out run/singlets_clusters
 #   hook/        scrust doubletfinder --counts <input> --out run: clustering on the fly (K12)
 #   inprocess/   scrust doubletfinder --counts <input> --clusters <input labels> --out run
 #                --recluster: the whole rule in one process
+#   alone/       scrust cluster --counts <input> --preset workflow --out run/clusters: the command
+#                whose output hook/run/clusters/ is, pca/ and neighbors/ aside
 # The checks, each into checks/<name>.json (and printed):
 #   c_step1          given/run against M7's run (label m7-b8c8a8c): cells.tsv, the sweep tables,
 #                    singlets/, byte for byte, and summary.json's result
@@ -20,10 +22,13 @@
 #                    --saved: M7's nine checks)
 #   k12_logged       the hook's clustering against the numbers the input's workflow job logged
 #                    (validation/clustering_panel.tsv)
-#   a_files          inprocess/run against given/run: DoubletFinder's files, and recluster/ against
+#   k12_alone        hook/run/clusters/ against alone/run/clusters/: every file the nested output
+#                    has, byte for byte, and its summary.json as JSON, the timings, the command line
+#                    and the manifest's entries of pca/ and neighbors/ (not written there) aside
+#   a_files          inprocess/run against given/run: DoubletFinder's files, and singlets_clusters/ against
 #                    the two-command route's, byte for byte, summary.json's timings and command
 #                    line aside (check (a) without the export; with it on T and P, m15_recluster.sbatch)
-#   b_saved          inprocess/run/recluster against the saved object's re-clustering (the export of
+#   b_saved          inprocess/run/singlets_clusters against the saved object's re-clustering (the export of
 #                    m15_export.sbatch): labels, levels, silhouette widths, purities, the RNA
 #                    columns, and the numbers its workflow job logged
 #   manifests        scrust validate manifest on hook/run and inprocess/run (nested outputs)
@@ -34,7 +39,7 @@
 #   SCRUST_BIN=<copy> sbatch --array=1-150%50 [--output=<dir>/%x-%A_%a.sbatch.log] \
 #       validation/slurm/m15_panel.sbatch <label>
 # Output, never overwritten (an existing one is skipped):
-# data/doubletfinder/<object>/rust/<label>/production/: given/, hook/, inprocess/, checks/,
+# data/doubletfinder/<object>/rust/<label>/production/: given/, hook/, inprocess/, alone/, checks/,
 # time_*.txt, stderr_*.txt, fingerprint.json, node_features.txt, row.tsv (this object's line of
 # the summary table). Work in progress goes to <dir>.partial.<job id>, renamed when complete. Exit
 # status 1 unless every check is made and identical.
@@ -103,7 +108,7 @@ if [ -e "$out" ]; then
 fi
 tmp=$out.partial.${SLURM_JOB_ID:-local}
 rm -rf "$tmp"
-mkdir -p "$tmp"/{given,hook,inprocess,checks}
+mkdir -p "$tmp"/{given,hook,inprocess,alone,checks}
 echo "$node $features" > "$tmp/node_features.txt"
 "$bin" fingerprint > "$tmp/fingerprint.json"
 got=$(sed -n 's/.*"openblas_corename": *"\([^"]*\)".*/\1/p' "$tmp/fingerprint.json" | head -n 1)
@@ -127,9 +132,10 @@ run() {
     sed -n 's/^\s*\(Elapsed (wall clock) time\|Maximum resident set size\).*: /&/p' "$tmp/time_$name.txt"
 }
 run given "$tmp/given" doubletfinder --counts "$inp" --clusters "$inp/seurat_clusters.tsv" --out run --threads "$threads"
-run recluster2 "$tmp/given" cluster --counts run/singlets --preset workflow --out run/recluster --threads "$threads"
+run recluster2 "$tmp/given" cluster --counts run/singlets --preset workflow --out run/singlets_clusters --threads "$threads"
 run hook "$tmp/hook" doubletfinder --counts "$inp" --out run --threads "$threads"
 run inprocess "$tmp/inprocess" doubletfinder --counts "$inp" --clusters "$inp/seurat_clusters.tsv" --out run --recluster --threads "$threads"
+run alone "$tmp/alone" cluster --counts "$inp" --preset workflow --out run/clusters --threads "$threads"
 
 status=0
 cmp_runs() { $py "$root/validation/python/compare_runs.py" "$@"; }
@@ -139,7 +145,7 @@ check() {
     echo "-- $name"
     if "$@"; then echo "$name: identical"; else echo "$name: DIFFERS" >&2; status=1; fi
 }
-check c_step1 cmp_runs "$m7run" "$tmp/given/run" --result-only --only-right recluster --json "$tmp/checks/c_step1.json"
+check c_step1 cmp_runs "$m7run" "$tmp/given/run" --result-only --only-right singlets_clusters --json "$tmp/checks/c_step1.json"
 k12_labels() {
     cmp "$tmp/hook/run/clusters/seurat_clusters.tsv" "$inp/seurat_clusters.tsv" &&
         cmp "$tmp/hook/run/clusters/seurat_clusters_levels.txt" "$inp/seurat_clusters_levels.txt"
@@ -158,9 +164,11 @@ k12_saved() {
 check k12_saved k12_saved
 check k12_logged $py "$root/validation/python/compare_saved_clustering.py" "$tmp/hook/run/clusters" - \
     --panel "$root/validation/clustering_panel.tsv" --object "$obj" --json "$tmp/checks/k12_logged.json"
+check k12_alone cmp_runs "$tmp/alone/run/clusters" "$tmp/hook/run/clusters" --only-left pca --only-left neighbors \
+    --json "$tmp/checks/k12_alone.json"
 check a_files cmp_runs "$tmp/given/run" "$tmp/inprocess/run" --ignore summary.json:run --ignore summary.json:files \
     --ignore summary.json:result.recluster --json "$tmp/checks/a_files.json"
-check b_saved $py "$root/validation/python/compare_saved_clustering.py" "$tmp/inprocess/run/recluster" "$saved_cl" \
+check b_saved $py "$root/validation/python/compare_saved_clustering.py" "$tmp/inprocess/run/singlets_clusters" "$saved_cl" \
     --panel "$root/validation/clustering_panel.tsv" --object "doubletfinder_$obj" --json "$tmp/checks/b_saved.json"
 manifests() { "$bin" validate manifest --dir "$tmp/hook/run" && "$bin" validate manifest --dir "$tmp/inprocess/run"; }
 check manifests manifests
@@ -172,11 +180,12 @@ wall() { sed -n 's/^\s*Elapsed (wall clock) time (h:mm:ss or m:ss): //p' "$1" | 
 cells=$(zcat "$inp/barcodes.tsv.gz" | wc -l)
 singlets=$(zcat "$tmp/given/run/singlets/barcodes.tsv.gz" | wc -l)
 {
-    printf 'object\tcells\tsinglets\tstatus\tm7_peak_kib\tm7_wall_s\tgiven_peak_kib\tgiven_wall_s\thook_peak_kib\thook_wall_s\trecluster2_peak_kib\trecluster2_wall_s\tinprocess_peak_kib\tinprocess_wall_s\tnode\n'
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$obj" "$cells" "$singlets" "$([ $status -eq 0 ] && echo pass || echo FAIL)" \
+    printf 'object\tcells\tsinglets\tstatus\tm7_peak_kib\tm7_wall_s\tgiven_peak_kib\tgiven_wall_s\thook_peak_kib\thook_wall_s\trecluster2_peak_kib\trecluster2_wall_s\tinprocess_peak_kib\tinprocess_wall_s\talone_peak_kib\talone_wall_s\tnode\n'
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$obj" "$cells" "$singlets" "$([ $status -eq 0 ] && echo pass || echo FAIL)" \
         "$(peak "$base/rust/$m7/production/time_v.txt")" "$(wall "$base/rust/$m7/production/time_v.txt")" \
         "$(peak "$tmp/time_given.txt")" "$(wall "$tmp/time_given.txt")" "$(peak "$tmp/time_hook.txt")" "$(wall "$tmp/time_hook.txt")" \
-        "$(peak "$tmp/time_recluster2.txt")" "$(wall "$tmp/time_recluster2.txt")" "$(peak "$tmp/time_inprocess.txt")" "$(wall "$tmp/time_inprocess.txt")" "$node"
+        "$(peak "$tmp/time_recluster2.txt")" "$(wall "$tmp/time_recluster2.txt")" "$(peak "$tmp/time_inprocess.txt")" "$(wall "$tmp/time_inprocess.txt")" \
+        "$(peak "$tmp/time_alone.txt")" "$(wall "$tmp/time_alone.txt")" "$node"
 } > "$tmp/row.tsv"
 cat "$tmp/row.tsv"
 mv "$tmp" "$out"

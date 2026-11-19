@@ -54,6 +54,16 @@ pub const FORMATS: [&str; 6] = ["matrix_market", "tsv", "npy", "json", "text", "
 /// parent lists only the nested `summary.json` (with its size and SHA-256), and the checks recurse.
 pub const NESTED_OUTPUT: &str = "nested_output";
 
+/// How deep nested outputs may go before [`Manifest::check`] stops recursing (scrust writes one
+/// level: `scrust doubletfinder`'s `clusters/` and `singlets_clusters/`).
+pub const MAX_NESTING: usize = 8;
+
+/// Whether a listed path stays inside the output it is listed in: relative, with no `..`, `.` or
+/// empty component. No listed file, and above all no nested output, may escape its output.
+pub fn path_inside(path: &str) -> bool {
+    !path.starts_with('/') && path.split('/').all(|c| !c.is_empty() && c != "." && c != "..")
+}
+
 /// A column of the file holding identifiers: its header name, or its 1-based number when the file
 /// has no header.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -504,21 +514,31 @@ impl Manifest {
     /// Checks the manifest against the directory it describes: every file there is listed, every
     /// listed file exists with its recorded size and SHA-256 (`verify_digests`), each path is
     /// listed once, every role, scale and format is known, every identifier file is listed, and
-    /// the naming rules hold. Returns the problems found.
+    /// the naming rules hold; every listed path stays inside `dir`. A nested output is checked
+    /// against its own manifest, recursively, its problems reported under its directory. Returns
+    /// the problems found.
     pub fn check(&self, dir: &Path, verify_digests: bool) -> io::Result<Vec<String>> {
+        self.check_at(dir, verify_digests, 0)
+    }
+
+    fn check_at(&self, dir: &Path, verify_digests: bool, depth: usize) -> io::Result<Vec<String>> {
         let mut out = Vec::new();
         let listed: BTreeSet<&str> = self.entries.iter().map(|e| e.path.as_str()).collect();
         if listed.len() != self.entries.len() {
             out.push("a path is listed more than once".into());
         }
         // a nested output's files are its own manifest's (checked below)
-        let nested: Vec<String> = self.entries.iter().filter(|e| e.role == NESTED_OUTPUT).map(|e| format!("{}/", e.dir())).collect();
+        let nested: Vec<String> = self.entries.iter().filter(|e| e.role == NESTED_OUTPUT && path_inside(&e.path)).map(|e| format!("{}/", e.dir())).collect();
         for f in list_files(dir)? {
             if !listed.contains(f.as_str()) && !nested.iter().any(|d| d != "/" && f.starts_with(d.as_str())) {
                 out.push(format!("{f}: in the directory, not in the manifest"));
             }
         }
         for e in &self.entries {
+            if !path_inside(&e.path) {
+                out.push(format!("{}: not a relative path inside the output (absolute, or with a `..`, `.` or empty component)", e.path));
+                continue;
+            }
             let p = dir.join(&e.path);
             if e.path == "summary.json" {
                 // the manifest's own file: no size or checksum (it holds them)
@@ -553,17 +573,21 @@ impl Manifest {
                 _ => out.push(format!("{}: no size or checksum", e.path)),
             }
         }
-        for e in self.entries.iter().filter(|e| e.role == NESTED_OUTPUT) {
-            if e.file_name() != "summary.json" || e.dir().is_empty() || e.format != "json" {
-                out.push(format!("{}: a nested output is listed by its own summary.json, in a subdirectory, as json", e.path));
+        for e in self.entries.iter().filter(|e| e.role == NESTED_OUTPUT && path_inside(&e.path)) {
+            if e.file_name() != "summary.json" || e.dir().is_empty() || e.format != "json" || e.scale != "none" {
+                out.push(format!("{}: a nested output is listed by its own summary.json, in a subdirectory, as json with scale none", e.path));
                 continue;
             }
             if self.entries.iter().any(|x| x.path != e.path && x.path.starts_with(&format!("{}/", e.dir()))) {
                 out.push(format!("{}/: a nested output's files are listed by its own manifest, not by this one", e.dir()));
             }
+            if depth >= MAX_NESTING {
+                out.push(format!("{}: nested outputs more than {MAX_NESTING} levels deep are not checked", e.path));
+                continue;
+            }
             let sub = dir.join(e.dir());
             match Manifest::read(&sub) {
-                Ok(m) => out.extend(m.check(&sub, verify_digests)?.into_iter().map(|p| format!("{}/: {p}", e.dir()))),
+                Ok(m) => out.extend(m.check_at(&sub, verify_digests, depth + 1)?.into_iter().map(|p| format!("{}/: {p}", e.dir()))),
                 Err(x) => out.push(format!("{}: not a scrust output's manifest: {x}", e.path)),
             }
         }
@@ -836,12 +860,13 @@ mod tests {
     }
 
     /// A nested output (M15): the parent lists only its `summary.json`; the check skips its files
-    /// and checks its own manifest instead; given digests are kept.
+    /// and checks its own manifest instead; given digests are kept; no listed path, nested or
+    /// not, may leave the output.
     #[test]
     fn nested_outputs() {
         let dir = crate::test_dir("manifest_nested");
         let _ = std::fs::remove_dir_all(&dir);
-        let sub = dir.join("recluster");
+        let sub = dir.join("singlets_clusters");
         std::fs::create_dir_all(sub.join("counts")).unwrap();
         std::fs::write(sub.join("metadata.tsv"), "barcode\tx\nA\t1\n").unwrap();
         std::fs::write(sub.join("counts/matrix.mtx.gz"), b"m").unwrap();
@@ -860,25 +885,83 @@ mod tests {
         cells.bytes = Some(15);
         cells.sha256 = Some(crate::sha256::hex(b"barcode\npANN\n"));
         m.push(cells);
-        m.push(Entry::new("recluster/summary.json", NESTED_OUTPUT, "none", "json", "nested"));
+        m.push(Entry::new("singlets_clusters/summary.json", NESTED_OUTPUT, "none", "json", "nested"));
         m.fill_digests(&dir, 2).unwrap();
         assert_eq!(m.entries[1].bytes, Some(15), "the given size is kept");
         assert!(m.entries[2].sha256.is_some(), "the nested summary.json is digested");
+        m.entries[1].bytes = Some(13);
         write_summary(&dir, &m);
-        let p = m.check(&dir, false).unwrap();
+        let p = m.check(&dir, true).unwrap();
         assert!(p.is_empty(), "{p:?}");
-        // the nested output's own problems are the parent's, under its directory
+        // the nested output's own problems are the parent's, under its directory, digests too
         std::fs::write(sub.join("stray.txt"), "x").unwrap();
         let p = m.check(&dir, false).unwrap();
-        assert_eq!(p, vec!["recluster/: stray.txt: in the directory, not in the manifest".to_string()]);
+        assert_eq!(p, vec!["singlets_clusters/: stray.txt: in the directory, not in the manifest".to_string()]);
         std::fs::remove_file(sub.join("stray.txt")).unwrap();
+        std::fs::write(sub.join("metadata.tsv"), "barcode\tx\nA\t2\n").unwrap();
+        let p = m.check(&dir, true).unwrap();
+        assert!(p.len() == 1 && p[0].starts_with("singlets_clusters/: metadata.tsv: 14 bytes, sha256 ") && p[0].contains("the manifest says 14 bytes"), "{p:?}");
+        std::fs::write(sub.join("metadata.tsv"), "barcode\tx\nA\t1\n").unwrap();
         // a nested output's file listed by the parent too, and a nested entry not named summary.json
         let mut m2 = m.clone();
-        m2.push(Entry::new("recluster/metadata.tsv", "cell_metadata", "none", "tsv", ""));
+        m2.push(Entry::new("singlets_clusters/metadata.tsv", "cell_metadata", "none", "tsv", ""));
         assert!(m2.check(&dir, false).unwrap().iter().any(|s| s.contains("listed by its own manifest")));
         let mut m3 = m.clone();
-        m3.entries[2].path = "recluster/metadata.tsv".into();
+        m3.entries[2].path = "singlets_clusters/metadata.tsv".into();
         assert!(m3.check(&dir, false).unwrap().iter().any(|s| s.contains("by its own summary.json")));
+        // a nested output can't escape its parent: `..` and absolute paths are refused, not followed
+        let outside = dir.with_file_name("manifest_nested_outside");
+        let _ = std::fs::remove_dir_all(&outside);
+        std::fs::create_dir_all(&outside).unwrap();
+        write_summary(&outside, &Manifest::new("cluster", provenance()));
+        for bad in ["../manifest_nested_outside/summary.json".to_string(), format!("{}/summary.json", outside.display()), "singlets_clusters/./summary.json".into(), "singlets_clusters//summary.json".into()] {
+            let mut m4 = m.clone();
+            m4.entries[2].path = bad.clone();
+            let p = m4.check(&dir, false).unwrap();
+            assert!(p.iter().any(|s| s == &format!("{bad}: not a relative path inside the output (absolute, or with a `..`, `.` or empty component)")), "{bad}: {p:?}");
+            assert!(!p.iter().any(|s| s.contains("not a scrust output's manifest") || s.contains("listed, not in")), "{bad}: not followed: {p:?}");
+        }
+        // nor may any other file
+        let mut m5 = m.clone();
+        m5.push(Entry::new("../manifest_nested_outside/summary.json", "cell_metadata", "none", "json", ""));
+        assert!(m5.check(&dir, false).unwrap().iter().any(|s| s.starts_with("../manifest_nested_outside/summary.json: not a relative path inside")));
+        // a nested entry with another scale
+        let mut m6 = m.clone();
+        m6.entries[2].scale = "raw_counts".into();
+        assert!(m6.check(&dir, false).unwrap().iter().any(|s| s.contains("as json with scale none")));
+        assert!(path_inside("a/b.tsv") && path_inside("summary.json") && !path_inside("") && !path_inside("/a") && !path_inside("a/../b") && !path_inside("a/"));
+        std::fs::remove_dir_all(&outside).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Nested outputs are checked level by level, up to [`MAX_NESTING`] levels deep.
+    #[test]
+    fn nested_outputs_nest() {
+        let dir = crate::test_dir("manifest_nest_deep");
+        let _ = std::fs::remove_dir_all(&dir);
+        // level k holds a.tsv and, below level MAX_NESTING + 1, the nested output n/
+        let levels = MAX_NESTING + 2;
+        for k in (0..levels).rev() {
+            let d = (0..k).fold(dir.clone(), |d, _| d.join("n"));
+            std::fs::create_dir_all(&d).unwrap();
+            std::fs::write(d.join("a.tsv"), "x\n").unwrap();
+            let mut m = Manifest::new("cluster", provenance());
+            m.push(Manifest::summary_entry());
+            m.push(Entry::new("a.tsv", "cell_metadata", "none", "tsv", "a").header(true));
+            if k + 1 < levels {
+                m.push(Entry::new("n/summary.json", NESTED_OUTPUT, "none", "json", "nested"));
+            }
+            m.fill_digests(&d, 1).unwrap();
+            std::fs::write(d.join("summary.json"), crate::json::to_file_text(&Json::obj(vec![("files", m.to_json())]))).unwrap();
+        }
+        let m = Manifest::read(&dir).unwrap();
+        let p = m.check(&dir, true).unwrap();
+        let deep = format!("{}n/summary.json: nested outputs more than {MAX_NESTING} levels deep are not checked", "n/: ".repeat(MAX_NESTING));
+        assert_eq!(p, vec![deep]);
+        // a problem at level 3 is reported under its directories
+        std::fs::write(dir.join("n/n/n/a.tsv"), "y\n").unwrap();
+        let p = m.check(&dir, true).unwrap();
+        assert!(p.iter().any(|s| s.starts_with("n/: n/: n/: a.tsv: 2 bytes, sha256 ")), "{p:?}");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

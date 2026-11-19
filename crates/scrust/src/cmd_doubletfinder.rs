@@ -19,8 +19,12 @@
 //!   in memory. Only the labels are kept (and the scores, with `--cluster-stats`); the counts read
 //!   once serve both. The clustering is written to `clusters/`;
 //! - **re-clustering the singlets** (`--recluster`): after the calls, the singlets go from memory
-//!   to the chain, as `doubletfinder.R` re-clusters them before saving, and `recluster/` gets what
-//!   `scrust cluster --counts <out>/singlets` writes, through the same code.
+//!   to the chain, as `doubletfinder.R` re-clusters them before saving, and `singlets_clusters/` gets
+//!   what `scrust cluster --counts <out>/singlets` writes, through the same code.
+//!
+//! Both directories are nested outputs (docs/output_manifest.md): each is a `scrust cluster`
+//! output with its own `summary.json` (the clustering's numbers) and manifest, which the parent's
+//! manifest lists by that `summary.json`, with the role `nested_output`.
 
 use crate::cli::{self, Args, Phases};
 use crate::cmd_cluster::{self, Record, Settings};
@@ -43,7 +47,7 @@ use std::path::{Path, PathBuf};
 /// Clustering on the fly's directory (C3h).
 pub const CLUSTERS: &str = "clusters";
 /// The singlets' re-clustering's directory (M15).
-pub const RECLUSTER: &str = "recluster";
+pub const SINGLETS_CLUSTERS: &str = "singlets_clusters";
 
 pub const USAGE: &str = "\
 Usage: scrust doubletfinder --counts <10x dir> [--clusters <tsv> [--cluster-levels <txt>]] --out <dir>
@@ -99,9 +103,9 @@ homotypic adjustment. The counts are read once for both; only the labels are kep
   --cluster-stats <list>      the scores: none (default), silhouette,purity, silhouette or purity
                               (the file's [stats] compute, when given and this is not)
   Writes clusters/: seurat_clusters.tsv and seurat_clusters_levels.txt (the layout --clusters
-  reads), the other label files and metadata.tsv as scrust cluster writes them (with the scores
-  when asked), and its own summary.json (the clustering's numbers and manifest). No pca/,
-  neighbors/ or sct/: only the labels are kept. Afterwards glibc's mmap threshold is fixed at
+  reads), the other label files and metadata.tsv (with the scores when asked), and its own
+  summary.json (the clustering's numbers and manifest), as scrust cluster --counts <dir> writes
+  them. No pca/, neighbors/ or sct/: only the labels are kept. Afterwards glibc's mmap threshold is fixed at
   128 KiB and the free pages returned, so that the clustering's freed buffers do not raise
   DoubletFinder's peak (SCRUST_NO_SETTLE=1 in the environment skips it, for measuring).
 
@@ -109,8 +113,8 @@ Re-clustering the singlets (--recluster; M15): after the calls, the singlets are
 this process, from memory, as the workflow's doubletfinder.R re-clusters them before saving
 (SCTransform, require_min_cells_for_pca(context = \"doubletfinder\"), RunPCA, FindNeighbors,
 FindClusters, add_silhouette_to_metadata; RunUMAP changes nothing downstream and is left out).
-recluster/ holds what scrust cluster --counts <out>/singlets writes, byte for byte, apart from
-the timings and the command line in its summary.json.
+singlets_clusters/ holds what scrust cluster --counts <out>/singlets writes, byte for byte, apart
+from the timings and the command line in its summary.json.
   --recluster-preset <name>   workflow (default) or seurat
   --recluster-params <file>   a parameter file, as scrust cluster --params reads it
   --recluster-export          also the export, as scrust cluster --export writes it (counts/: a
@@ -119,9 +123,10 @@ the timings and the command line in its summary.json.
 Outputs: cells.tsv (barcode, pANN and classification of every cell), sweep_stats.tsv (pN, pK,
 BCreal), bcmvn.tsv (find.pK's table), summary.json (\"result\": pK and its label as R writes it,
 nExp_poi, the homotypic proportion, nExp, the doublets made, k, the column names R writes, the
-digest of the final .Random.seed, and the clustering's numbers when it ran; \"run\": parameters,
+digest of the final .Random.seed, and for clusters/ and singlets_clusters/ their directory,
+cells, clusters and levels, the rest being in their own summary.json; \"run\": parameters,
 versions, timings and peak memory per phase; \"files\": the manifest, which lists clusters/ and
-recluster/ by their own summary.json), and singlets/: the counts without the doublets, as a new
+singlets_clusters/ by their own summary.json, as nested outputs), and singlets/: the counts without the doublets, as a new
 10x directory (matrix.mtx.gz, barcodes.tsv.gz, features.tsv.gz): every singlet's column exactly
 as stored, in input order, and the input's feature lines. The counts are read again from
 --counts to write it, so that they need not stay in memory through the final run; with
@@ -189,7 +194,19 @@ impl chain::Observer for Marks<'_> {
 
 /// The entry in the parent's manifest for a nested output's own `summary.json`.
 fn nested_entry(dir: &str, what: &str) -> Entry {
-    Entry::new(&format!("{dir}/summary.json"), "nested_output", "none", "json", what)
+    Entry::new(&format!("{dir}/summary.json"), scio::manifest::NESTED_OUTPUT, "none", "json", what)
+}
+
+/// What the parent's `result` says of a nested clustering: where it is, its cells, clusters and
+/// levels. The clustering's numbers are in the nested output's own `summary.json`.
+fn nested_result(dir: &str, c: &cluster::chain::Chain) -> Json {
+    let levels = &c.clusters.seurat_clusters.levels;
+    Json::obj(vec![
+        ("dir", Json::Str(dir.into())),
+        ("n_cells", Json::Int(c.n_cells as i64)),
+        ("n_clusters", Json::Int(levels.len() as i64)),
+        ("seurat_clusters_levels", Json::strs(levels)),
+    ])
 }
 
 pub fn main(argv: &[String]) -> Result<(), String> {
@@ -276,7 +293,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     } else {
         None
     };
-    for f in ["cells.tsv", "summary.json", SINGLETS, CLUSTERS, RECLUSTER] {
+    for f in ["cells.tsv", "summary.json", SINGLETS, CLUSTERS, SINGLETS_CLUSTERS] {
         if out.join(f).exists() {
             return Err(format!("{}: holds a previous run; choose another --out", out.display()));
         }
@@ -312,8 +329,9 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         ProvInput::digest("counts", &counts, &scio::tenx::input_files(&counts).map_err(|e| e.to_string())?.iter().map(|p| p.as_path()).collect::<Vec<_>>()).map_err(|e| e.to_string())
     };
     let mut counts_prov: Option<ProvInput> = None;
-    // clusters/: the labels the run computed, as a nested scrust cluster output; then the result
-    // goes, but for the clustering's numbers (result.clustering) and its number of clusters
+    // clusters/: the labels the run computed, as a nested scrust cluster output, whose own
+    // summary.json holds the clustering's numbers; then the result goes, but for what the parent's
+    // result says of it (result.clustering) and its number of clusters
     let mut hook_done: Option<(Json, usize)> = None;
     if let (Some(c), Some((hp, preset, file, stats))) = (hook_result.take(), &hook) {
         let dir = out.join(CLUSTERS);
@@ -338,7 +356,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         p.mark("load");
         let Clustered { chain: ch, .. } = c;
         let d = cmd_cluster::finish_run(&dir, "counts", &s, rec, w, ch, p)?;
-        hook_done = Some((d.result, d.chain.clusters.seurat_clusters.levels.len()));
+        hook_done = Some((nested_result(CLUSTERS, &d.chain), d.chain.clusters.seurat_clusters.levels.len()));
         phases.borrow_mut().mark("clustering: write");
         // the clustering's memory is freed: DoubletFinder's peak starts from what is in use
         if std::env::var_os("SCRUST_NO_SETTLE").is_none() {
@@ -390,14 +408,14 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     let n_doublets = output.doublet.iter().filter(|&&d| d).count();
     let (n_cells, pk_label, nexp, best_row) = (output.n_cells, output.pk_label.clone(), output.nexp, output.sweep.as_ref().map(|s| s.best_row));
 
-    // recluster/: the singlets, handed over in memory, through the chain's entry point, written as
+    // singlets_clusters/: the singlets, handed over in memory, through the chain's entry point, written as
     // scrust cluster --counts <out>/singlets writes them (doubletfinder.R's steps after the calls)
     let mut re_done: Option<cmd_cluster::Done> = None;
     if let Some((rp, preset, file, export)) = &re {
         // DoubletFinder's own stages are gone; only its result's tables remain
         drop(output);
         let sdir = out.join(SINGLETS);
-        let rdir = out.join(RECLUSTER);
+        let rdir = out.join(SINGLETS_CLUSTERS);
         let (input, entries, export_s) = if *export {
             // the export's counts/ is singlets/ copied byte for byte, with its checksums
             cmd_cluster::counts_input(&sdir, &rdir, true)?
@@ -507,7 +525,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         run_items.push(("clustering", Json::obj(vec![("dir", Json::Str(CLUSTERS.into())), ("on_the_fly", Json::Bool(true))])));
     }
     if re.is_some() {
-        run_items.push(("recluster", Json::obj(vec![("dir", Json::Str(RECLUSTER.into())), ("singlets_from", Json::Str("memory".into()))])));
+        run_items.push(("recluster", Json::obj(vec![("dir", Json::Str(SINGLETS_CLUSTERS.into())), ("singlets_from", Json::Str("memory".into()))])));
     }
     run_items.extend([
         ("start_time", Json::Str(start_time)),
@@ -590,7 +608,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         m.push(nested_entry(CLUSTERS, "clustering on the fly: the input's clustering, whose labels and levels DoubletFinder used (seurat_clusters.tsv, seurat_clusters_levels.txt), as scrust cluster writes its labels and metadata.tsv; a nested scrust output, whose own manifest (this file) lists its files"));
     }
     if re.is_some() {
-        m.push(nested_entry(RECLUSTER, "the singlets re-clustered, as doubletfinder.R does before saving: what scrust cluster --counts singlets/ writes; a nested scrust output, whose own manifest (this file) lists its files"));
+        m.push(nested_entry(SINGLETS_CLUSTERS, "the singlets re-clustered, as doubletfinder.R does before saving: what scrust cluster --counts singlets/ writes; a nested scrust output, whose own manifest (this file) lists its files"));
     }
     m.fill_shapes(&out).map_err(|e| e.to_string())?;
     let files = crate::cli::finish_manifest(&out, &mut m, threads)?;
@@ -599,16 +617,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         items.push(("clustering".into(), r.clone()));
     }
     if let (Json::Object(items), Some(d)) = (&mut result, &re_done) {
-        let levels = &d.chain.clusters.seurat_clusters.levels;
-        items.push((
-            "recluster".into(),
-            Json::obj(vec![
-                ("dir", Json::Str(RECLUSTER.into())),
-                ("n_cells", Json::Int(d.chain.n_cells as i64)),
-                ("n_clusters", Json::Int(levels.len() as i64)),
-                ("seurat_clusters_levels", Json::strs(levels)),
-            ]),
-        ));
+        items.push(("recluster".into(), nested_result(SINGLETS_CLUSTERS, &d.chain)));
     }
     let summary = Json::obj(vec![("result", result), ("run", run_info), ("files", files)]);
     std::fs::write(out.join("summary.json"), scio::json::to_file_text(&summary)).map_err(|e| e.to_string())?;
@@ -623,7 +632,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         written.ncol,
         written.nnz,
         hook_done.as_ref().map(|(_, n)| format!(" {CLUSTERS}/: {n} clusters (on the fly);")).unwrap_or_default(),
-        re_done.as_ref().map(|d| format!(" {RECLUSTER}/: {} clusters;", d.chain.clusters.seurat_clusters.levels.len())).unwrap_or_default(),
+        re_done.as_ref().map(|d| format!(" {SINGLETS_CLUSTERS}/: {} clusters;", d.chain.clusters.seurat_clusters.levels.len())).unwrap_or_default(),
         phases.elapsed(),
         threads,
         cli::peak_rss_kib().unwrap_or(0) as f64 / 1048576.0

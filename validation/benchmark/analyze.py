@@ -228,11 +228,13 @@ def output_phase(tool, rel, mode, late=False):
                 if rel.startswith(prefix):
                     return phase
         return "write"
-    # doubletfinder; M15: clusters/ (clustering on the fly) and recluster/ (--recluster)
+    # doubletfinder; M15: clusters/ (clustering on the fly) and singlets_clusters/ (--recluster;
+    # recluster/ in the runs of the binaries before M15's final commit, 8ab8fc8 among them)
     if rel.startswith("clusters/"):
         return "clustering: write"
-    if rel.startswith("recluster/"):
-        sub = rel[len("recluster/"):]
+    nested = next((d for d in ("singlets_clusters/", "recluster/") if rel.startswith(d)), None)
+    if nested:
+        sub = rel[len(nested):]
         if sub == "summary.json":
             return "recluster"
         if sub.startswith("counts/"):

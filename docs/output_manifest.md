@@ -2,7 +2,7 @@
 
 Every scrust command that writes `summary.json` (`scrust sctransform`, `pca`, `neighbors`, `cluster`, `doubletfinder`) lists there every file of its output directory: what the file is (its **role**), the **scale** of its values, its format and shape, where its row and column identifiers are, its size and SHA-256, and how the output was made (its **provenance**). This document is the schema's specification (docs/PLAN.md C3f; milestone M13). The loaders (C3g, milestone M14) are written against it: they find each file by its role, and put a matrix only into a slot meant for its scale.
 
-The schema is **`scrust-files`, version 1**. A reader checks both and refuses other versions; a later version that changes the meaning of a field changes the version number. Fields may be added within a version; a reader ignores the fields it does not know.
+The schema is **`scrust-files`, version 1**. A reader checks both and refuses other versions; a later version that changes the meaning of a field changes the version number. Fields and roles may be added within a version (M15 added the role `nested_output`); a reader ignores the fields it does not know and the roles it does not use.
 
 The implementation is `crates/scio/src/manifest.rs`; `scrust validate manifest --dir <output dir>` checks a directory against its manifest.
 
@@ -73,11 +73,19 @@ A command checks its own manifest before writing `summary.json` and fails if any
 
 ### Nested outputs (M15)
 
-A subdirectory can itself be a scrust output, with its own `summary.json` and manifest: `scrust doubletfinder`'s `clusters/` (clustering on the fly) and `recluster/` (`--recluster`, the singlets' re-clustering), each as `scrust cluster` writes its output.
+A subdirectory can itself be a scrust output, with its own `summary.json` and manifest, as the command it reproduces writes them. `scrust doubletfinder` writes two:
 
-- The parent's manifest lists the nested output's `summary.json` alone, with role `nested_output` (format `json`, scale `none`), its size and its SHA-256. It lists none of the nested output's other files: the nested manifest does, under the nested directory.
-- The checks recurse: a nested output's files must satisfy the completeness rules of its own manifest, and the naming rules hold within each manifest. `scrust validate manifest` reports a nested problem under the nested directory's name.
-- Loaders find the parent's own files by role, one per role, as before, and ignore `nested_output`. A nested output loads on its own, from its directory. So the singlets' re-clustering, which has its own `raw_counts` with `--recluster-export`, its own metadata and graphs, never shadows the DoubletFinder output's files.
+- `clusters/`, clustering on the fly: the label files and `metadata.tsv` of `scrust cluster --counts <input>`, and its `summary.json` with the clustering's numbers. It has no `pca/` or `neighbors/`, because only the labels are kept;
+- `singlets_clusters/`, from `--recluster`: what `scrust cluster --counts <out>/singlets` writes, byte for byte.
+
+The rules:
+
+- **The parent's entry.** The parent's manifest lists the nested output's `summary.json` alone, with role `nested_output`, format `json`, scale `none`, its size and its SHA-256. It lists none of the nested output's other files. The nested manifest lists them, with paths relative to the nested directory.
+- **The checks recurse.** `Manifest::check` checks a nested output against its own manifest: completeness, sizes and checksums, the naming rules, and that output's own nested outputs in turn, up to eight levels deep. `scrust validate manifest` and every command's check of its own manifest use it. A nested problem is reported under the nested directory's name, as in `clusters/: stray.txt: in the directory, not in the manifest`.
+- **No path leaves its output.** Every listed path, a nested output's above all, is relative and has no `..`, `.` or empty component. The checks refuse any other path, absolute or like `../x/summary.json`, and do not follow it.
+- **Readers ignore roles they do not use, this one included.** The loaders find the parent's own files by role, one per role, as before, and never open a nested output from the parent.
+- **A nested output loads on its own,** from its directory: `load_seurat("<out>/singlets_clusters")` and `add_scrust(obj, "<out>/clusters")` in R; `load_anndata("<out>/singlets_clusters")` in Python, where `clusters/`, which holds no counts, is read through `read_manifest`. So the singlets' re-clustering, which has its own `raw_counts` with `--recluster-export` and its own metadata and graphs, never shadows the DoubletFinder output's files.
+- **The parent's summary points to them.** `scrust doubletfinder`'s `result.clustering` and `result.recluster` give each nested clustering's directory, cells, clusters and levels. The clustering's numbers are in the nested `summary.json`.
 
 ### Identifiers
 
@@ -158,7 +166,7 @@ The scale tells a loader which slot a matrix may go into. Only `raw_counts` is r
 | `doublet_calls` | `cells.tsv` (`doubletfinder`): barcode, pANN, classification | tsv | cells (`barcode`) |
 | `doublet_sweep_stats`, `doublet_bcmvn` | `sweep_stats.tsv`, `bcmvn.tsv` (`doubletfinder`) | tsv | |
 | `stage_dump`, `stage_index`, `stage_scalars`, `start_partitions` | `stages/` (`--dump-stages`, `--keep-stages`): the instrumented R runs' layout, for validation | npy, tsv, json | |
-| `nested_output` | `clusters/summary.json`, `recluster/summary.json` (`doubletfinder`, M15): a nested scrust output's own summary, whose manifest lists its files ([Nested outputs](#nested-outputs-m15)) | json | |
+| `nested_output` | `clusters/summary.json`, `singlets_clusters/summary.json` (`doubletfinder`, M15): a nested scrust output's own summary, whose manifest lists its files ([Nested outputs](#nested-outputs-m15)) | json, `none` | |
 
 In `scrust cluster`'s output these files sit under `sct/`, `pca/` and `neighbors/` as listed; in `scrust sctransform`'s, `scrust pca`'s and `scrust neighbors`' outputs, at the top. A `path` is always the full relative path.
 
@@ -180,6 +188,7 @@ The normalised matrices also say what they are: right after the Matrix Market ba
 The loaders, `loaders/R/scrustio` (Seurat, SingleCellExperiment) and `loaders/python/scrustio` (AnnData), are written against this document (milestone M14; docs/PLAN.md C3g):
 
 - Find files by `role`, never by name; refuse a manifest whose `schema` or `version` is not this one.
+- Ignore the roles a loader does not use, `nested_output` among them: a nested output's files are its own manifest's, and it loads on its own, from its directory ([Nested outputs](#nested-outputs-m15)).
 - Put a matrix only into a slot meant for its `scale`: `raw_counts` into counts slots (Seurat's RNA `counts`, SingleCellExperiment's `counts`, AnnData's `layers["counts"]`); `corrected_counts` and `log1p_corrected_counts` only into the SCT assay's `counts` and `data` (or `altExp(sce, "SCT")`, AnnData's `layers["sct_corrected_counts"]` and `X`); `residuals` only into `scale.data` (or its equivalents). Each slot takes exactly one role, one scale and one format; the loaders refuse any other, a Matrix Market file whose comment lines say "NOT raw counts" for a raw-count slot, and a file not so marked for a slot of SCTransform's layers.
 - Take row and column names from `rows` and `columns`, and check their counts against `shape`.
 - `sct_scale_data`'s rows are in `VariableFeatures()` order; Seurat keeps `scale.data`'s rows in the SCT assay's gene order (C3g), which `sct_features` gives.

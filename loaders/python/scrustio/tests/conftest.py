@@ -40,7 +40,7 @@ def outputs(tmp_path_factory):
     _run("doubletfinder", "--counts", DF_IN, "--clusters", os.path.join(DF_IN, "seurat_clusters.tsv"),
          "--out", out["doubletfinder"], "--threads", "2")
     # M15: clustering on the fly (clusters/) and the singlets' re-clustering with the export
-    # (recluster/), nested outputs
+    # (singlets_clusters/), nested outputs
     _run("doubletfinder", "--counts", DF_IN, "--out", out["doubletfinder_nested"], "--cluster-stats", "silhouette,purity",
          "--recluster", "--recluster-export", "--threads", "2")
     return out

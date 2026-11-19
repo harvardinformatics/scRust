@@ -362,7 +362,7 @@ check(identical(with_cl$seurat_clusters, obj$seurat_clusters), "add_scrust: scru
 
 # 6. Nested outputs (M15) ----------------------------------------------------------------------------
 # scrust doubletfinder clustering its own input (clusters/) and re-clustering the singlets with the
-# export (recluster/): the DoubletFinder output loads as before, by its own files' roles; each nested
+# export (singlets_clusters/): the DoubletFinder output loads as before, by its own files' roles; each nested
 # output loads on its own
 dfn <- file.path(tmp, "doubletfinder_nested")
 run("doubletfinder", "--counts", df_in, "--out", dfn, "--cluster-stats", "silhouette,purity", "--recluster",
@@ -375,7 +375,7 @@ dfno <- load_seurat(dfn)
 check(identical(colnames(dfno), colnames(dfo)) && identical(SeuratObject::Assays(dfno), "RNA") &&
         identical(dfno[[res$pANN_column, drop = TRUE]], dfo[[res$pANN_column, drop = TRUE]]),
       "nested outputs: the DoubletFinder output loads as before")
-rc <- load_seurat(file.path(dfn, "recluster"))
+rc <- load_seurat(file.path(dfn, "singlets_clusters"))
 check(identical(colnames(rc), singlets) && identical(DefaultAssay(rc), "SCT") && "pca" %in% names(rc@reductions) &&
         is.factor(rc$seurat_clusters), "nested outputs: the re-clustering loads on its own, with the export")
 with_hook <- suppressMessages(add_scrust(base, file.path(dfn, "clusters")))

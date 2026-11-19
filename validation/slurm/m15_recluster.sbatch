@@ -10,8 +10,11 @@
 # saved DoubletFinder object's re-clustering (M8's exports on T, M15's on P): its labels and
 # levels, silhouette widths, purities, the RNA columns and, with the export, nCount_SCT and
 # nFeature_SCT; on P also the numbers its workflow job logged. And clustering on the fly with
-# both scores (--cluster-stats silhouette,purity) against the saved input object's (M8's exports
-# of the inputs on T and P), and on P the numbers the input's job logged. The saved objects were
+# both scores (--cluster-stats silhouette,purity): its clusters/ against scrust cluster --counts
+# <input> --stats silhouette,purity's output (every file it has, byte for byte, and its
+# summary.json, pca/ and neighbors/ aside; Rust against Rust, so held to (a)'s standard), and
+# against the saved input object's (M8's exports of the inputs on T and P), and on P the numbers
+# the input's job logged. The saved objects were
 # made under the SapphireRapids kernel: in the portable profile, (b) and the scores are reported,
 # their differences graded by the floor elsewhere (M11, M12), not here.
 #
@@ -19,9 +22,9 @@
 #
 # Tasks 1-5 are tier T, 6-10 tier P (the objects below). Output, never overwritten:
 # data/doubletfinder/<object>/rust/<label>/<profile>_recluster/: the routes' directories
-# (inprocess/, inprocess_export/, two/, two_export/, hook/), checks/*.json, time_*.txt,
-# stderr_*.txt, fingerprint.json. Exit status 1 unless (a) holds, and in the production profile
-# every check.
+# (inprocess/, inprocess_export/, two/, two_export/, hook/, alone/), checks/*.json, time_*.txt,
+# stderr_*.txt, fingerprint.json. Exit status 1 unless (a) and hook_alone hold, and in the
+# production profile every check.
 #
 #SBATCH --job-name=scrust-m15-rc
 #SBATCH -A informatics
@@ -82,7 +85,7 @@ out=$base/rust/$label/${profile}_recluster
 [ -e "$out" ] && { echo "skip $out: exists"; exit 0; }
 tmp=$out.partial.${SLURM_JOB_ID:-local}
 rm -rf "$tmp"
-mkdir -p "$tmp"/{inprocess,inprocess_export,two,two_export/run,hook,checks}
+mkdir -p "$tmp"/{inprocess,inprocess_export,two,two_export/run,hook,alone,checks}
 "$bin" fingerprint > "$tmp/fingerprint.json"
 echo "== task $i: $obj (tier $tier) on $(hostname -s), $profile profile (OpenBLAS $core), $threads threads"
 
@@ -100,11 +103,12 @@ given=(--counts "$inp" --clusters "$inp/seurat_clusters.tsv" --out run --threads
 run inprocess "$tmp/inprocess" doubletfinder "${given[@]}" --recluster
 run inprocess_export "$tmp/inprocess_export" doubletfinder "${given[@]}" --recluster --recluster-export
 run two_df "$tmp/two" doubletfinder "${given[@]}"
-run two_cluster "$tmp/two" cluster --counts run/singlets --preset workflow --out run/recluster --threads "$threads"
+run two_cluster "$tmp/two" cluster --counts run/singlets --preset workflow --out run/singlets_clusters --threads "$threads"
 # the export's second command reads the same singlets/ (a link), at the same relative path
 ln -s ../../two/run/singlets "$tmp/two_export/run/singlets"
-run two_cluster_export "$tmp/two_export" cluster --counts run/singlets --preset workflow --export --out run/recluster --threads "$threads"
+run two_cluster_export "$tmp/two_export" cluster --counts run/singlets --preset workflow --export --out run/singlets_clusters --threads "$threads"
 run hook "$tmp/hook" doubletfinder --counts "$inp" --out run --cluster-stats silhouette,purity --threads "$threads"
+run alone "$tmp/alone" cluster --counts "$inp" --preset workflow --stats silhouette,purity --out run/clusters --threads "$threads"
 
 status=0 bstatus=0
 cmp_runs() { $py "$root/validation/python/compare_runs.py" "$@"; }
@@ -122,12 +126,13 @@ check() {
 }
 check a_files a cmp_runs "$tmp/two/run" "$tmp/inprocess/run" --ignore summary.json:run --ignore summary.json:files \
     --ignore summary.json:result.recluster --json "$tmp/checks/a_files.json"
-check a_export a cmp_runs "$tmp/two_export/run/recluster" "$tmp/inprocess_export/run/recluster" --json "$tmp/checks/a_export.json"
+check a_export a cmp_runs "$tmp/two_export/run/singlets_clusters" "$tmp/inprocess_export/run/singlets_clusters" --json "$tmp/checks/a_export.json"
+check hook_alone a cmp_runs "$tmp/alone/run/clusters" "$tmp/hook/run/clusters" --only-left pca --only-left neighbors --json "$tmp/checks/hook_alone.json"
 manifests() { "$bin" validate manifest --dir "$tmp/inprocess/run" && "$bin" validate manifest --dir "$tmp/inprocess_export/run" && "$bin" validate manifest --dir "$tmp/hook/run"; }
 check manifests a manifests
 logged=()
 [ "$tier" = P ] && logged=(--panel "$root/validation/clustering_panel.tsv" --object "doubletfinder_$obj")
-check b_saved b saved_cmp "$tmp/inprocess_export/run/recluster" "$saved_out" "${logged[@]}" --json "$tmp/checks/b_saved.json"
+check b_saved b saved_cmp "$tmp/inprocess_export/run/singlets_clusters" "$saved_out" "${logged[@]}" --json "$tmp/checks/b_saved.json"
 hook_logged=()
 [ "$tier" = P ] && hook_logged=(--panel "$root/validation/clustering_panel.tsv" --object "$obj")
 check hook_saved b saved_cmp "$tmp/hook/run/clusters" "$saved_in" "${hook_logged[@]}" --json "$tmp/checks/hook_saved.json"

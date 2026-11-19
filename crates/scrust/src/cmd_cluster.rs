@@ -296,8 +296,6 @@ pub fn counts_input(dir: &Path, out: &Path, export: bool) -> Result<(Input, Vec<
 pub struct Done {
     /// FindClusters' result and the scores (the stages are freed once written).
     pub chain: Chain,
-    /// `summary.json`'s `result` section.
-    pub result: Json,
     /// The run's phases (`run.phases`: name, seconds since `started`, peak RSS), for a caller
     /// that records them on its own clock.
     pub phases: Vec<(String, f64, Option<u64>)>,
@@ -619,7 +617,7 @@ pub fn finish_run(out: &Path, start: &str, s: &Settings, rec: Record, mut w: Wri
         ("tool", Json::Str("scrust cluster".into())),
         ("reference", Json::Str(format!("{}; {}; {}; {}; bluster 1.20.0 approxSilhouette and neighborPurity (BiocNeighbors 2.4.0, knncolle's KMKNN: searched exhaustively with its arithmetic, with a certificate)", sctransform::REFERENCE, pca::REFERENCE, neighbors::REFERENCE, cluster::REFERENCE))),
         ("scrust_version", Json::Str(version.into())),
-        ("result", result.clone()),
+        ("result", result),
         (
             "run",
             Json::obj(vec![
@@ -685,5 +683,5 @@ pub fn finish_run(out: &Path, start: &str, s: &Settings, rec: Record, mut w: Wri
         t.purity,
         phases.elapsed()
     );
-    Ok(Done { chain: r, result, started: phases.started(), phases: phases.marks })
+    Ok(Done { chain: r, started: phases.started(), phases: phases.marks })
 }

@@ -6,11 +6,15 @@ peak memory, and the provenance's command line (``files.provenance.command_line`
 more members can be set aside (``--ignore <file>:<dotted path>``, repeatable, where ``<file>`` is
 the summary's relative path, e.g. ``summary.json:result.clustering``, or ``*`` for every
 summary), and files present on one side only can be allowed under given directories
-(``--only-left``, ``--only-right``).
+(``--only-left``, ``--only-right``): so are their entries in that side's manifests and lists of
+files written (``files.entries`` and ``run.files`` of each ``summary.json`` above them), which the
+other side cannot have.
 
 Used for:
-- K12: ``scrust doubletfinder`` clustering on the fly against M7's runs (``--only-left
-  clusters`` and ``--ignore`` for the clustering's own members of summary.json);
+- K12: ``scrust doubletfinder`` clustering on the fly against M7's runs (``--only-right
+  clusters`` and ``--ignore`` for the clustering's own members of summary.json), and its
+  ``clusters/`` against ``scrust cluster --counts <input>``'s output (``--only-left pca
+  --only-left neighbors``: only the labels are kept);
 - the re-clustering's check (a): ``scrust doubletfinder --recluster`` against the two-command
   route (``scrust doubletfinder``, then ``scrust cluster --counts <out>/singlets``);
 - check (c): ``scrust doubletfinder`` without the new options against M7's runs.
@@ -90,6 +94,29 @@ def diff_json(a, b, path=""):
     return [] if a == b else [path]
 
 
+def drop_entries(j, rel, dirs):
+    """The summary.json ``j`` (at relative path ``rel``) without its manifest's entries
+    (``files.entries``) and its list of files written (``run.files``) under ``dirs``; and how many
+    were dropped."""
+    if not dirs or not isinstance(j, dict):
+        return j, 0
+    base = os.path.dirname(rel)
+    base = base + "/" if base else ""
+    under = lambda p: any((base + str(p)).startswith(d) for d in dirs)
+    out, n = dict(j), 0
+    f = j.get("files")
+    if isinstance(f, dict) and isinstance(f.get("entries"), list):
+        keep = [e for e in f["entries"] if not (isinstance(e, dict) and under(e.get("path", "")))]
+        n += len(f["entries"]) - len(keep)
+        out["files"] = {**f, "entries": keep}
+    r = j.get("run")
+    if isinstance(r, dict) and isinstance(r.get("files"), list):
+        keep = [p for p in r["files"] if not (isinstance(p, str) and under(p))]
+        n += len(r["files"]) - len(keep)
+        out["run"] = {**r, "files": keep}
+    return out, n
+
+
 def main(argv):
     args = argv[1:]
     report = None
@@ -146,9 +173,14 @@ def main(argv):
                 b = json.load(f)
             if result_only and rel == "summary.json":
                 a, b = {"result": a.get("result")}, {"result": b.get("result")}
+            a, na = drop_entries(a, rel, only_left)
+            b, nb = drop_entries(b, rel, only_right)
             ign = {p.split(":", 1)[1] for p in ignore if p.split(":", 1)[0] in ("*", rel)}
             d = diff_json(strip(a, ign), strip(b, ign))
-            rows.append({"file": rel, "status": "identical (as JSON, timings and command line aside)" if not d else "differs", "members": d})
+            row = {"file": rel, "status": "identical (as JSON, timings and command line aside)" if not d else "differs", "members": d}
+            if na or nb:
+                row["entries_set_aside"] = {"left": na, "right": nb}
+            rows.append(row)
             differ += bool(d)
             continue
         same = os.path.getsize(fl[rel]) == os.path.getsize(fr[rel]) and sha256(fl[rel]) == sha256(fr[rel])
