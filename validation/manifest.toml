@@ -651,7 +651,8 @@ note = "SHA-256 of .Random.seed after RunPCA() (set.seed(42), then irlba's draws
 # by hand). Results: docs/validation/clustering.md.
 #
 #   tests/fixtures/kernels.tsv   the OpenBLAS kernel each BLAS-dependent fixture without its own
-#               run record was made under (rcompat::blas::require_fixture_kernel)
+#               run record was made under (rcompat::blas::require_fixture_kernel); M15b added two
+#               rows and updated this entry by hand to the file as M15b left it
 #   data/clustering/bin/scrust-m11-<commit>   the binary of the validation and benchmark runs
 #   data/clustering/floor_kernel_m11/, data/doubletfinder/compare/floor_kernel_m11/   the R-vs-R
 #               floor across OpenBLAS kernels, measured by `scrust validate floor` on M8's and M2's
@@ -675,12 +676,12 @@ note = "SHA-256 of .Random.seed after RunPCA() (set.seed(42), then irlba's draws
 
 [[file]]
 path = "tests/fixtures/kernels.tsv"
-sha256 = "9025993d8c6e0cbd0a0b41c1f18f9d22958fb9c2e4ae468099de0b8a15c5d2f7"
-bytes = 3294
+sha256 = "e509427c698393c962aaec4b2b028c80ef891ed5079c3dfda991ee9202f6463a"
+bytes = 3585
 tool = "clustering"
 role = "fixture"
 milestone = "M11"
-note = "the OpenBLAS kernel of each BLAS-dependent fixture without its own run record"
+note = "the OpenBLAS kernel of each BLAS-dependent fixture without its own run record; M15b extended it (commit 25fe846: the rows of tests/fixtures/rcompat/linpack_qr.tsv.gz and linpack_resid.tsv.gz), and its size and SHA-256 are the file as M15b left it"
 
 [[file]]
 path = "data/clustering/bin/scrust-m11-eedf376"
@@ -58521,6 +58522,10 @@ note = "the pinned scrust binary of the loaders' tests"
 #               loaders' tests
 #   tests/fixtures/rcompat/linpack_*.tsv.gz, tests/fixtures/clustering/{m15b,percent_mt}/   the
 #               committed fixtures (their README)
+#   tests/fixtures/kernels.tsv   extended by M15b (the linpack fixtures' rows); it keeps its one
+#               entry, M11's, updated to the file as M15b left it
+#   validation/python/check_manifest.py   the whole manifest against the files on disk: every
+#               entry's size, the committed files' SHA-256 (with --hash M15b, M15b's entries' too)
 
 [[run]]
 id = "clustering/m15b/filtered_seurat_tenx_test/pm/direct-portable-cascadelake"

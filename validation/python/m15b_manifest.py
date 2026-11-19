@@ -144,6 +144,10 @@ def r_runs(out, cases):
 #               loaders' tests
 #   tests/fixtures/rcompat/linpack_*.tsv.gz, tests/fixtures/clustering/{m15b,percent_mt}/   the
 #               committed fixtures (their README)
+#   tests/fixtures/kernels.tsv   extended by M15b (the linpack fixtures' rows); it keeps its one
+#               entry, M11's, updated to the file as M15b left it
+#   validation/python/check_manifest.py   the whole manifest against the files on disk: every
+#               entry's size, the committed files' SHA-256 (with --hash M15b, M15b's entries' too)
 
 """
     out.append(header)
