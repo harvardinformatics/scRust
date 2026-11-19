@@ -1,0 +1,213 @@
+{
+  "result": {
+    "level": "full",
+    "n_cells": 267,
+    "idents_equal_seurat_clusters": true,
+    "n_clusters": 4,
+    "cluster_sizes": [80, 65, 62, 60],
+    "default_assay": "SCT",
+    "assays": {
+      "RNA": "Assay",
+      "SCT": "SCTAssay"
+    },
+    "metadata_vst_attr_names": [],
+    "sct_n_features": 821,
+    "sct_nnz": 61367,
+    "sct_counts_integer": true,
+    "sct_counts_min": 1,
+    "sct_counts_explicit_zeros": 0,
+    "sct_data_is_log1p_counts": true,
+    "nCount_SCT_is_colSums": true,
+    "nFeature_SCT_is_nonzero": true,
+    "sct_counts_x_sha256": "7e19ef21c6fa048d8736c6e472ef92f53eceee2701bc081aad46db8acc88fa90",
+    "sct_data_x_sha256": "02430cf7d4667b6330cbd0f435740050583b4c1435b41e205812cf3e9f3f8eb6",
+    "scale_data_dim": [821, 267],
+    "scale_data_sha256": "ad53351b0971d4e635484ef36145e2a2ce4c7fb8586d40e0fab66e0a8ef8cca5",
+    "n_variable_features": 821,
+    "scale_data_rows_are_variable_features": true,
+    "scale_data_rows_in_variable_feature_order": false,
+    "sct_models": 1,
+    "model_feature_rows_are_sct_features": true,
+    "model_cell_rows_are_cells": true,
+    "rna_assay_class": "Assay",
+    "seed": 12345,
+    "optimizer": {
+      "nodes": 267,
+      "edges": 11498,
+      "max_modularity": "0.5188",
+      "communities": 4,
+      "singletons": 0,
+      "final_clusters": 4
+    },
+    "rng_after": {
+      "SCTransform": "6fd1c4c8188e63e0021a0394257f98a380f221a09f7b10cbfaa5506bef06c840",
+      "RunPCA": "c6e761b05213550401a02c32f96c4a130904f0384f37bda9419746d0b183c279",
+      "RunUMAP": "7a9ee1e56bb6f215698eac1392fe46c039e249e23dca22ec88ed986db716358d",
+      "FindNeighbors": "7a9ee1e56bb6f215698eac1392fe46c039e249e23dca22ec88ed986db716358d",
+      "FindClusters": "7a9ee1e56bb6f215698eac1392fe46c039e249e23dca22ec88ed986db716358d",
+      "add_silhouette_to_metadata": "7a9ee1e56bb6f215698eac1392fe46c039e249e23dca22ec88ed986db716358d"
+    },
+    "rng_end_sha256": "7a9ee1e56bb6f215698eac1392fe46c039e249e23dca22ec88ed986db716358d",
+    "covariates": {
+      "percent_mt": {
+        "definition": "pattern",
+        "pattern": "(?i)^mt-",
+        "features": [],
+        "cells_zero": 267
+      }
+    },
+    "regression": {
+      "vars": ["percent.mt"],
+      "rank": 1,
+      "pivot": [1, 2],
+      "n_columns": 2
+    }
+  },
+  "run": {
+    "kind": "validation/R/reference_clustering.R",
+    "input": "data/clustering/filtered_seurat_emptydrops_test/input",
+    "input_source": "export",
+    "outdir": "data/clustering/m15b/runs/filtered_seurat_emptydrops_test/pm/direct-portable-cascadelake.partial.62084537",
+    "level": "full",
+    "umap": true,
+    "assay": "v3",
+    "start_time": "2026-11-19T07:09:07-0500",
+    "slurm_job_id": "62084537",
+    "profile": "portable",
+    "fingerprint": {
+      "scrust_version": "0.1.0",
+      "host": "holy7c22506.rc.fas.harvard.edu",
+      "kernel": "4.18.0-553.155.1.el8_10.x86_64",
+      "cpu_model": "Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz",
+      "cpu_flags": ["avx2", "fma", "avx512f", "avx512bw"],
+      "glibc": "2.28",
+      "openblas_corename": "Haswell",
+      "openblas_config": "OpenBLAS 0.3.34 DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=128",
+      "openblas_num_threads": 1,
+      "openblas_library": "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRust/.envs/rust-dev/lib/libopenblasp-r0.3.34.so",
+      "OPENBLAS_CORETYPE": "Haswell",
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": null,
+      "SLURM_JOB_ID": "62084537",
+      "SLURM_JOB_PARTITION": "shared",
+      "SLURMD_NODENAME": "holy7c22506",
+      "SLURM_CPUS_PER_TASK": "1",
+      "R": "R version 4.5.3 (2026-03-11)",
+      "platform": "x86_64-conda-linux-gnu",
+      "packages": {
+        "Seurat": {
+          "version": "5.5.1"
+        },
+        "SeuratObject": {
+          "version": "5.4.0"
+        },
+        "sctransform": {
+          "version": "0.4.3"
+        },
+        "glmGamPoi": {
+          "version": "1.22.0"
+        },
+        "irlba": {
+          "version": "2.4.1"
+        },
+        "uwot": {
+          "version": "0.2.5"
+        },
+        "RcppAnnoy": {
+          "version": "0.0.23"
+        },
+        "RcppEigen": {
+          "version": "0.3.4.0.2"
+        },
+        "bluster": {
+          "version": "1.20.0"
+        },
+        "BiocNeighbors": {
+          "version": "2.4.0"
+        },
+        "assorthead": {
+          "version": "1.4.0"
+        },
+        "Matrix": {
+          "version": "1.7-6"
+        },
+        "future": {
+          "version": "1.82.0"
+        },
+        "future.apply": {
+          "version": "1.21.0"
+        },
+        "Rcpp": {
+          "version": "1.1.2"
+        }
+      },
+      "blas_library": "/n/holylfs05/LABS/informatics/Users/afreedman/smk-conda-envs/d3ca7f730a70e6f748bb65a12a5ed3f9_/lib/libopenblasp-r0.3.34.so",
+      "lapack_library": "/n/holylfs05/LABS/informatics/Users/afreedman/smk-conda-envs/d3ca7f730a70e6f748bb65a12a5ed3f9_/lib/libopenblasp-r0.3.34.so",
+      "lapack_version": "3.12.0",
+      "blas_md5": "d77a762c672e6e8c39a458506f73cfd1",
+      "rng_kind": ["Mersenne-Twister", "Inversion", "Rejection"],
+      "locale": "LC_CTYPE=en_US.UTF-8;LC_NUMERIC=C;LC_TIME=en_US.UTF-8;LC_COLLATE=en_US.UTF-8;LC_MONETARY=en_US.UTF-8;LC_MESSAGES=en_US.UTF-8;LC_PAPER=en_US.UTF-8;LC_NAME=C;LC_ADDRESS=C;LC_TELEPHONE=C;LC_MEASUREMENT=en_US.UTF-8;LC_IDENTIFICATION=C",
+      "sizeof_longdouble": 16
+    },
+    "phases": {
+      "load": {
+        "elapsed_s": 0.18200000000000038,
+        "peak_rss_kib": 704928,
+        "rss_kib": 704928
+      },
+      "covariates": {
+        "elapsed_s": 0.23200000000000109,
+        "peak_rss_kib": 704928,
+        "rss_kib": 704928
+      },
+      "SCTransform": {
+        "elapsed_s": 3.3060000000000009,
+        "peak_rss_kib": 834992,
+        "rss_kib": 834992
+      },
+      "RunPCA": {
+        "elapsed_s": 3.5960000000000001,
+        "peak_rss_kib": 851780,
+        "rss_kib": 851780
+      },
+      "RunUMAP": {
+        "elapsed_s": 6.2210000000000001,
+        "peak_rss_kib": 852424,
+        "rss_kib": 852424
+      },
+      "FindNeighbors": {
+        "elapsed_s": 6.5869999999999997,
+        "peak_rss_kib": 852456,
+        "rss_kib": 852456
+      },
+      "FindClusters": {
+        "elapsed_s": 6.636000000000001,
+        "peak_rss_kib": 852516,
+        "rss_kib": 852516
+      },
+      "silhouette": {
+        "elapsed_s": 6.902000000000001,
+        "peak_rss_kib": 852720,
+        "rss_kib": 852720
+      },
+      "purity": {
+        "elapsed_s": 6.9200000000000017,
+        "peak_rss_kib": 852780,
+        "rss_kib": 852780
+      },
+      "chain_end": {
+        "elapsed_s": 6.9220000000000006,
+        "peak_rss_kib": 852780,
+        "rss_kib": 852780
+      },
+      "write": {
+        "elapsed_s": 7.6760000000000019,
+        "peak_rss_kib": 888684,
+        "rss_kib": 888848
+      }
+    },
+    "peak_rss_kib": 898100,
+    "printed": ["Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck", "", "Number of nodes: 267", "Number of edges: 11498", "", "Running Louvain algorithm...", "Maximum modularity in 10 random starts: 0.5188", "Number of communities: 4", "Elapsed time: 0 seconds"],
+    "messages": []
+  }
+}

@@ -42,6 +42,14 @@
 //!   attributes and the counts, against R's corrected counts, log1p data, `nCount_SCT`,
 //!   `nFeature_SCT` and K10 scalars. Its `mu` is a BLAS product, so it is graded under the
 //!   validator's own kernel against R's;
+//! - **vars.to.regress and percent.mt** (M15b), when the runs have them: `metadata.tsv`'s
+//!   `percent.mt` (as text: computed from the counts, BLAS-free), every other column both
+//!   `metadata.tsv` files hold that the chain does not write (a regressed `--metadata` column: R
+//!   wrote the double `read.delim()` parsed, `%.17g`; the candidate carries the table's text, which
+//!   is parsed again as R parses it, `rcompat::as_numeric`, and compared bit for bit), and the
+//!   `result` records: the regression's covariates, the rank and pivot of `lm()`'s QR (R's
+//!   `result.regression` against `result.sctransform.regression`), and percent.mt's features (R's
+//!   `result.covariates.percent_mt.features` against the candidate's count and its first names);
 //! - **the manifest** (M13): the candidate's `summary.json` `files` section describes its
 //!   directory: every file listed, every listed file present with its size and SHA-256, the
 //!   naming rules that keep normalised data from being read as raw counts;
@@ -1133,6 +1141,40 @@ fn compare_files(g: &mut Grader, reference: &Path, candidate: &Path, r_summary: 
             _ => {}
         }
     }
+    // M15b: percent.mt (from the counts, BLAS-free), and the other columns both hold that the
+    // chain does not write: a regressed --metadata column, which R wrote as the double read.delim()
+    // parsed (%.17g) and the candidate carries as the table's text, parsed again as R parses it
+    match (r_meta.col("percent.mt"), c_meta.col("percent.mt")) {
+        (Some(a), Some(b)) if same_n => {
+            let nd = (0..n).filter(|&i| r_meta.rows[i].get(a) != c_meta.rows[i].get(b)).count();
+            g.exact("M15b", "metadata.tsv: percent.mt", Inputs::Free, n, nd, "as text".into());
+        }
+        (Some(_), None) => g.missing("M15b", "metadata.tsv: percent.mt", Inputs::Free, "not in the candidate's metadata.tsv".into()),
+        (None, Some(_)) => g.not_applicable("M15b", "metadata.tsv: percent.mt", Inputs::Free, "R's run has no percent.mt".into()),
+        _ => {}
+    }
+    const CHAIN_COLUMNS: [&str; 14] = ["barcode", "nCount_RNA", "nFeature_RNA", "percent.mt", "nCount_SCT", "nFeature_SCT", "seurat_clusters", "silhouette_width", "silhouette_other", "neighborhood_purity", "purity_maximum", "orig.ident", "ident", "label"];
+    for (j, col) in r_meta.header.iter().enumerate() {
+        if CHAIN_COLUMNS.contains(&col.as_str()) || col.contains("_res.") {
+            continue;
+        }
+        match c_meta.col(col) {
+            Some(b) if same_n => {
+                let nd = (0..n)
+                    .filter(|&i| {
+                        let rv = r_meta.rows[i].get(j).and_then(|v| scio::parse17(v));
+                        let cv = c_meta.rows[i].get(b).map(|v| rcompat::as_numeric(v));
+                        match (rv, cv) {
+                            (Some(x), Some(y)) => x.to_bits() != y.to_bits(),
+                            _ => true,
+                        }
+                    })
+                    .count();
+                g.exact("M15b", &format!("metadata.tsv: {col} (R's read.delim() double = R_strtod of the candidate's text)"), Inputs::Free, n, nd, "bit for bit".into());
+            }
+            _ => g.missing("M15b", &format!("metadata.tsv: {col}"), Inputs::Free, "a column of R's metadata.tsv the candidate does not carry".into()),
+        }
+    }
     match (r_meta.col("silhouette_width"), c_meta.col("silhouette_width")) {
         (Some(a), Some(b)) if same_n => {
             let s = grade::stats(&meta_numbers(r_meta, a), &meta_numbers(c_meta, b), n, 1, false);
@@ -1328,6 +1370,38 @@ fn compare_files(g: &mut Grader, reference: &Path, candidate: &Path, r_summary: 
                 None => g.not_applicable("K1", "result: scale_data_sha256", Inputs::Sct, "the candidate did not run SCTransform".into()),
             }
         }
+        // M15b: the regression and percent.mt's features, when R's run records them
+        if let Some(rg) = rr.get("regression") {
+            let c_rg = c_sct.and_then(|s| s.get("regression"));
+            let text = |j: Option<&Json>, key: &str| str_list(j.and_then(|x| x.get(key))).join(",");
+            let ints = |j: Option<&Json>, key: &str| num_list(j.and_then(|x| x.get(key))).iter().map(|v| (*v as i64).to_string()).collect::<Vec<_>>().join(",");
+            for (key, a, b, inputs) in [
+                ("vars_to_regress", text(Some(rg), "vars"), text(c_rg, "vars_to_regress"), Inputs::Free),
+                ("columns", ints(Some(rg), "n_columns"), ints(c_rg, "n_columns"), Inputs::Free),
+                ("rank", ints(Some(rg), "rank"), ints(c_rg, "rank"), Inputs::Sct),
+                ("pivot", ints(Some(rg), "pivot"), ints(c_rg, "pivot"), Inputs::Sct),
+            ] {
+                if c_rg.is_none() {
+                    g.missing("M15b", &format!("result: regression {key}"), inputs, "the candidate did not regress".into());
+                } else {
+                    g.exact("M15b", &format!("result: regression {key}"), inputs, 1, (a != b) as usize, if a == b { a } else { format!("R {a}, Rust {b}") });
+                }
+            }
+        }
+        if let Some(pm) = rr.get("covariates").and_then(|c| c.get("percent_mt")) {
+            let c_pm = c_sct.and_then(|s| s.get("percent_mt"));
+            let r_feats = str_list(pm.get("features"));
+            match c_pm {
+                Some(cp) => {
+                    let c_n = jnum(cp, "n_features").map(|v| v as usize);
+                    let c_first = str_list(cp.get("features_first"));
+                    let want_first: Vec<String> = r_feats.iter().take(crate::covariates::FEATURES_LISTED).cloned().collect();
+                    let ok = c_n == Some(r_feats.len()) && c_first == want_first;
+                    g.exact("M15b", "result: percent.mt's features", Inputs::Free, 1, (!ok) as usize, format!("{} feature(s){}", r_feats.len(), if ok { String::new() } else { format!("; Rust {c_n:?}: {}", c_first.join(",")) }));
+                }
+                None => g.missing("M15b", "result: percent.mt's features", Inputs::Free, "the candidate did not compute percent.mt".into()),
+            }
+        }
         let rng_after = rr.get("rng_after");
         for (key, label, inputs) in [("SCTransform", "K1", Inputs::Free), ("RunPCA", "K2", Inputs::Pca)] {
             let a = rng_after.and_then(|x| x.get(key)).and_then(Json::as_str);
@@ -1337,6 +1411,34 @@ fn compare_files(g: &mut Grader, reference: &Path, candidate: &Path, r_summary: 
                 (Some(_), None) => g.not_applicable(if label == "K1" { "K1" } else { "K2" }, &format!("result: .Random.seed after {key} (digest)"), inputs, format!("the candidate did not run {key}")),
                 _ => {}
             }
+        }
+    }
+    // M15b: scale.data value by value, when R kept it (sct/scale_data.npy, levels full and
+    // standard) and the candidate did (--keep-stages, --export): the rows matched by name (R's in
+    // the assay's gene order, the candidate's in VariableFeatures() order). A digest cannot be
+    // graded across kernels; the values can, against the floor's S2d_scale_data.
+    let (r_sd, c_sd) = (reference.join("sct/scale_data.npy"), candidate.join("sct/scale_data.npy"));
+    if r_sd.is_file() && c_sd.is_file() {
+        let r_names: Vec<String> = read_text(&reference.join("sct/scale_data_features.tsv")).unwrap_or_default().lines().map(String::from).collect();
+        let c_names: Vec<String> = read_table(&candidate.join("sct/variable_features.tsv")).map(|t| t.rows.iter().map(|r| r.get(1).cloned().unwrap_or_default()).collect()).unwrap_or_default();
+        let (r, rn, rc) = scio::npy::read_f64_row_major(&r_sd).map_err(|e| e.to_string())?;
+        let (c, cn, cc) = scio::npy::read_f64_row_major(&c_sd).map_err(|e| e.to_string())?;
+        let pos: std::collections::HashMap<&str, usize> = c_names.iter().enumerate().map(|(i, x)| (x.as_str(), i)).collect();
+        let rows: Option<Vec<usize>> = r_names.iter().map(|x| pos.get(x.as_str()).copied()).collect();
+        match rows {
+            Some(rows) if rn == r_names.len() && cn == c_names.len() && rn == cn && rc == cc => {
+                // column-major features x cells, R's row order
+                let (mut a, mut b) = (vec![0.0f64; rn * rc], vec![0.0f64; rn * rc]);
+                for (i, &k) in rows.iter().enumerate() {
+                    for j in 0..rc {
+                        a[i + j * rn] = r[i * rc + j];
+                        b[i + j * rn] = c[k * cc + j];
+                    }
+                }
+                let st = grade::stats(&a, &b, rn, rc, false);
+                g.numeric("K1", "sct/scale_data.npy (value by value, rows matched by name)", Inputs::Sct, "S2d_scale_data", &st, "");
+            }
+            _ => g.missing("K1", "sct/scale_data.npy (value by value)", Inputs::Sct, format!("R's {rn} x {rc} and the candidate's {cn} x {cc} rows do not match by name")),
         }
     }
     Ok(())

@@ -11,7 +11,9 @@
 //! 4. the variable features: `sort(residual_variance, decreasing = TRUE)` (stable; NA dropped),
 //!    the first `variable_features_n`;
 //! 5. `scale.data`: their residuals clipped to `+-sqrt(ncells / 30)`, then centred by
-//!    `ScaleData` (`FastRowScale`: `mat - rowMeans2(mat, na.rm = TRUE)`).
+//!    `ScaleData` (`FastRowScale`: `mat - rowMeans2(mat, na.rm = TRUE)`). With `vars.to.regress`
+//!    ([`residuals_with`], milestone M15b), `ScaleData` first regresses each clipped row on the
+//!    covariates (`RegressOutMatrix`, [`crate::regress`]), centres the result, and sets `NA` to 0.
 //!
 //! With `correct` ([`residuals_corrected`], milestone M13), the same pass also makes the
 //! corrected counts of sctransform 0.4.3's `correct()`, which `vst()` calls on these residuals
@@ -35,6 +37,7 @@
 use crate::correct::Corrected;
 use crate::matrix::GeneRows;
 use crate::params::{MinVariance, SctParams};
+use crate::regress::Regression;
 use crate::setup::bins;
 use crate::SctError;
 use rcompat::blas::tcrossprod_into;
@@ -474,19 +477,28 @@ impl<'s> Run<'_, 's> {
 
 /// Stage S2d. `rows` are the kept genes' counts, `threads` the threads sharing each bin's genes.
 pub fn residuals(rows: &GeneRows, input: &ResidualInput, params: &SctParams, keep_y: bool, threads: usize) -> Result<Residuals, SctError> {
-    residuals_in_groups(rows, input, params, keep_y, threads, gene_group(rows.ncol), false).map(|r| r.0)
+    residuals_in_groups(rows, input, params, keep_y, threads, gene_group(rows.ncol), false, None).map(|r| r.0)
 }
 
 /// Stage S2d with `correct()` in the same pass (M13): the residuals as [`residuals`] makes them,
 /// and the corrected counts of every kept gene and cell (`do.correct.umi = TRUE`).
 pub fn residuals_corrected(rows: &GeneRows, input: &ResidualInput, params: &SctParams, keep_y: bool, threads: usize) -> Result<(Residuals, Corrected), SctError> {
-    let (r, c) = residuals_in_groups(rows, input, params, keep_y, threads, gene_group(rows.ncol), true)?;
+    let (r, c) = residuals_in_groups(rows, input, params, keep_y, threads, gene_group(rows.ncol), true, None)?;
     Ok((r, c.expect("corrected counts when correcting")))
 }
 
-/// [`residuals`], the threads taking `group` genes at a time; with `correct`, `correct()` too.
+/// Stage S2d with `correct()` when asked, and with `regress` (`vars.to.regress`, M15b), the
+/// second regression of `scale.data`'s clipped rows before they are centred: every other result
+/// ([`Residuals::residual_variance`], the variable features, the corrected counts) is the same as
+/// without it.
+pub fn residuals_with(rows: &GeneRows, input: &ResidualInput, params: &SctParams, keep_y: bool, threads: usize, correct: bool, regress: Option<&Regression>) -> Result<(Residuals, Option<Corrected>), SctError> {
+    residuals_in_groups(rows, input, params, keep_y, threads, gene_group(rows.ncol), correct, regress)
+}
+
+/// [`residuals`], the threads taking `group` genes at a time; with `correct`, `correct()` too;
+/// with `regress`, `vars.to.regress`' regression.
 #[allow(clippy::too_many_arguments)]
-fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParams, keep_y: bool, threads: usize, group: usize, correct: bool) -> Result<(Residuals, Option<Corrected>), SctError> {
+fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParams, keep_y: bool, threads: usize, group: usize, correct: bool, regress: Option<&Regression>) -> Result<(Residuals, Option<Corrected>), SctError> {
     let ng = rows.nrow();
     let nc = rows.ncol;
     if input.model_pars_fit.len() != ng || input.log_umi.len() != nc {
@@ -582,22 +594,58 @@ fn residuals_in_groups(rows: &GeneRows, input: &ResidualInput, params: &SctParam
     slab.truncate(top_features.len() * nc);
     slab.shrink_to_fit();
     let mut scale_data = slab;
-    for k in 0..top_features.len() {
-        let row = &mut scale_data[k * nc..(k + 1) * nc];
-        for d in row.iter_mut() {
-            let mut v = *d;
-            if v < clip.0 {
-                v = clip.0;
+    match regress {
+        None => {
+            for k in 0..top_features.len() {
+                let row = &mut scale_data[k * nc..(k + 1) * nc];
+                for d in row.iter_mut() {
+                    let mut v = *d;
+                    if v < clip.0 {
+                        v = clip.0;
+                    }
+                    if v > clip.1 {
+                        v = clip.1;
+                    }
+                    *d = v;
+                }
+                if params.do_center {
+                    let rm = mean2_na_rm(row);
+                    for d in row.iter_mut() {
+                        *d -= rm;
+                    }
+                }
             }
-            if v > clip.1 {
-                v = clip.1;
-            }
-            *d = v;
         }
-        if params.do_center {
-            let rm = mean2_na_rm(row);
-            for d in row.iter_mut() {
-                *d -= rm;
+        Some(reg) => {
+            // SCTransform.default clips; ScaleData regresses (RegressOutMatrix), centres
+            // (FastRowScale), then sets NA to 0
+            for d in scale_data.iter_mut() {
+                let mut v = *d;
+                if v < clip.0 {
+                    v = clip.0;
+                }
+                if v > clip.1 {
+                    v = clip.1;
+                }
+                *d = v;
+            }
+            if reg.qr.n != nc {
+                return Err(SctError::Input(format!("vars.to.regress: {} cells' covariates for {nc} cells", reg.qr.n)));
+            }
+            reg.regress_rows(&mut scale_data, nc, threads);
+            for k in 0..top_features.len() {
+                let row = &mut scale_data[k * nc..(k + 1) * nc];
+                if params.do_center {
+                    let rm = mean2_na_rm(row);
+                    for d in row.iter_mut() {
+                        *d -= rm;
+                    }
+                }
+                for d in row.iter_mut() {
+                    if d.is_nan() {
+                        *d = 0.0;
+                    }
+                }
             }
         }
     }
@@ -804,7 +852,7 @@ mod tests {
                 let got = if group == 0 {
                     residuals(&rows, &input, params, keep_y, threads).unwrap()
                 } else {
-                    residuals_in_groups(&rows, &input, params, keep_y, threads, group, false).unwrap().0
+                    residuals_in_groups(&rows, &input, params, keep_y, threads, group, false, None).unwrap().0
                 };
                 let what = format!("{params:?}, {threads} threads, keep_y {keep_y}, group {group}");
                 assert!(same(&got.residual_mean, &want.residual_mean), "residual_mean: {what}");
@@ -880,7 +928,7 @@ mod tests {
             assert!(want_c.nnz() > 100 && beyond > 0, "the case exercises corrected counts and residuals beyond the clip range");
             let plain = residuals(&rows, &input, &params, false, 1).unwrap();
             for (threads, group) in [1, 2, 3, 7].into_iter().flat_map(|t| [1, 3, 8].map(|g| (t, g))) {
-                let (r, c) = residuals_in_groups(&rows, &input, &params, false, threads, group, true).unwrap();
+                let (r, c) = residuals_in_groups(&rows, &input, &params, false, threads, group, true, None).unwrap();
                 let c = c.unwrap();
                 assert_eq!(c, want_c, "{nc} cells, {threads} threads, group {group}");
                 assert_eq!(c.median_log_umi.to_bits(), med.to_bits());

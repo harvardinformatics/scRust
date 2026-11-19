@@ -56,8 +56,9 @@ Usage: scrust doubletfinder --counts <10x dir> [--clusters <tsv> [--cluster-leve
                             [--pk auto|<value>] [--threads N]
                             [--cluster-preset workflow] [--cluster-params <file.toml>]
                             [--cluster-stats none|silhouette,purity|silhouette|purity]
+                            [--cluster-metadata <tsv>]
                             [--recluster [--recluster-preset workflow] [--recluster-params <file.toml>]
-                                         [--recluster-export]]
+                                         [--recluster-export] [--recluster-metadata <tsv>]]
                             [--dump-stages none|light|standard|full] [--from-stages <dir>]
 
 DoubletFinder 2.0.6 as the workflow calls it (docs/PLAN.md B1), every stage computed by Rust:
@@ -103,6 +104,14 @@ homotypic adjustment. The counts are read once for both; only the labels are kep
                               [sctransform], [pca], [neighbors], [cluster], [stats])
   --cluster-stats <list>      the scores: none (default), silhouette,purity, silhouette or purity
                               (the file's [stats] compute, when given and this is not)
+  --cluster-metadata <tsv>    scrust cluster's --metadata: a table with a barcode column whose
+                              columns clusters/metadata.tsv carries, and which the parameter file's
+                              vars_to_regress may name
+  The parameter file's [sctransform] takes SCTransform's vars.to.regress and percent.mt as
+  scrust cluster's does: vars_to_regress = [\"percent.mt\", \"nCount_RNA\", ...] (none by
+  default), percent_mt = true, mt_genes = \"<file>\" (ids, read from the file's directory when
+  relative); see scrust cluster --help. DoubletFinder's own SCTransform runs never regress, as
+  DoubletFinder's R code calls SCTransform.
   Writes clusters/: seurat_clusters.tsv and seurat_clusters_levels.txt (the layout --clusters
   reads), the other label files and metadata.tsv (with the scores when asked), and its own
   summary.json (the clustering's numbers and manifest), as scrust cluster --counts <dir> writes
@@ -120,6 +129,7 @@ from the timings and the command line in its summary.json.
   --recluster-params <file>   a parameter file, as scrust cluster --params reads it
   --recluster-export          also the export, as scrust cluster --export writes it (counts/: a
                               copy of singlets/; sct/: SCTransform's normalised data; README.txt)
+  --recluster-metadata <tsv>  scrust cluster's --metadata for the singlets (by barcode), as above
 
 Outputs: cells.tsv (barcode, pANN and classification of every cell), sweep_stats.tsv (pN, pK,
 BCreal), bcmvn.tsv (find.pK's table), summary.json (\"result\": pK and its label as R writes it,
@@ -138,8 +148,9 @@ as stored, in input order, and the input's feature lines. The counts are read ag
 const SWITCHES: [&str; 2] = ["recluster", "recluster-export"];
 
 /// The clustering's parameters from `--<prefix>-preset` (default: the file's `preset`, else
-/// `workflow`) and `--<prefix>-params`, with `stats` (a `--stats` value) applied last. Returns the
-/// parameters, the preset applied and the file.
+/// `workflow`) and `--<prefix>-params`, with `stats` (a `--stats` value) applied last; a relative
+/// `mt_genes` in the file is read from its directory (M15b). Returns the parameters, the preset
+/// applied and the file.
 fn chain_params_of(args: &Args, prefix: &str, stats: Option<&str>) -> Result<(ChainParams, String, Option<String>), String> {
     let file = args.get(&format!("{prefix}-params")).map(str::to_string);
     let toml = match &file {
@@ -152,7 +163,8 @@ fn chain_params_of(args: &Args, prefix: &str, stats: Option<&str>) -> Result<(Ch
     };
     let preset = args.get(&format!("{prefix}-preset")).map(str::to_string).or(file_preset).unwrap_or_else(|| "workflow".into());
     let flags: Vec<(String, String)> = stats.map(|s| vec![("stats".to_string(), s.to_string())]).unwrap_or_default();
-    let p = chain_params::build(Some(&preset), toml.as_deref(), &flags).map_err(|e| format!("--{prefix}-preset/--{prefix}-params: {e}"))?;
+    let dir = file.as_deref().map(|f| Path::new(f).parent().unwrap_or(Path::new("")).to_path_buf());
+    let p = chain_params::build_in(Some(&preset), toml.as_deref(), dir.as_deref(), &flags).map_err(|e| format!("--{prefix}-preset/--{prefix}-params: {e}"))?;
     Ok((p, preset, file))
 }
 
@@ -164,8 +176,10 @@ fn file_sets_stats(args: &Args, prefix: &str) -> Result<bool, String> {
 }
 
 /// The `scrust cluster` command whose values a nested clustering reproduces (its manifest's
-/// `provenance.command`): `--counts <dir> --preset <p> [--params <file>] [--stats <s>] [--export]`.
-fn equivalent_command(counts: &Path, preset: &str, params: Option<&str>, stats: Option<&str>, export: bool) -> String {
+/// `provenance.command`): `--counts <dir> --preset <p> [--params <file>] [--stats <s>]
+/// [--metadata <tsv>] [--export]`; `--metadata` stays only when its columns are regressed (M15b),
+/// as in `scrust cluster`'s own command.
+fn equivalent_command(counts: &Path, cp: &ChainParams, preset: &str, params: Option<&str>, stats: Option<&str>, metadata: Option<&str>, export: bool) -> String {
     let mut a: Vec<String> = vec!["--counts".into(), counts.display().to_string(), "--preset".into(), preset.into()];
     if let Some(p) = params {
         a.extend(["--params".into(), p.into()]);
@@ -173,12 +187,15 @@ fn equivalent_command(counts: &Path, preset: &str, params: Option<&str>, stats: 
     if let Some(s) = stats {
         a.extend(["--stats".into(), s.into()]);
     }
+    if let Some(m) = metadata {
+        a.extend(["--metadata".into(), m.into()]);
+    }
     if export {
         a.push("--export".into());
     }
     let mut switches: Vec<&str> = chain_params::PARAM_SWITCHES.to_vec();
     switches.extend(["keep-stages", "export"]);
-    scio::manifest::canonical_command("cluster", &a, &cmd_cluster::OUTPUT_ONLY, &switches)
+    scio::manifest::canonical_command("cluster", &a, &cmd_cluster::output_only(cp), &switches)
 }
 
 /// Marks each stage of an in-process clustering on the command's clock.
@@ -214,7 +231,8 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     let args = Args::parse_with_flags(argv, &SWITCHES)?;
     args.only(&[
         "counts", "clusters", "cluster-levels", "from-stages", "out", "threads", "pcs", "pn", "nexp-rate", "pk", "seed", "dump-stages",
-        "cluster-preset", "cluster-params", "cluster-stats", "recluster", "recluster-preset", "recluster-params", "recluster-export",
+        "cluster-preset", "cluster-params", "cluster-stats", "cluster-metadata", "recluster", "recluster-preset", "recluster-params", "recluster-export",
+        "recluster-metadata",
     ])?;
     let phases = RefCell::new(Phases::new());
     let start_time = cli::utc_now();
@@ -259,7 +277,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     // clustering on the fly (C3h): only without --clusters
     let on_the_fly = clusters_path.is_none();
     if !on_the_fly {
-        if let Some(o) = ["cluster-preset", "cluster-params", "cluster-stats"].into_iter().find(|o| args.get(o).is_some()) {
+        if let Some(o) = ["cluster-preset", "cluster-params", "cluster-stats", "cluster-metadata"].into_iter().find(|o| args.get(o).is_some()) {
             return Err(format!("--{o}: clustering on the fly is for runs without --clusters"));
         }
     } else {
@@ -272,7 +290,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     }
     let recluster = args.flag("recluster");
     if !recluster {
-        if let Some(o) = ["recluster-preset", "recluster-params", "recluster-export"].into_iter().find(|o| args.get(o).is_some()) {
+        if let Some(o) = ["recluster-preset", "recluster-params", "recluster-export", "recluster-metadata"].into_iter().find(|o| args.get(o).is_some()) {
             return Err(format!("--{o} goes with --recluster"));
         }
     }
@@ -302,6 +320,8 @@ pub fn main(argv: &[String]) -> Result<(), String> {
 
     // the input: the counts, and the labels given or computed
     let mut hook_result: Option<Clustered> = None;
+    // what clustering on the fly read for percent.mt and vars.to.regress (M15b), for its provenance
+    let mut hook_inputs: Vec<ProvInput> = Vec::new();
     let (input, levels_described, matrix) = match &clusters_path {
         Some(cp) => {
             let (input, levels) = read_input(&counts, cp, args.get("cluster-levels").map(Path::new)).map_err(|e| e.to_string())?;
@@ -315,7 +335,13 @@ pub fn main(argv: &[String]) -> Result<(), String> {
             // the chain borrows the counts, which DoubletFinder reads next; it keeps the labels
             // (and the scores when asked) and frees each stage once the next has what it needs
             let mut marks = Marks { phases: &phases, prefix: "clustering: " };
-            let clustered = chain::cluster_counts(Cow::Borrowed(&c), hp, threads, Options::default(), &mut marks).map_err(|e| format!("clustering on the fly: {e}"))?;
+            // percent.mt's ids and --cluster-metadata's regressed columns (M15b)
+            let (cov, more) = cmd_cluster::read_covariates(hp, args.get("cluster-metadata"), &c.barcodes).map_err(|e| format!("clustering on the fly: {e}"))?;
+            hook_inputs = more;
+            let clustered = chain::cluster_counts_with(Cow::Borrowed(&c), hp, &cov, threads, Options::default(), &mut marks).map_err(|e| format!("clustering on the fly: {e}"))?;
+            for n in &clustered.notes {
+                eprintln!("scrust doubletfinder: clustering on the fly: {n}");
+            }
             let f = clustered.labels();
             let scio::Counts { matrix, barcodes, feature_lines } = c;
             let input = Input { barcodes, clusters: f.label_strings(), cluster_levels: f.levels.clone(), n_genes: feature_lines.len() };
@@ -337,16 +363,19 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     if let (Some(c), Some((hp, preset, file, stats))) = (hook_result.take(), &hook) {
         let dir = out.join(CLUSTERS);
         let s = Settings { params: hp.clone(), threads, keep: false, export: false, dumps: None, purity_lists: false, annoy: false };
+        let mut provenance_inputs = vec![counts_prov.get_or_insert(counts_digest()?).clone()];
+        provenance_inputs.append(&mut hook_inputs);
         let rec = Record {
             command_line: cli::command_line("doubletfinder", argv),
-            command: equivalent_command(&counts, preset, file.as_deref(), stats.as_deref(), false),
+            command: equivalent_command(&counts, hp, preset, file.as_deref(), stats.as_deref(), args.get("cluster-metadata"), false),
             start_time: start_time.clone(),
             inputs: vec![("counts", Json::Str(counts.display().to_string()))],
-            provenance_inputs: vec![counts_prov.get_or_insert(counts_digest()?).clone()],
+            provenance_inputs,
             counts_entries: Vec::new(),
             export_s: 0.0,
-            metadata: None,
+            metadata: args.get("cluster-metadata").map(str::to_string),
             stats_note: Vec::new(),
+            notes: c.notes.clone(),
         };
         phases.borrow_mut().mark("clustering: digest");
         std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
@@ -425,20 +454,25 @@ pub fn main(argv: &[String]) -> Result<(), String> {
             (ProvInput { option: "counts".into(), path: sdir.display().to_string(), files }, Vec::new(), 0.0)
         };
         let s = Settings { params: rp.clone(), threads, keep: false, export: *export, dumps: None, purity_lists: false, annoy: false };
+        // percent.mt's ids and --recluster-metadata's regressed columns, for the singlets (M15b)
+        let (cov, more) = cmd_cluster::read_covariates(rp, args.get("recluster-metadata"), &singlets.barcodes).map_err(|e| format!("re-clustering the singlets: {e}"))?;
+        let mut provenance_inputs = vec![input];
+        provenance_inputs.extend(more);
         let rec = Record {
             command_line: cli::command_line("doubletfinder", argv),
-            command: equivalent_command(&sdir, preset, file.as_deref(), None, *export),
+            command: equivalent_command(&sdir, rp, preset, file.as_deref(), None, args.get("recluster-metadata"), *export),
             start_time: cli::utc_now(),
             inputs: vec![("counts", Json::Str(sdir.display().to_string()))],
-            provenance_inputs: vec![input],
+            provenance_inputs,
             counts_entries: entries,
             export_s,
-            metadata: None,
+            metadata: args.get("recluster-metadata").map(str::to_string),
             stats_note: Vec::new(),
+            notes: Vec::new(),
         };
         let mut p = Phases::new();
         p.mark("load");
-        let d = cmd_cluster::run_counts(singlets, &rdir, &s, rec, p, Some("doubletfinder")).map_err(|e| format!("re-clustering the singlets: {e}"))?;
+        let d = cmd_cluster::run_counts(singlets, &rdir, &s, rec, p, Some("doubletfinder"), &cov).map_err(|e| format!("re-clustering the singlets: {e}"))?;
         // the re-clustering's own phases, on this command's clock
         let offset = d.started.saturating_duration_since(phases.started()).as_secs_f64();
         for (name, t, rss) in &d.phases {
@@ -468,26 +502,29 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         ("pK", pk_text),
     ];
     if let Some((hp, preset, file, stats)) = &hook {
-        parameters.push((
-            "clustering",
-            Json::obj(vec![
-                ("preset", Json::Str(preset.clone())),
-                ("params_file", file.clone().map(Json::Str).unwrap_or(Json::Null)),
-                ("stats", stats.clone().map(Json::Str).unwrap_or(Json::Null)),
-                ("parameters", cmd_cluster::params_json(hp)),
-            ]),
-        ));
+        let mut items = vec![
+            ("preset", Json::Str(preset.clone())),
+            ("params_file", file.clone().map(Json::Str).unwrap_or(Json::Null)),
+            ("stats", stats.clone().map(Json::Str).unwrap_or(Json::Null)),
+            ("parameters", cmd_cluster::params_json(hp)),
+        ];
+        // M15b: only when given, so that runs without it record what earlier runs did
+        if let Some(m) = args.get("cluster-metadata") {
+            items.push(("metadata", Json::Str(m.into())));
+        }
+        parameters.push(("clustering", Json::obj(items)));
     }
     if let Some((rp, preset, file, export)) = &re {
-        parameters.push((
-            "recluster",
-            Json::obj(vec![
-                ("preset", Json::Str(preset.clone())),
-                ("params_file", file.clone().map(Json::Str).unwrap_or(Json::Null)),
-                ("export", Json::Bool(*export)),
-                ("parameters", cmd_cluster::params_json(rp)),
-            ]),
-        ));
+        let mut items = vec![
+            ("preset", Json::Str(preset.clone())),
+            ("params_file", file.clone().map(Json::Str).unwrap_or(Json::Null)),
+            ("export", Json::Bool(*export)),
+            ("parameters", cmd_cluster::params_json(rp)),
+        ];
+        if let Some(m) = args.get("recluster-metadata") {
+            items.push(("metadata", Json::Str(m.into())));
+        }
+        parameters.push(("recluster", Json::obj(items)));
     }
     let parameters = Json::obj(parameters);
     let mut reproduces = vec![doubletfinder::REFERENCE, sctransform::REFERENCE, pca::REFERENCE];
@@ -552,7 +589,12 @@ pub fn main(argv: &[String]) -> Result<(), String> {
             inputs.push(ProvInput::digest("cluster-levels", l.parent().unwrap_or(Path::new("")), &[l.as_path()]).map_err(|e| e.to_string())?);
         }
     }
-    for (option, file) in [("cluster-params", args.get("cluster-params")), ("recluster-params", args.get("recluster-params"))] {
+    for (option, file) in [
+        ("cluster-params", args.get("cluster-params")),
+        ("recluster-params", args.get("recluster-params")),
+        ("cluster-metadata", args.get("cluster-metadata")),
+        ("recluster-metadata", args.get("recluster-metadata")),
+    ] {
         if let Some(f) = file {
             let p = Path::new(f);
             inputs.push(ProvInput::digest(option, p.parent().unwrap_or(Path::new("")), &[p]).map_err(|e| e.to_string())?);

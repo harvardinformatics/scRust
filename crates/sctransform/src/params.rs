@@ -5,8 +5,9 @@
 //! Only the defaults are validated against R (milestone M4). Other values are accepted where the
 //! code path is the same one with a different number (cells and genes for the fits, bin size,
 //! clipping, bandwidth adjustment, number of variable features, seed); options that would take R
-//! down another path (other methods, batch variables, `do.scale`, extra regressors) are rejected
-//! by [`SctParams::check`].
+//! down another path (other methods, batch variables, `do.scale`) are rejected by
+//! [`SctParams::check`]. `vars.to.regress` (milestone M15b) is ported: the regression of
+//! `scale.data` on per-cell covariates ([`crate::regress`]).
 
 /// How `min_variance` is set (`vst(min_variance = )`).
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -36,6 +37,11 @@ pub struct SctParams {
     pub clip_range: Option<(f64, f64)>,
     /// `return.only.var.genes`: `scale.data` holds the variable features only.
     pub return_only_var_genes: bool,
+    /// `vars.to.regress` (milestone M15b): the per-cell covariates `ScaleData` regresses
+    /// `scale.data`'s clipped rows on, in the formula's order; empty for none (Seurat's default,
+    /// and the workflow's since its commit 8d34de1). Their values reach `vst`'s caller in memory
+    /// ([`crate::Regression`]).
+    pub vars_to_regress: Vec<String>,
 
     // --- vst (sctransform, vst.flavor = "v2") ---
     /// `n_genes`: genes used to fit the models (density-weighted sample when more qualify).
@@ -69,6 +75,7 @@ impl Default for SctParams {
             do_center: true,
             clip_range: None,
             return_only_var_genes: true,
+            vars_to_regress: Vec::new(),
             n_genes: Some(2000),
             bin_size: 500,
             min_cells: 5,

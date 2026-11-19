@@ -170,7 +170,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     m.push(Manifest::summary_entry());
     m.entries.extend(neighbors::output::manifest_entries("", r.n, Some((r.nn.nnz(), r.snn.nnz())), write_annoy, None));
     if out.join(cluster::metadata::FILE).is_file() {
-        m.push(crate::cmd_sctransform::rna_entry(cluster::metadata::FILE, r.n));
+        m.push(crate::cmd_sctransform::rna_entry_of(&out, cluster::metadata::FILE, r.n));
     }
     m.fill_shapes(&out).map_err(|e| e.to_string())?;
     let files = cli::finish_manifest(&out, &mut m, threads)?;

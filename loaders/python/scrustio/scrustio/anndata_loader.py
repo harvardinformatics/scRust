@@ -27,7 +27,7 @@ from .read import read_first_line, read_lines, read_tsv
 from .sctmodel import model_parts, sct_tables
 from .slots import check_slot, read_for_slot
 
-META_DOUBLE = ("nCount_RNA", "nCount_SCT", "silhouette_width", "neighborhood_purity")
+META_DOUBLE = ("nCount_RNA", "percent.mt", "nCount_SCT", "silhouette_width", "neighborhood_purity")
 META_INTEGER = ("nFeature_RNA", "nFeature_SCT")
 
 

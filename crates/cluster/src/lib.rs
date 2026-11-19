@@ -7,7 +7,8 @@
 //! SCTransform, the workflow's PCA guard, RunPCA, FindNeighbors, FindClusters, the silhouette
 //! widths and the purities, through the `sctransform`, `pca`, `neighbors` and `knn` crates), with
 //! its parameters ([`chain_params`]), its outputs ([`chain_output`]) and its comparison with R
-//! ([`validate`], kernel-gated).
+//! ([`validate`], kernel-gated); SCTransform's `vars.to.regress` and the workflow's `percent.mt`
+//! ([`covariates`], milestone M15b).
 //!
 //! FindClusters, as `FindClusters(obj, random.seed = 12345)` runs it on the `SCT_snn` graph with
 //! its defaults (modularity function 1, resolution 0.8, algorithm 1, 10 starts, 10 iterations):
@@ -32,6 +33,7 @@ pub mod chain;
 pub mod chain_output;
 pub mod chain_params;
 pub mod clustering;
+pub mod covariates;
 pub mod find_clusters;
 pub mod input;
 pub mod java_random;
@@ -51,7 +53,8 @@ pub use find_clusters::{find_clusters, ClusterError, Factor, FindClusters, Resol
 pub use java_random::JavaRandom;
 pub use network::Network;
 pub use optimizer::{OptimizerParams, OptimizerResult};
-pub use chain::{cluster_counts, Chain, ChainError, Clustered, Observer};
+pub use chain::{cluster_counts, cluster_counts_with, Chain, ChainError, Clustered, Observer};
+pub use covariates::{CellCovariates, MtGenes, PercentMt};
 pub use chain_params::{ChainParams, Stats};
 pub use params::{parse_resolutions, ClusterParams};
 pub use silhouette::{approx_silhouette, Silhouette};

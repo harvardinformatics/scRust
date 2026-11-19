@@ -82,7 +82,7 @@ pub fn write_outputs(dir: &Path, barcodes: &[String], genes: &[Gene], sct: &Sct)
 
 /// The parameters as `summary.json` records them.
 pub fn params_json(params: &SctParams) -> Json {
-    Json::obj(vec![
+    let mut v = vec![
         ("seed_use", Json::Int(params.seed_use.unwrap_or(0) as i64)),
         ("ncells", Json::Int(params.ncells as i64)),
         ("variable_features_n", Json::Int(params.variable_features_n.unwrap_or(0) as i64)),
@@ -90,6 +90,25 @@ pub fn params_json(params: &SctParams) -> Json {
         ("bin_size", Json::Int(params.bin_size as i64)),
         ("min_cells", Json::Int(params.min_cells as i64)),
         ("bw_adjust", Json::Num(params.bw_adjust)),
+    ];
+    // M15b: only when set, so that a run without it records what earlier runs recorded
+    if !params.vars_to_regress.is_empty() {
+        v.push(("vars_to_regress", Json::strs(&params.vars_to_regress)));
+    }
+    Json::obj(v)
+}
+
+/// `result`'s record of `vars.to.regress`' regression (M15b): the covariates in the formula's
+/// order, and the QR `lm()` made of the model matrix (the intercept and the covariates): its rank,
+/// the columns' order after `dqrdc2`'s pivoting (1-based) and its tolerance.
+pub fn regression_json(r: &crate::Regression) -> Json {
+    Json::obj(vec![
+        ("vars_to_regress", Json::strs(&r.names)),
+        ("model", Json::Str("linear: lm(GENE ~ vars)$qr once, qr.resid() per row (Seurat's RegressOutMatrix)".into())),
+        ("n_columns", Json::Int(r.qr.p as i64)),
+        ("rank", Json::Int(r.qr.rank as i64)),
+        ("pivot", Json::Vector(r.qr.pivot.iter().map(|&v| Json::Int(v as i64)).collect())),
+        ("tol", Json::Num(r.qr.tol)),
     ])
 }
 
@@ -119,6 +138,10 @@ pub fn result_json(sct: &Sct, n_features: usize) -> Json {
     // the corrected counts (M13), when computed: the members R's reference runs record
     if let (Json::Object(m), Some(c)) = (&mut out, &sct.corrected) {
         m.push(("corrected".into(), corrected_json(c)));
+    }
+    // vars.to.regress (M15b), when regressed
+    if let (Json::Object(m), Some(r)) = (&mut out, &sct.regression) {
+        m.push(("regression".into(), regression_json(r)));
     }
     out
 }

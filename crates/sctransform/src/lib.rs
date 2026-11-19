@@ -17,7 +17,10 @@
 //! - [`residuals`] (S2d): clipped Pearson residuals, residual variance, the variable features and
 //!   `scale.data`;
 //! - [`correct`] (K10, milestone M13): `correct()`'s corrected counts, made in S2d's pass when
-//!   asked for, their `log1p`, `nCount_SCT` and `nFeature_SCT`.
+//!   asked for, their `log1p`, `nCount_SCT` and `nFeature_SCT`;
+//! - [`regress`] (milestone M15b): `vars.to.regress`, the second regression of `scale.data`'s
+//!   clipped rows on per-cell covariates (`ScaleData`'s `RegressOutMatrix`, through R's LINPACK
+//!   QR, `rcompat::linpack`), before they are centred.
 //!
 //! Shared by DoubletFinder (7 calls per object) and the clustering crate (M11).
 
@@ -29,6 +32,7 @@ pub mod output;
 pub mod params;
 pub mod record;
 pub mod reg;
+pub mod regress;
 pub mod residuals;
 pub mod setup;
 pub mod vst;
@@ -38,9 +42,10 @@ pub use matrix::GeneRows;
 pub use params::{MinVariance, SctParams};
 pub use reg::{regularize, Reg, RegInput};
 pub use correct::Corrected;
-pub use residuals::{residuals, residuals_corrected, ResidualInput, Residuals};
+pub use regress::Regression;
+pub use residuals::{residuals, residuals_corrected, residuals_with, ResidualInput, Residuals};
 pub use setup::{setup, CellAttr, Setup};
-pub use vst::{finish, finish_with, sctransform, start, Sct, Started};
+pub use vst::{finish, finish_full, finish_with, sctransform, start, Sct, Started};
 
 use std::fmt;
 

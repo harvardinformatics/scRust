@@ -36,8 +36,16 @@
 //! **Random numbers.** R's stream (`&mut RRng`) is reseeded by SCTransform and by RunPCA, as in
 //! R; Annoy and the modularity optimizer have their own generators; GroupSingletons reseeds R's
 //! with `set.seed(1)`. The thread count changes no result.
+//!
+//! **`vars.to.regress` and `percent.mt`** (milestone M15b; [`crate::covariates`]):
+//! [`cluster_counts_with`] takes what the parameters' covariates need in memory
+//! ([`CellCovariates`]: `--mt-genes`' ids, `--metadata`'s columns), computes `percent.mt` from
+//! the counts when asked (before SCTransform, as the workflow's scripts do), takes the QR of the
+//! covariates once and hands it to SCTransform, which regresses `scale.data`'s clipped rows on
+//! them before centring them. Without them the code path is the one before M15b, unchanged.
 
 use crate::chain_params::ChainParams;
+use crate::covariates::{covariate_values, CellCovariates, MtGenes, PercentMt};
 use crate::find_clusters::{find_clusters, ClusterError, Factor, FindClusters};
 use crate::metadata::RnaMetadata;
 use crate::purity::{neighbor_purity, Purity};
@@ -46,7 +54,7 @@ use neighbors::{find_neighbors, Neighbors, NeighborsError};
 use pca::{Pca, PcaError};
 use rcompat::RRng;
 use scio::{CscMatrix, Json};
-use sctransform::{Sct, SctError};
+use sctransform::{Regression, Sct, SctError};
 use std::borrow::Cow;
 use std::fmt;
 use std::io;
@@ -239,8 +247,14 @@ pub struct Clustered {
     pub cells: Vec<String>,
     /// The counts' features (id, name): the rows of `sct/` and of the loadings.
     pub features: Vec<(String, String)>,
-    /// `nCount_RNA` and `nFeature_RNA`, as `CreateSeuratObject()` computes them.
+    /// `nCount_RNA` and `nFeature_RNA`, as `CreateSeuratObject()` computes them, and `percent.mt`
+    /// when asked for (M15b).
     pub rna: RnaMetadata,
+    /// `percent.mt`'s definition and record, when computed (M15b; its values are in `rna`).
+    pub percent_mt: Option<PercentMt>,
+    /// Warnings about `percent.mt` and the regression (ids not found, no feature matched, a
+    /// rank-deficient model), for the caller to print and record.
+    pub notes: Vec<String>,
     pub sct: SctResult,
     pub pca: PcaResult,
     pub neighbors: NeighborsResult,
@@ -269,8 +283,16 @@ impl Clustered {
 /// has what it needs, unless `opts` keeps it in the result. `obs` sees each stage as it is made
 /// (stage dumps, timings); [`NoObserver`] sees nothing.
 pub fn cluster_counts(counts: Cow<'_, scio::Counts>, params: &ChainParams, threads: usize, opts: Options, obs: &mut dyn Observer) -> Result<Clustered, ChainError> {
+    cluster_counts_with(counts, params, &CellCovariates::default(), threads, opts, obs)
+}
+
+/// [`cluster_counts`] with what `percent.mt` and `vars.to.regress` need besides the counts
+/// (M15b): `--mt-genes`' ids and `--metadata`'s columns, in memory (`cov`; the pattern when no
+/// ids are given). When the parameters ask for neither, this is [`cluster_counts`].
+pub fn cluster_counts_with(counts: Cow<'_, scio::Counts>, params: &ChainParams, cov: &CellCovariates, threads: usize, opts: Options, obs: &mut dyn Observer) -> Result<Clustered, ChainError> {
     params.check().map_err(ChainError::Params)?;
-    let rna = RnaMetadata::of(&counts.matrix);
+    let mut rna = RnaMetadata::of(&counts.matrix);
+    let (percent_mt, regression, notes) = covariates_for(&counts, params, cov, &mut rna)?;
     let features: Vec<(String, String)> = counts.features().into_iter().map(|f| (f.id, f.name)).collect();
     let (matrix, cells) = match counts {
         Cow::Owned(c) => {
@@ -279,8 +301,55 @@ pub fn cluster_counts(counts: Cow<'_, scio::Counts>, params: &ChainParams, threa
         }
         Cow::Borrowed(c) => (Cow::Borrowed(&c.matrix), c.barcodes.clone()),
     };
-    let s = stages_from_counts(matrix, params, threads, opts, obs)?;
-    Ok(Clustered { cells, features, rna, sct: s.sct, pca: s.pca, neighbors: s.neighbors, chain: s.chain })
+    let mut s = stages_from_counts(matrix, params, regression, threads, opts, obs)?;
+    if let (Some(p), Json::Object(m)) = (&percent_mt, &mut s.sct.summary) {
+        m.push(("percent_mt".into(), p.record_json()));
+    }
+    Ok(Clustered { cells, features, rna, percent_mt, notes, sct: s.sct, pca: s.pca, neighbors: s.neighbors, chain: s.chain })
+}
+
+/// `percent.mt` (when the parameters ask for it) into `rna`, and `vars.to.regress`' regression
+/// (when they name covariates), from the counts and `cov` (M15b). Returns `percent.mt`'s record,
+/// the regression, and the warnings for the caller.
+pub fn covariates_for(counts: &scio::Counts, params: &ChainParams, cov: &CellCovariates, rna: &mut RnaMetadata) -> Result<(Option<PercentMt>, Option<Regression>, Vec<String>), ChainError> {
+    let mut notes = Vec::new();
+    let vars = &params.sct.vars_to_regress;
+    if params.mt_genes.is_some() != cov.mt_genes.is_some() {
+        return Err(ChainError::Params("--mt-genes: the parameters name a file, but its ids were not handed to the chain (or the other way round)".into()));
+    }
+    let percent_mt = if params.wants_percent_mt() {
+        let mt = cov.mt_genes.clone().unwrap_or(MtGenes::Pattern);
+        let p = PercentMt::compute(counts, &mt).map_err(ChainError::Params)?;
+        if p.rows.is_empty() && vars.iter().any(|v| v == crate::covariates::PERCENT_MT) {
+            return Err(ChainError::Params(format!(
+                "--vars-to-regress percent.mt: no feature's name matches the workflow's pattern \"{}\", so percent.mt would be 0 in every cell; give the mitochondrial genes' ids (column 1 of features.tsv) with --mt-genes <file>",
+                scio::features::MT_PATTERN
+            )));
+        }
+        notes.extend(p.notes());
+        rna.percent_mt = Some(p.values.clone());
+        Some(p)
+    } else {
+        None
+    };
+    let regression = if vars.is_empty() {
+        None
+    } else {
+        let names = counts.seurat_names();
+        let values = covariate_values(vars, rna, cov.metadata.as_ref(), &names).map_err(ChainError::Params)?;
+        let r = Regression::new(vars.clone(), &values, counts.n_cells()).map_err(ChainError::Params)?;
+        let (rank, p) = r.rank();
+        if rank < p {
+            notes.push(format!(
+                "vars.to.regress: the model matrix (the intercept and {}) has rank {rank} of {p}: lm()'s QR moved {} column(s) to the end as negligible (pivot {}), and the regression uses the first {rank}, as R's does",
+                vars.join(", "),
+                p - rank,
+                r.qr.pivot.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(",")
+            ));
+        }
+        Some(r)
+    };
+    Ok((percent_mt, regression, notes))
 }
 
 /// From the counts (genes x cells, every stored entry as read): the whole chain, keeping only the
@@ -288,7 +357,10 @@ pub fn cluster_counts(counts: Cow<'_, scio::Counts>, params: &ChainParams, threa
 /// stages. [`cluster_counts`] returns them.
 pub fn from_counts(counts: CscMatrix, params: &ChainParams, threads: usize, opts: Options, obs: &mut dyn Observer) -> Result<Chain, ChainError> {
     params.check().map_err(ChainError::Params)?;
-    Ok(stages_from_counts(Cow::Owned(counts), params, threads, opts, obs)?.chain)
+    if params.needs_covariates() {
+        return Err(ChainError::Params("percent.mt and vars.to.regress need the counts' features and the covariates: use cluster_counts_with".into()));
+    }
+    Ok(stages_from_counts(Cow::Owned(counts), params, None, threads, opts, obs)?.chain)
 }
 
 struct Stages {
@@ -299,7 +371,7 @@ struct Stages {
 }
 
 /// The chain from the counts, stage by stage, freeing what no later stage or the result needs.
-fn stages_from_counts(matrix: Cow<'_, CscMatrix>, params: &ChainParams, threads: usize, opts: Options, obs: &mut dyn Observer) -> Result<Stages, ChainError> {
+fn stages_from_counts(matrix: Cow<'_, CscMatrix>, params: &ChainParams, regression: Option<Regression>, threads: usize, opts: Options, obs: &mut dyn Observer) -> Result<Stages, ChainError> {
     let t0 = Instant::now();
     let n_features = matrix.nrow;
     // SCTransform.Seurat calls set.seed(seed.use) first: R's state before it does not matter
@@ -307,7 +379,7 @@ fn stages_from_counts(matrix: Cow<'_, CscMatrix>, params: &ChainParams, threads:
     let started = sctransform::start(&matrix, &params.sct, &mut rng).map_err(ChainError::Sct)?;
     // taken counts are freed here; borrowed ones stay with the caller
     drop(matrix);
-    let mut sct = sctransform::finish_with(started, &params.sct, &mut rng, opts.keep_residuals, opts.correct, threads).map_err(ChainError::Sct)?;
+    let mut sct = sctransform::finish_full(started, &params.sct, &mut rng, opts.keep_residuals, opts.correct, regression, threads).map_err(ChainError::Sct)?;
     let mut sct_result = SctResult {
         summary: sctransform::output::result_json(&sct, n_features),
         rng_exit: sct.rng_exit.clone(),

@@ -1,0 +1,12 @@
+# tier T has no mitochondrial gene: a stand-in set, the ribosomal protein genes (Rpl*, Rps*)
+Rpl5
+Rplp2
+Rpl13
+
+Rpsa
+Rpl26
+Rpl19
+Rpl17
+Rpl5
+NOT_A_FEATURE_1
+NOT_A_FEATURE_2

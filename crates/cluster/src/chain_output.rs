@@ -5,9 +5,10 @@
 //! - `neighbors/`: FindNeighbors' result in `scrust neighbors`' layout (`neighbors::output`);
 //! - the labels' files (`seurat_clusters.tsv`, `clusters.tsv`, the levels, `cluster_ids.txt`,
 //!   `nclusters.txt`, `optimizer_ids.tsv`; [`crate::output`]);
-//! - `metadata.tsv`: `barcode`, `nCount_RNA` and `nFeature_RNA` (when known), each `res.`
-//!   column, `seurat_clusters`, `silhouette_width` and `silhouette_other`, `neighborhood_purity`
-//!   and `purity_maximum` (when computed), then the columns of `--metadata`;
+//! - `metadata.tsv`: `barcode`, `nCount_RNA` and `nFeature_RNA` (when known), `percent.mt`
+//!   (when asked for, M15b), each `res.` column, `seurat_clusters`, `silhouette_width` and
+//!   `silhouette_other`, `neighborhood_purity` and `purity_maximum` (when computed), then the
+//!   columns of `--metadata`;
 //! - with `--keep-stages`: `sct/` in `scrust sctransform`'s layout (`sctransform::output`), and
 //!   every random start's partition (`stages/<column>_partitions.npy`);
 //! - with `--export` (M13): `sct/` with the SCT assay's corrected counts and their `log1p`
@@ -210,6 +211,12 @@ impl Writer {
             cols.push(a);
             names.push("nFeature_RNA".into());
             cols.push(b);
+            // percent.mt (M15b), when asked for: before SCTransform's columns, as the workflow's
+            // objects hold it
+            if let Some(pm) = rna.percent_mt_texts() {
+                names.push(crate::covariates::PERCENT_MT.into());
+                cols.push(pm);
+            }
         }
         // with --export (M13): the SCT assay's columns, after the counts', as Seurat orders them
         if let Some((nc, nf)) = &self.sct_columns {
@@ -417,9 +424,13 @@ impl Writer {
             }
             let found = |v: &[Entry]| v.iter().find(|e| &e.path == f).cloned();
             let e = match f.as_str() {
-                "metadata.tsv" => Entry::new(f, "cell_metadata", "none", "tsv", "one row per cell, in the counts' column order: barcode, nCount_RNA, nFeature_RNA, nCount_SCT and nFeature_SCT (with --export), each res. column, seurat_clusters, silhouette_width, silhouette_other, neighborhood_purity, purity_maximum, then --metadata's columns; Seurat's meta.data")
-                    .header(true)
-                    .rows(cells(f)),
+                "metadata.tsv" => Entry::new(f, "cell_metadata", "none", "tsv", if self.rna.as_ref().is_some_and(|r| r.percent_mt.is_some()) {
+                    "one row per cell, in the counts' column order: barcode, nCount_RNA, nFeature_RNA, percent.mt (PercentageFeatureSet of the mitochondrial features; summary.json's result.sctransform.percent_mt says which), nCount_SCT and nFeature_SCT (with --export), each res. column, seurat_clusters, silhouette_width, silhouette_other, neighborhood_purity, purity_maximum, then --metadata's columns; Seurat's meta.data"
+                } else {
+                    "one row per cell, in the counts' column order: barcode, nCount_RNA, nFeature_RNA, nCount_SCT and nFeature_SCT (with --export), each res. column, seurat_clusters, silhouette_width, silhouette_other, neighborhood_purity, purity_maximum, then --metadata's columns; Seurat's meta.data"
+                })
+                .header(true)
+                .rows(cells(f)),
                 "seurat_clusters.tsv" => Entry::new(f, "cluster_labels", "none", "tsv", "the cluster labels (seurat_clusters), as scrust doubletfinder --clusters reads them: barcode, seurat_clusters").header(true).rows(cells(f)),
                 "seurat_clusters_levels.txt" => Entry::new(f, "cluster_levels", "none", "tsv", "seurat_clusters' levels, in the factor's order, one per line").header(false),
                 "clusters.tsv" => Entry::new(f, "cluster_columns", "none", "tsv", "one column per resolution, named as Seurat names it (SCT_snn_res.0.8): barcode, then the columns").header(true).rows(cells(f)),

@@ -1,0 +1,10 @@
+# an ID list: ID03 and ID04 (renamed by Seurat), ID11 (no counts), ID02 twice,
+# two IDs not among the features, and a blank line
+ID03
+ID04
+
+ID11
+ID02
+ID02
+NOPE1
+NOPE2

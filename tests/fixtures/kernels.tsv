@@ -23,3 +23,5 @@ clustering/soupx_emptydrops_test/saved	SapphireRapids	the saved object's workflo
 clustering/decontx_raw_tenx_test/saved	SapphireRapids	the saved object's workflow job (Sapphire Rapids, kernel detected; docs/validation/clustering_m8.md)
 clustering/decontx_raw_emptydrops_test/saved	SapphireRapids	the saved object's workflow job (Sapphire Rapids, kernel detected; docs/validation/clustering_m8.md)
 clustering/cellbender_fromraw_test/saved	SapphireRapids	the saved object's workflow job (Sapphire Rapids, kernel detected; docs/validation/clustering_m8.md)
+rcompat/linpack_qr.tsv.gz	Haswell	validation/manifest.toml: profile portable (OPENBLAS_CORETYPE=Haswell), validation/R/regress_vectors.R (M15b)
+rcompat/linpack_resid.tsv.gz	Haswell	validation/manifest.toml: profile portable (OPENBLAS_CORETYPE=Haswell), validation/R/regress_vectors.R (M15b)

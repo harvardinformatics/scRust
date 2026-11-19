@@ -33,7 +33,10 @@
 //! - [`gamma`]: R's `lgammafn`, `digamma`, `trigamma`, and glibc's `lgamma` (M4);
 //! - [`port`]: `nlminb()`, R's PORT library (`DRMNHB` and its call tree) (M4);
 //! - [`matrixstats`]: matrixStats' `rowMeans2`, `colMeans2`, `rowVars`, `weightedMedian`, and
-//!   R's `R_qsort_I` (M4).
+//!   R's `R_qsort_I` (M4);
+//! - [`linpack`]: R's LINPACK QR (`dqrdc2`, `dqrsl`) as `lm()` makes it and `qr.resid()` applies
+//!   it, through OpenBLAS's `dnrm2`, `dscal`, `ddot` and `daxpy` (M15b: SCTransform's
+//!   `vars.to.regress`).
 //!
 //! Indices are 0-based throughout (R's minus one). Functions that call the C math library ([`libm`])
 //! use the system glibc, as R does.
@@ -48,6 +51,7 @@ pub mod format;
 pub mod gamma;
 pub mod ldouble;
 pub mod libm;
+pub mod linpack;
 pub mod matrixstats;
 pub mod nbinom;
 pub mod normal;

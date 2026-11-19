@@ -95,7 +95,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     m.push(Manifest::summary_entry());
     m.entries.extend(pca::output::manifest_entries(""));
     if out.join(cluster::metadata::FILE).is_file() {
-        m.push(crate::cmd_sctransform::rna_entry(cluster::metadata::FILE, nc));
+        m.push(crate::cmd_sctransform::rna_entry_of(&out, cluster::metadata::FILE, nc));
     }
     m.fill_shapes(&out).map_err(|e| e.to_string())?;
     let files = cli::finish_manifest(&out, &mut m, threads)?;

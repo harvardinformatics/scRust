@@ -12,7 +12,8 @@ use crate::fit::{fit, FitInput, Fits};
 use crate::matrix::GeneRows;
 use crate::params::SctParams;
 use crate::reg::{mean_cell_sum, regularize, Reg, RegInput};
-use crate::residuals::{residuals, residuals_corrected, ResidualInput, Residuals};
+use crate::regress::Regression;
+use crate::residuals::{residuals_with, ResidualInput, Residuals};
 use crate::setup::{setup, Setup};
 use crate::SctError;
 use rcompat::RRng;
@@ -28,6 +29,8 @@ pub struct Sct {
     pub residuals: Residuals,
     /// `correct()`'s corrected counts, when asked for ([`finish_with`]; M13)
     pub corrected: Option<Corrected>,
+    /// `vars.to.regress`' regression of `scale.data`, when asked for ([`finish_full`]; M15b)
+    pub regression: Option<Regression>,
     /// `.Random.seed` when `vst` starts, after `SCTransform`'s `set.seed` calls (R's checkpoint
     /// "vst_entry")
     pub rng_entry: Vec<i32>,
@@ -76,7 +79,19 @@ pub fn finish(started: Started, params: &SctParams, rng: &mut RRng, keep_y: bool
 /// from its residuals before clipping them (`do.correct.umi = TRUE`, Seurat's default; M13). They
 /// change nothing else: `correct()` draws no random number and its result feeds no later stage.
 pub fn finish_with(started: Started, params: &SctParams, rng: &mut RRng, keep_y: bool, correct: bool, threads: usize) -> Result<Sct, SctError> {
+    finish_full(started, params, rng, keep_y, correct, None, threads)
+}
+
+/// [`finish_with`], and with `regress` SCTransform's second regression (`vars.to.regress`,
+/// milestone M15b): `scale.data`'s clipped rows regressed on the covariates before they are
+/// centred ([`crate::regress`]). It draws no random number and changes nothing but `scale.data`.
+pub fn finish_full(started: Started, params: &SctParams, rng: &mut RRng, keep_y: bool, correct: bool, regress: Option<Regression>, threads: usize) -> Result<Sct, SctError> {
     let Started { setup, rows, rng_entry } = started;
+    if let Some(r) = &regress {
+        if r.qr.n != setup.cell_attr.log_umi.len() {
+            return Err(SctError::Input(format!("vars.to.regress: covariates for {} cells, but the counts have {}", r.qr.n, setup.cell_attr.log_umi.len())));
+        }
+    }
     let fits = fit(&rows, &FitInput::from_setup(&setup), params, rng, threads)?;
     let mcs = mean_cell_sum(&rows);
     let reg = regularize(
@@ -92,12 +107,7 @@ pub fn finish_with(started: Started, params: &SctParams, rng: &mut RRng, keep_y:
         params,
     )?;
     let input = ResidualInput { model_pars_fit: &reg.model_pars_fit, log_umi: &setup.cell_attr.log_umi };
-    let (residuals, corrected) = if correct {
-        let (r, c) = residuals_corrected(&rows, &input, params, keep_y, threads)?;
-        (r, Some(c))
-    } else {
-        (residuals(&rows, &input, params, keep_y, threads)?, None)
-    };
+    let (residuals, corrected) = residuals_with(&rows, &input, params, keep_y, threads, correct, regress.as_ref())?;
     let rng_exit = rng.random_seed();
-    Ok(Sct { setup, rows, fits, mean_cell_sum: mcs, reg, residuals, corrected, rng_entry, rng_exit })
+    Ok(Sct { setup, rows, fits, mean_cell_sum: mcs, reg, residuals, corrected, regression: regress, rng_entry, rng_exit })
 }

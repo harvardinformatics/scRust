@@ -269,3 +269,17 @@ def test_cluster_output_without_export_holds_no_matrices(outputs):
     assert not m.has_role("raw_counts") and not m.has_role("sct_counts")
     with pytest.raises(ScrustError, match="neither raw counts nor"):
         scrustio.load_anndata(outputs["cluster"])
+
+
+def test_percent_mt(outputs):
+    """M15b: an export with percent.mt loads it as a float column of obs, exactly as written,
+    after the counts' columns."""
+    import scrustio
+
+    d = outputs["export_percent_mt"]
+    a = scrustio.load_anndata(d)
+    text = pd.read_csv(os.path.join(d, "metadata.tsv"), sep="\t", dtype=str)["percent.mt"].tolist()
+    assert a.obs["percent.mt"].dtype == np.float64
+    assert [float(t) for t in text] == a.obs["percent.mt"].tolist()
+    assert list(a.obs.columns[:3]) == ["nCount_RNA", "nFeature_RNA", "percent.mt"]
+    assert (a.obs["percent.mt"] > 0).any()

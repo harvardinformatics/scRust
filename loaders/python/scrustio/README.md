@@ -19,7 +19,7 @@ From `scrust cluster --export`:
 
 Genes are named by the features file's names, made unique as scanpy does (`var_names_make_unique`); `var["gene_ids"]` and `var["feature_types"]` hold the rest. From `scrust sctransform --corrected-counts` (no raw counts there) `var` holds the model genes; from `scrust doubletfinder`, `layers["counts"]` holds the singlets' raw counts, `obs` DoubletFinder's calls (named as DoubletFinder names them), and `X` stays empty: only SCTransform's log1p data go there.
 
-**What is not rebuilt:** the UMAP; metadata columns of other workflow steps; and `uns["sct_model"]["cell_attributes"]["cells_step1"]` for objects above 5,000 cells (vst() drew those cells with R's `sample()`, which this loader does not reproduce; the R loader does).
+**What is not rebuilt:** the UMAP; metadata columns of other workflow steps (`percent.mt` is loaded, as a float column of `obs`, when the output computed it: `scrust cluster --counts` and `scrust sctransform` with `--percent-mt`, `--mt-genes` or `--vars-to-regress percent.mt`; milestone M15b); and `uns["sct_model"]["cell_attributes"]["cells_step1"]` for objects above 5,000 cells (vst() drew those cells with R's `sample()`, which this loader does not reproduce; the R loader does).
 
 **Seurat's data layer is read, not recomputed.** Its values are the C library's `log1p` (R's). numpy's `np.log1p` may differ in the last bit (in 13,457 of 65,546 values of one test export, numpy 2.5.5), so `X` must come from the file; the loader checks it against `math.log1p` of the corrected counts.
 

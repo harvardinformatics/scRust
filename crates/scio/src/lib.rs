@@ -31,6 +31,7 @@ pub mod copy;
 pub mod counts;
 pub mod deflate;
 pub mod factor;
+pub mod features;
 pub mod grade;
 pub mod gz;
 pub mod json;

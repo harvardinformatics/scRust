@@ -6,7 +6,12 @@
 # validation/slurm/reference_clustering.sbatch.
 #
 #   Rscript validation/R/reference_clustering.R --input <export input dir> --out <dir> \
-#     --level full|standard|light --umap yes|no --assay auto|v5|v3
+#     --level full|standard|light --umap yes|no --assay auto|v5|v3 \
+#     [--vars-to-regress <names>] [--percent-mt yes|no] [--mt-genes <file>] [--metadata <tsv>]
+#
+# M15b: --vars-to-regress passes SCTransform(vars.to.regress = ...); percent.mt is computed first
+# (by the workflow's pattern, or by the ids --mt-genes lists) and a table's columns are added with
+# AddMetaData() (lib/clustering.R cl_covariates).
 #
 # --input is an export's input/ (export_clustering.R): the object's RNA counts as saved, rebuilt as
 # the identical dgCMatrix and wrapped with CreateSeuratObject(), as a v3 Assay for the emptyDrops
@@ -21,5 +26,9 @@ source(file.path(here, "lib", "io.R"))
 source(file.path(here, "lib", "doubletfinder.R"))  # df_args
 source(file.path(here, "lib", "clustering.R"))
 
-args <- df_args(list(input = NULL, out = NULL, level = NULL, umap = "yes", assay = "auto"))
+# M15b: --vars-to-regress <names>, --percent-mt yes|no, --mt-genes <file>, --metadata <tsv>
+# (lib/clustering.R cl_covariates; the defaults are the chain as the workflow runs it now)
+args <- df_args(list(input = NULL, out = NULL, level = NULL, umap = "yes", assay = "auto",
+                     `vars-to-regress` = "", `percent-mt` = "no", `mt-genes` = "", metadata = ""))
+names(args) <- gsub("-", "_", names(args), fixed = TRUE)
 cl_main(args, "validation/R/reference_clustering.R")

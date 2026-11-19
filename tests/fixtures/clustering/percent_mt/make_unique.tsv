@@ -1,0 +1,6 @@
+# names	make.unique(names)
+a,a,b,a,a.1,b	a,a.2,b,a.3,a.1,b.1
+a,a.1,a	a,a.1,a.2
+x,x,x.1,x.1,x	x,x.2,x.1,x.1.1,x.3
+g,g.2,g,g,g.1	g,g.2,g.3,g.4,g.1
+mt,mt,mt.1,MT,mt	mt,mt.2,mt.1,MT,mt.3

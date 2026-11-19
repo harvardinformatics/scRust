@@ -9,6 +9,7 @@ use crate::cli::{self, Args, Phases};
 use cluster::chain::{self, Chain, Options};
 use cluster::chain_output::Writer;
 use cluster::chain_params::{self, ChainParams, PARAM_FLAGS, PARAM_SWITCHES};
+use cluster::covariates::{CellCovariates, MtGenes, FROM_COUNTS};
 use cluster::metadata::RnaMetadata;
 use scio::manifest::{Entry, Ids, Input, InputFile, Manifest, Provenance};
 use scio::stages::DumpLevel;
@@ -54,6 +55,24 @@ the defaults, the preset, the --params file (a TOML file with the sections [sctr
 Numbers are read as R reads them; a fraction such as 1/15 is divided in double.
   SCTransform:   --sct-seed 1448145  --ncells 5000  --variable-features 3000
                  --clip-range lo,hi (default +-sqrt(N/30))
+                 --vars-to-regress <name>[,<name>...]  vars.to.regress (default: none): the
+                     per-cell covariates SCTransform's second regression removes from scale.data
+                     (ScaleData's RegressOutMatrix: lm(GENE ~ vars)'s QR, qr.resid per variable
+                     feature, then the centring): percent.mt, nCount_RNA, nFeature_RNA, or any
+                     numeric column of --metadata (read as R reads numbers). An unknown or
+                     repeated name, a name R cannot use in a formula, or a missing, non-numeric or
+                     non-finite value is an error
+                 --percent-mt  compute percent.mt without regressing it, as the workflow's
+                     objects hold it (metadata.tsv; implied by --mt-genes and by regressing it)
+                 --mt-genes <file>  percent.mt's mitochondrial features by id: one id per line
+                     (column 1 of the counts' features.tsv; blank lines and lines starting with #
+                     are skipped). Ids that no feature has are reported and skipped; a list that
+                     matches none is an error. Without it: the workflow's \"(?i)^mt-\" on Seurat's
+                     row names (features.tsv's column 2 made unique, _ and | replaced by -).
+                     percent.mt is PercentageFeatureSet(): their counts over nCount_RNA, times
+                     100. Regressing percent.mt when no feature matches the pattern is an error
+                     that names --mt-genes; otherwise the column is written as computed (zeros
+                     included, with a warning)
   RunPCA:        --npcs 50  --pca-seed 42  --weight-by-var true  --pca-guard none|true|N
   FindNeighbors: --dims 1:10  --k 20  --trees 50  --metric euclidean|cosine|manhattan
                  --prune 1/15  --search-k -1
@@ -62,19 +81,24 @@ Numbers are read as R reads them; a fraction such as 1/15 is divided in double.
   Scores:        --stats silhouette,purity (default) | silhouette | purity | none
                  --purity-k 50  --purity-weighted true
                  The scores use the neighbour search's dims (1:30 with the preset).
-  Other code paths are refused: --vars-to-regress, --vst-flavor other than v2, --sct-method
-  other than glmGamPoi_offset, --do-scale true, --nn-method rann|hnsw, --l2-norm true,
-  --metric hamming, --algorithm 4 (Leiden).
+  The TOML file's [sctransform] takes vars_to_regress = [\"percent.mt\", ...], percent_mt = true
+  and mt_genes = \"<file>\" (a relative path is read from the TOML file's directory).
+  Other code paths are refused: --vst-flavor other than v2, --sct-method other than
+  glmGamPoi_offset, --do-scale true, --nn-method rann|hnsw, --l2-norm true, --metric hamming,
+  --algorithm 4 (Leiden). --vars-to-regress, --mt-genes and --percent-mt act where SCTransform
+  runs: --counts here, or scrust sctransform (whose cell_metadata.tsv carries percent.mt to the
+  staged starts).
 
 Outputs (--out, which must not hold a previous run):
   seurat_clusters.tsv, seurat_clusters_levels.txt   the labels, as scrust doubletfinder reads them
   clusters.tsv, <column>_levels.txt                 one column per resolution (SCT_snn_res.0.8)
   cluster_ids.txt, nclusters.txt                    as the workflow's write_cluster_metadata
   optimizer_ids.tsv                                 each resolution's optimizer result
-  metadata.tsv      barcode, nCount_RNA, nFeature_RNA, each res. column, seurat_clusters,
-                    silhouette_width, silhouette_other (the closest other cluster),
-                    neighborhood_purity, purity_maximum (the cluster with the largest share),
-                    then the columns of --metadata (a TSV with a barcode column), by barcode
+  metadata.tsv      barcode, nCount_RNA, nFeature_RNA, percent.mt (when asked for), each res.
+                    column, seurat_clusters, silhouette_width, silhouette_other (the closest
+                    other cluster), neighborhood_purity, purity_maximum (the cluster with the
+                    largest share), then the columns of --metadata (a TSV with a barcode column),
+                    by barcode
   pca/              embeddings.tsv, loadings.tsv, stdev.tsv, random_seed.txt (scrust pca's)
   neighbors/        knn_index.tsv, knn_distance.tsv, nn.mtx.gz, snn.mtx.gz (scrust neighbors'),
                     and annoy.ann with --annoy yes
@@ -83,8 +107,10 @@ Outputs (--out, which must not hold a previous run):
                     the stage dumps of the instrumented R runs, for scrust validate cluster
                     (--purity-lists: purity's neighbour lists among them; auto: at level full)
   summary.json      result: FindClusters' (the network, every start, the best start, what
-                    FindClusters printed, the singletons, the levels), each stage's, R's digests
-                    of .Random.seed after SCTransform and RunPCA and of scale.data, the scores
+                    FindClusters printed, the singletons, the levels), each stage's (SCTransform's
+                    with the regression and percent.mt's definition, features and ids not found,
+                    when asked for), R's digests of .Random.seed after SCTransform and RunPCA
+                    and of scale.data, the scores
                     (purity: the radius and the certificate, every flagged pair); run:
                     parameters, timings and peak memory per stage, the environment fingerprint;
                     files: the manifest, every file's role, scale, shape, identifiers, size and
@@ -151,6 +177,7 @@ pub fn params_from_args(args: &Args) -> Result<ChainParams, String> {
         Some(p) => Some(std::fs::read_to_string(p).map_err(|e| format!("--params {p}: {e}"))?),
         None => None,
     };
+    let toml_dir = args.get("params").map(|p| Path::new(p).parent().unwrap_or(Path::new("")).to_path_buf());
     let mut flags: Vec<(String, String)> = Vec::new();
     for name in PARAM_FLAGS {
         if let Some(v) = args.get(name) {
@@ -162,7 +189,44 @@ pub fn params_from_args(args: &Args) -> Result<ChainParams, String> {
             flags.push((name.to_string(), String::new()));
         }
     }
-    chain_params::build(args.get("preset"), toml.as_deref(), &flags)
+    chain_params::build_in(args.get("preset"), toml.as_deref(), toml_dir.as_deref(), &flags)
+}
+
+/// Whether a covariate of `vars.to.regress` is a column of `--metadata` (M15b): any name but
+/// percent.mt, nCount_RNA and nFeature_RNA.
+pub fn metadata_regressed(params: &ChainParams) -> bool {
+    params.sct.vars_to_regress.iter().any(|v| !FROM_COUNTS.contains(&v.as_str()))
+}
+
+/// What the chain needs besides the counts for `percent.mt` and `vars.to.regress` (M15b), read
+/// here so that the chain reads no file: `--mt-genes`' ids, with the file's digest, and, when a
+/// covariate is one of `--metadata`'s columns, the table's columns for `barcodes` (each cell's
+/// text). Returns them and the inputs read, for the provenance.
+pub fn read_covariates(params: &ChainParams, metadata: Option<&str>, barcodes: &[String]) -> Result<(CellCovariates, Vec<Input>), String> {
+    let mut cov = CellCovariates::default();
+    let mut inputs = Vec::new();
+    if let Some(f) = &params.mt_genes {
+        let p = Path::new(f);
+        let text = std::fs::read_to_string(p).map_err(|e| format!("--mt-genes {f}: {e}"))?;
+        let input = Input::digest("mt-genes", p.parent().unwrap_or(Path::new("")), &[p]).map_err(|e| format!("--mt-genes {f}: {e}"))?;
+        cov.mt_genes = Some(MtGenes::from_file_text(&text, f, &input.files[0].sha256));
+        inputs.push(input);
+    }
+    if metadata_regressed(params) {
+        let m = metadata.ok_or_else(|| {
+            let cols: Vec<&str> = params.sct.vars_to_regress.iter().map(String::as_str).filter(|v| !FROM_COUNTS.contains(v)).collect();
+            format!("--vars-to-regress {}: not percent.mt, nCount_RNA or nFeature_RNA, so a column of --metadata, but no --metadata table is given", cols.join(","))
+        })?;
+        cov.metadata = Some(cluster::metadata::extra_columns(Path::new(m), barcodes, &[])?);
+        inputs.push(Input::digest("metadata", Path::new(m).parent().unwrap_or(Path::new("")), &[Path::new(m)]).map_err(|e| e.to_string())?);
+    }
+    Ok((cov, inputs))
+}
+
+/// The options left out of the normalised matrices' comment lines' command (M15b): `--metadata`
+/// changes values when its columns are regressed, so it stays in the command then.
+pub fn output_only(params: &ChainParams) -> Vec<&'static str> {
+    OUTPUT_ONLY.iter().copied().filter(|&o| !(o == "metadata" && metadata_regressed(params))).collect()
 }
 
 /// The parameters as `summary.json` records them (`run.parameters`).
@@ -174,6 +238,15 @@ pub fn params_json(p: &ChainParams) -> Json {
     let mut pca = pca::output::params_json(&p.pca);
     if let Json::Object(m) = &mut pca {
         m.push(("guard_npcs".into(), p.pca_guard.map(|v| Json::Int(v as i64)).unwrap_or(Json::Null)));
+    }
+    // percent.mt (M15b): only when asked for, so that a run without it records what earlier runs did
+    if let Json::Object(m) = &mut sct {
+        if p.percent_mt {
+            m.push(("percent_mt".into(), Json::Bool(true)));
+        }
+        if let Some(f) = &p.mt_genes {
+            m.push(("mt_genes".into(), Json::Str(f.clone())));
+        }
     }
     Json::obj(vec![
         ("preset", p.preset.clone().map(Json::Str).unwrap_or(Json::Null)),
@@ -265,6 +338,9 @@ pub struct Record {
     pub metadata: Option<String>,
     /// Notes on the scores (`run.stats.note`), such as scores asked for that a route cannot make.
     pub stats_note: Vec<String>,
+    /// Warnings about `percent.mt` and the regression (`run.notes`, written only when there are
+    /// some; M15b).
+    pub notes: Vec<String>,
 }
 
 /// The input counts of a run from a 10x directory, as the manifest records them: with `export`,
@@ -308,7 +384,7 @@ pub struct Done {
 /// counts and calls this; `scrust doubletfinder --recluster` hands over its singlets from memory
 /// (M15). `phases` holds the caller's marks so far (`load`); `guard_context` is the PCA guard's
 /// (`doubletfinder.R` calls it with "doubletfinder").
-pub fn run_counts(counts: scio::Counts, out: &Path, s: &Settings, mut rec: Record, phases: Phases, guard_context: Option<&'static str>) -> Result<Done, String> {
+pub fn run_counts(counts: scio::Counts, out: &Path, s: &Settings, mut rec: Record, phases: Phases, guard_context: Option<&'static str>, cov: &CellCovariates) -> Result<Done, String> {
     if let Some(e) = rec.counts_entries.first_mut() {
         *e = e.clone().shape(&[counts.n_features(), counts.n_cells()]).nnz(counts.matrix.nnz());
     }
@@ -328,7 +404,11 @@ pub fn run_counts(counts: scio::Counts, out: &Path, s: &Settings, mut rec: Recor
         w = w.with_dumps(level);
     }
     let opts = Options { guard_context, ..s.options() };
-    let c = chain::cluster_counts(Cow::Owned(counts), &s.params, s.threads, opts, &mut w).map_err(|e| e.to_string())?;
+    let c = chain::cluster_counts_with(Cow::Owned(counts), &s.params, cov, s.threads, opts, &mut w).map_err(|e| e.to_string())?;
+    for n in &c.notes {
+        eprintln!("scrust cluster: {n}");
+    }
+    rec.notes.extend(c.notes.iter().cloned());
     w.write_clustered(&c).map_err(|e| e.to_string())?;
     // the stages are written: only the clustering and the scores go on
     let r = c.chain;
@@ -376,7 +456,10 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     if export && start != "counts" {
         return Err("--export needs --counts: the export copies the input counts (counts/) and makes the corrected counts from vst's residuals of every model gene, which only a run from the counts has (scrust sctransform keeps only the variable features' clipped residuals); run scrust cluster --counts <dir> --export, or scrust sctransform --corrected-counts for the SCT part alone".into());
     }
-    let command = scio::manifest::canonical_command("cluster", argv, &OUTPUT_ONLY, &switches);
+    if start != "counts" && params.needs_covariates() {
+        return Err("--vars-to-regress, --mt-genes and --percent-mt act where SCTransform runs: give them to scrust cluster --counts, or to scrust sctransform, whose cell_metadata.tsv carries percent.mt on to scrust pca, scrust neighbors and the staged starts (the regression is in its scale_data.npy)".into());
+    }
+    let command = scio::manifest::canonical_command("cluster", argv, &output_only(&params), &switches);
     if out.join("summary.json").exists() || out.join("clusters.tsv").exists() {
         return Err(format!("{}: holds a previous run; choose another --out", out.display()));
     }
@@ -393,6 +476,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         export_s: 0.0,
         metadata: args.get("metadata").map(str::to_string),
         stats_note: Vec::new(),
+        notes: Vec::new(),
     };
     let params = &settings.params;
 
@@ -406,8 +490,11 @@ pub fn main(argv: &[String]) -> Result<(), String> {
             rec.export_s = export_s;
             rec.inputs.push(("counts", Json::Str(dir.display().to_string())));
             let counts = scio::Counts::read(&dir).map_err(|e| e.to_string())?;
+            // percent.mt's ids and --metadata's regressed columns (M15b), before the chain
+            let (cov, more) = read_covariates(params, args.get("metadata"), &counts.barcodes)?;
+            rec.provenance_inputs.extend(more);
             phases.mark("load");
-            run_counts(counts, &out, &settings, rec, phases, None)?;
+            run_counts(counts, &out, &settings, rec, phases, None, &cov)?;
             return Ok(());
         }
         "sct" => {
@@ -536,11 +623,17 @@ pub fn finish_run(out: &Path, start: &str, s: &Settings, rec: Record, mut w: Wri
     }
     if let Some(m) = &rec.metadata {
         let mut taken: Vec<&str> = vec!["barcode", "nCount_RNA", "nFeature_RNA", "seurat_clusters", "silhouette_width", "silhouette_other", "neighborhood_purity", "purity_maximum", "nCount_SCT", "nFeature_SCT"];
+        if w.rna.as_ref().is_some_and(|x| x.percent_mt.is_some()) {
+            taken.push(cluster::covariates::PERCENT_MT);
+        }
         let cols: Vec<String> = r.clusters.resolutions.iter().map(|x| x.column.name.clone()).collect();
         taken.extend(cols.iter().map(String::as_str));
         w.extra = Some(cluster::metadata::extra_columns(Path::new(m), &w.barcodes, &taken)?);
         inputs.push(("metadata", Json::Str(m.to_string())));
-        provenance_inputs.push(Input::digest("metadata", Path::new(m).parent().unwrap_or(Path::new("")), &[Path::new(m)]).map_err(|e| e.to_string())?);
+        // read before the chain when its columns are regressed (M15b): digested once
+        if !provenance_inputs.iter().any(|i| i.option == "metadata") {
+            provenance_inputs.push(Input::digest("metadata", Path::new(m).parent().unwrap_or(Path::new("")), &[Path::new(m)]).map_err(|e| e.to_string())?);
+        }
     }
     w.finish_labels(&r.clusters, r.silhouette.as_ref(), r.purity.as_ref()).map_err(|e| e.to_string())?;
     w.finish_dumps().map_err(|e| e.to_string())?;
@@ -613,7 +706,8 @@ pub fn finish_run(out: &Path, start: &str, s: &Settings, rec: Record, mut w: Wri
     let fingerprint = Json::parse(&crate::fingerprint::json()).unwrap_or(Json::Null);
     let t = &r.timings;
     let result = w.result_json(&r.clusters);
-    let summary = Json::obj(vec![
+    let notes = rec.notes;
+    let mut summary = Json::obj(vec![
         ("tool", Json::Str("scrust cluster".into())),
         ("reference", Json::Str(format!("{}; {}; {}; {}; bluster 1.20.0 approxSilhouette and neighborPurity (BiocNeighbors 2.4.0, knncolle's KMKNN: searched exhaustively with its arithmetic, with a certificate)", sctransform::REFERENCE, pca::REFERENCE, neighbors::REFERENCE, cluster::REFERENCE))),
         ("scrust_version", Json::Str(version.into())),
@@ -658,6 +752,14 @@ pub fn finish_run(out: &Path, start: &str, s: &Settings, rec: Record, mut w: Wri
         ),
         ("files", files_json),
     ]);
+    // M15b: the warnings about percent.mt and the regression, only when there are some
+    if !notes.is_empty() {
+        if let Json::Object(m) = &mut summary {
+            if let Some((_, Json::Object(run))) = m.iter_mut().find(|(k, _)| k == "run") {
+                run.push(("notes".into(), Json::strs(&notes)));
+            }
+        }
+    }
     write(&out.join("summary.json"), &scio::json::to_file_text(&summary))?;
     eprint!("scrust cluster: {} cells; {}", r.n_cells, cluster::output::describe(&r.clusters));
     if let Some(p) = r.purity.as_ref().filter(|p| p.computed) {

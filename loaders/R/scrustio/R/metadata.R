@@ -2,8 +2,9 @@
 # cell_metadata.tsv (rna_cell_metadata), scrust doubletfinder's cells.tsv (doublet_calls), with
 # each column's type as Seurat holds it and each factor in its levels' order.
 
-# Columns of metadata.tsv with a known type (docs/output_manifest.md, role cell_metadata).
-.META_DOUBLE <- c("nCount_RNA", "nCount_SCT", "silhouette_width", "neighborhood_purity")
+# Columns of metadata.tsv with a known type (docs/output_manifest.md, role cell_metadata);
+# percent.mt (M15b) when the output computed it.
+.META_DOUBLE <- c("nCount_RNA", "percent.mt", "nCount_SCT", "silhouette_width", "neighborhood_purity")
 .META_INTEGER <- c("nFeature_RNA", "nFeature_SCT")
 
 # Factor levels, from the files of role cluster_levels: each holds one column's levels in order,

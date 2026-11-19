@@ -49,7 +49,7 @@ from scrustio.read import read_mm  # noqa: E402
 CHAIN = ["nCount_RNA", "nFeature_RNA", "nCount_SCT", "nFeature_SCT", "SCT_snn_res.0.8", "seurat_clusters",
          "silhouette_width", "neighborhood_purity"]
 COL_FLOOR = {"silhouette_width": "K8_silhouette_width", "neighborhood_purity": "K9_purity"}
-BLAS_FREE_COLS = {"nCount_RNA", "nFeature_RNA"}
+BLAS_FREE_COLS = {"nCount_RNA", "nFeature_RNA", "percent.mt"}
 
 
 def peak_rss_gib() -> float:
@@ -144,7 +144,9 @@ def compare_cluster(g: Grader, a, saved: str, input_dir: str):
     meta = read_saved_meta(saved)
     g.add("obs names (cells)", list(a.obs_names) == meta["barcode"].tolist(), blas=False)
     levels = {c: open(os.path.join(saved, f"{c}_levels.txt")).read().splitlines() for c in ("seurat_clusters", "SCT_snn_res.0.8")}
-    for col in CHAIN:
+    # M15b: percent.mt, when the export computed it and the saved object's export holds it
+    extra = ["percent.mt"] if "percent.mt" in a.obs and "percent.mt" in meta else []
+    for col in CHAIN + extra:
         x = a.obs[col]
         if col in levels:
             ident = list(x.cat.categories) == levels[col] and x.astype(str).tolist() == meta[col].tolist()

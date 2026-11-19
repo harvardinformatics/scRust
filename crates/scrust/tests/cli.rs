@@ -525,7 +525,9 @@ fn cluster_parameters_and_refusals() {
     };
     refused(&["--nn-method", "rann"], "only Annoy");
     refused(&["--l2-norm", "true"], "l2.norm");
-    refused(&["--vars-to-regress", "percent.mt"], "vars.to.regress");
+    // vars.to.regress is ported (M15b); percent.mt by the workflow's pattern on the test data, which
+    // has no mitochondrial gene, is refused with its remedy
+    refused(&["--vars-to-regress", "percent.mt"], "--mt-genes");
     refused(&["--algorithm", "4"], "Leiden");
     refused(&["--preset", "fast"], "unknown preset");
     refused(&["--pca", "x"], "give one starting point");

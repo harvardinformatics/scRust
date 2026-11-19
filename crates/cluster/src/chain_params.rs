@@ -18,10 +18,17 @@
 //! **`workflow`** is the workflow's calls (C1): seed 12345 in SCTransform, RunPCA and
 //! FindClusters, `dims = 1:30`, and the PCA guard.
 //!
+//! **`vars.to.regress` and `percent.mt`** (milestone M15b; [`crate::covariates`]): SCTransform's
+//! `vars.to.regress` (`--vars-to-regress`, `[sctransform] vars_to_regress`; none by default),
+//! `percent.mt` asked for without regressing it (`--percent-mt`, `percent_mt`), and its
+//! mitochondrial features given by id (`--mt-genes <file>`, `mt_genes`; a relative path in a
+//! parameter file is read from the file's directory). `percent.mt` is computed when any of them
+//! asks for it.
+//!
 //! **Other code paths are refused** with a message, as [`sctransform::SctParams::check`] does:
-//! `vars.to.regress`, another `vst.flavor` or `method`, `do.scale`, `nn.method = "rann"` or
-//! `"hnsw"`, `l2.norm = TRUE`, `annoy.metric = "hamming"`, Leiden (`algorithm = 4`), and seeds of
-//! `NULL` (which would leave R's stream where an earlier session left it).
+//! another `vst.flavor` or `method`, `do.scale`, `nn.method = "rann"` or `"hnsw"`,
+//! `l2.norm = TRUE`, `annoy.metric = "hamming"`, Leiden (`algorithm = 4`), and seeds of `NULL`
+//! (which would leave R's stream where an earlier session left it).
 //!
 //! **Numbers are read as R reads them:** each number's text goes through R's own decimal parser
 //! (`as.numeric`), and a fraction written as text, `"1/15"`, is divided in double, as R
@@ -91,7 +98,13 @@ impl Stats {
 pub struct ChainParams {
     /// The preset applied (`None` for Seurat's defaults).
     pub preset: Option<String>,
+    /// SCTransform's arguments, `vars.to.regress` among them (M15b).
     pub sct: SctParams,
+    /// `percent.mt` asked for without regressing it (`--percent-mt`; M15b).
+    pub percent_mt: bool,
+    /// `--mt-genes`: the file listing the mitochondrial features' ids (M15b); the command reads it
+    /// and hands its ids to the chain ([`crate::covariates::CellCovariates`]).
+    pub mt_genes: Option<String>,
     pub pca: PcaParams,
     /// The workflow's `require_min_cells_for_pca()`: stop with this many cells or fewer.
     pub pca_guard: Option<usize>,
@@ -106,6 +119,8 @@ impl Default for ChainParams {
         ChainParams {
             preset: None,
             sct: SctParams::default(),
+            percent_mt: false,
+            mt_genes: None,
             pca: PcaParams::default(),
             pca_guard: None,
             neighbors: NeighborParams::default(),
@@ -140,9 +155,20 @@ impl ChainParams {
         }
     }
 
+    /// Whether `percent.mt` is computed (M15b): asked for, given a list of features, or regressed.
+    pub fn wants_percent_mt(&self) -> bool {
+        self.percent_mt || self.mt_genes.is_some() || self.sct.vars_to_regress.iter().any(|v| v == crate::covariates::PERCENT_MT)
+    }
+
+    /// Whether the chain needs more than the counts (M15b): `percent.mt`, or covariates.
+    pub fn needs_covariates(&self) -> bool {
+        self.wants_percent_mt() || !self.sct.vars_to_regress.is_empty()
+    }
+
     /// Checks every stage's parameters and refuses the paths that are not ported.
     pub fn check(&self) -> Result<(), String> {
         self.sct.check().map_err(|e| format!("SCTransform: {e}"))?;
+        crate::covariates::check_names(&self.sct.vars_to_regress).map_err(|e| format!("SCTransform: {e}"))?;
         if self.sct.seed_use.is_none() {
             return Err(refused("SCTransform's seed.use = NULL", "it leaves R's stream where an earlier session left it; give a seed"));
         }
@@ -181,7 +207,7 @@ fn refused(what: &str, why: &str) -> String {
 /// [`PARAM_SWITCHES`]).
 pub const PARAM_FLAGS: &[&str] = &[
     // SCTransform
-    "sct-seed", "ncells", "variable-features", "clip-range", "vars-to-regress", "vst-flavor", "sct-method", "do-scale",
+    "sct-seed", "ncells", "variable-features", "clip-range", "vars-to-regress", "mt-genes", "vst-flavor", "sct-method", "do-scale",
     // RunPCA
     "npcs", "pca-seed", "weight-by-var", "pca-guard",
     // FindNeighbors
@@ -193,7 +219,7 @@ pub const PARAM_FLAGS: &[&str] = &[
 ];
 
 /// Flags without a value.
-pub const PARAM_SWITCHES: &[&str] = &["no-group-singletons"];
+pub const PARAM_SWITCHES: &[&str] = &["no-group-singletons", "percent-mt"];
 
 fn int_of(name: &str, s: &str) -> Result<i64, String> {
     s.trim().parse::<i64>().map_err(|_| format!("{name}: '{s}' is not an integer"))
@@ -235,7 +261,19 @@ pub fn set(p: &mut ChainParams, name: &str, v: &str) -> Result<(), String> {
         "ncells" => p.sct.ncells = usize_of(n, v)?,
         "variable-features" => p.sct.variable_features_n = Some(usize_of(n, v)?),
         "clip-range" => p.sct.clip_range = Some(clip_of(n, v)?),
-        "vars-to-regress" => return Err(refused("SCTransform's vars.to.regress", "regressing out variables takes sctransform down another code path, which is not ported")),
+        "vars-to-regress" => {
+            // comma-separated names, in the formula's order; empty for none
+            let vars: Vec<String> = v.split(',').map(str::trim).filter(|t| !t.is_empty()).map(str::to_string).collect();
+            crate::covariates::check_names(&vars).map_err(|e| format!("{n}: {e}"))?;
+            p.sct.vars_to_regress = vars;
+        }
+        "mt-genes" => {
+            if v.trim().is_empty() {
+                return Err(format!("{n}: a file is needed"));
+            }
+            p.mt_genes = Some(v.to_string());
+        }
+        "percent-mt" => p.percent_mt = bool_of(n, v)?,
         "vst-flavor" => {
             if v.trim() != "v2" {
                 return Err(refused(&format!("vst.flavor = \"{v}\""), "only sctransform's v2 flavour (Seurat's default) is ported"));
@@ -304,6 +342,8 @@ const TOML_KEYS: &[(&str, &str, &str)] = &[
     ("sctransform", "variable_features", "variable-features"),
     ("sctransform", "clip_range", "clip-range"),
     ("sctransform", "vars_to_regress", "vars-to-regress"),
+    ("sctransform", "mt_genes", "mt-genes"),
+    ("sctransform", "percent_mt", "percent-mt"),
     ("sctransform", "vst_flavor", "vst-flavor"),
     ("sctransform", "method", "sct-method"),
     ("sctransform", "do_scale", "do-scale"),
@@ -375,8 +415,14 @@ pub fn read_toml(text: &str) -> Result<(Option<String>, Vec<(String, String)>), 
 
 /// Builds the parameters: Seurat's defaults, then the preset (`cli_preset`, else the file's),
 /// then the file's values, then the flags (`(name, value)`, in the order given;
-/// `no-group-singletons` as a switch). Checks the result.
+/// `no-group-singletons` and `percent-mt` as switches). Checks the result.
 pub fn build(cli_preset: Option<&str>, toml_text: Option<&str>, flags: &[(String, String)]) -> Result<ChainParams, String> {
+    build_in(cli_preset, toml_text, None, flags)
+}
+
+/// [`build`], with the parameter file's directory (`toml_dir`), from which a relative `mt_genes`
+/// path in the file is read (M15b).
+pub fn build_in(cli_preset: Option<&str>, toml_text: Option<&str>, toml_dir: Option<&std::path::Path>, flags: &[(String, String)]) -> Result<ChainParams, String> {
     let mut p = ChainParams::default();
     let (file_preset, file_values) = match toml_text {
         Some(t) => read_toml(t).map_err(|e| format!("--params: {e}"))?,
@@ -386,11 +432,17 @@ pub fn build(cli_preset: Option<&str>, toml_text: Option<&str>, flags: &[(String
         p.apply_preset(&name)?;
     }
     for (k, v) in &file_values {
-        set(&mut p, k, v).map_err(|e| format!("--params: {e}"))?;
+        let v = match (k.as_str(), toml_dir) {
+            ("mt-genes", Some(d)) if std::path::Path::new(v).is_relative() => d.join(v).display().to_string(),
+            _ => v.clone(),
+        };
+        set(&mut p, k, &v).map_err(|e| format!("--params: {e}"))?;
     }
     for (k, v) in flags {
         if k == "no-group-singletons" {
             p.cluster.group_singletons = false;
+        } else if k == "percent-mt" {
+            p.percent_mt = true;
         } else {
             set(&mut p, k, v)?;
         }
@@ -457,7 +509,8 @@ mod tests {
         bad("", &[("nn-method", "rann")], "nn.method");
         bad("", &[("nn-method", "hnsw")], "only Annoy");
         bad("", &[("l2-norm", "true")], "l2.norm");
-        bad("", &[("vars-to-regress", "percent.mt")], "vars.to.regress");
+        bad("", &[("vars-to-regress", "percent.mt,percent.mt")], "twice");
+        bad("", &[("vars-to-regress", "my-col")], "not a syntactic name");
         bad("", &[("metric", "hamming")], "hamming");
         bad("", &[("vst-flavor", "v1")], "vst.flavor");
         bad("", &[("do-scale", "TRUE")], "do.scale");
@@ -472,5 +525,26 @@ mod tests {
         assert!(build(Some("nonsense"), None, &[]).unwrap_err().contains("unknown preset"));
         // the default code path's own values are accepted
         assert!(build(None, None, &f(&[("nn-method", "annoy"), ("l2-norm", "false"), ("vst-flavor", "v2")])).is_ok());
+    }
+
+    #[test]
+    fn vars_to_regress_and_percent_mt() {
+        let d = build(Some("workflow"), None, &[]).unwrap();
+        assert!(d.sct.vars_to_regress.is_empty() && !d.wants_percent_mt() && !d.needs_covariates());
+        let p = build(None, None, &f(&[("vars-to-regress", " percent.mt , nCount_RNA")])).unwrap();
+        assert_eq!(p.sct.vars_to_regress, vec!["percent.mt", "nCount_RNA"]);
+        assert!(p.wants_percent_mt() && p.needs_covariates());
+        let p = build(None, None, &f(&[("vars-to-regress", "nCount_RNA")])).unwrap();
+        assert!(!p.wants_percent_mt() && p.needs_covariates());
+        let p = build(None, None, &f(&[("percent-mt", "")])).unwrap();
+        assert!(p.percent_mt && p.wants_percent_mt());
+        // the file: a relative mt_genes path is the file's directory's
+        let toml = "[sctransform]\nvars_to_regress = [\"percent.mt\", \"score\"]\nmt_genes = \"mt.txt\"\npercent_mt = true\n";
+        let p = build_in(None, Some(toml), Some(std::path::Path::new("/some/dir")), &[]).unwrap();
+        assert_eq!(p.sct.vars_to_regress, vec!["percent.mt", "score"]);
+        assert_eq!(p.mt_genes.as_deref(), Some("/some/dir/mt.txt"));
+        assert!(p.percent_mt);
+        let p = build_in(None, Some("[sctransform]\nvars_to_regress = []\n"), None, &[]).unwrap();
+        assert!(p.sct.vars_to_regress.is_empty());
     }
 }

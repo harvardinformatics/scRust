@@ -88,7 +88,7 @@ add_whole <- function(loader, component, ident, prefixes) {
 CHAIN <- c("nCount_RNA", "nFeature_RNA", "nCount_SCT", "nFeature_SCT", "SCT_snn_res.0.8", "seurat_clusters",
            "silhouette_width", "neighborhood_purity")
 COL_FLOOR <- c(silhouette_width = "K8_silhouette_width", neighborhood_purity = "K9_purity")
-COL_BLAS_FREE <- c("nCount_RNA", "nFeature_RNA")
+COL_BLAS_FREE <- c("nCount_RNA", "nFeature_RNA", "percent.mt")
 
 # The metadata columns, the identities -----------------------------------------------------------
 cmp_column <- function(L, col, a, b) {
@@ -154,6 +154,11 @@ cmp_seurat <- function(obj, o) {
   }
   add(L, "metadata orig.ident", identical(obj$orig.ident, o$orig.ident), blas = FALSE)
   for (col in CHAIN) cmp_column(L, col, obj@meta.data[[col]], o@meta.data[[col]])
+  # M15b: percent.mt, when the export computed it (scrust's --percent-mt, --mt-genes or
+  # --vars-to-regress percent.mt); otherwise it is one of the columns not rebuilt
+  if ("percent.mt" %in% colnames(obj@meta.data) && "percent.mt" %in% colnames(o@meta.data)) {
+    cmp_column(L, "percent.mt", obj@meta.data[["percent.mt"]], o@meta.data[["percent.mt"]])
+  }
   add(L, "identities (active.ident)", identical(obj@active.ident, o@active.ident))
   add(L, "default assay", identical(DefaultAssay(obj), DefaultAssay(o)), blas = FALSE)
   s1 <- obj[["SCT"]]; s2 <- o[["SCT"]]
@@ -228,6 +233,9 @@ cmp_sce <- function(sce, o) {
   cd <- as.data.frame(colData(sce))
   add(L, "colData rows (cells)", identical(rownames(cd), colnames(o)), blas = FALSE)
   for (col in CHAIN) cmp_column(L, col, cd[[col]], o@meta.data[[col]])
+  if ("percent.mt" %in% colnames(cd) && "percent.mt" %in% colnames(o@meta.data)) {
+    cmp_column(L, "percent.mt", cd[["percent.mt"]], o@meta.data[["percent.mt"]])
+  }
   sct <- altExp(sce, "SCT"); s2 <- o[["SCT"]]
   a <- assay(sct, "corrected_counts"); add(L, "altExp SCT corrected_counts", identical(a, s2@counts), ld_sparse_stats(a, s2@counts))
   a <- assay(sct, "logcounts"); add(L, "altExp SCT logcounts", identical(a, s2@data), ld_sparse_stats(a, s2@data))

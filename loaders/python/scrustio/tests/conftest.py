@@ -33,7 +33,7 @@ def _run(*args):
 @pytest.fixture(scope="session")
 def outputs(tmp_path_factory):
     d = tmp_path_factory.mktemp("scrust")
-    out = {k: str(d / k) for k in ("export", "sctransform", "cluster", "doubletfinder", "doubletfinder_nested")}
+    out = {k: str(d / k) for k in ("export", "sctransform", "cluster", "doubletfinder", "doubletfinder_nested", "export_percent_mt")}
     _run("cluster", "--counts", COUNTS_IN, "--preset", "workflow", "--export", "--out", out["export"], "--threads", "2")
     _run("sctransform", "--counts", COUNTS_IN, "--seed", "12345", "--corrected-counts", "--out", out["sctransform"], "--threads", "2")
     _run("cluster", "--counts", COUNTS_IN, "--preset", "workflow", "--out", out["cluster"], "--threads", "2")
@@ -43,6 +43,16 @@ def outputs(tmp_path_factory):
     # (singlets_clusters/), nested outputs
     _run("doubletfinder", "--counts", DF_IN, "--out", out["doubletfinder_nested"], "--cluster-stats", "silhouette,purity",
          "--recluster", "--recluster-export", "--threads", "2")
+    # M15b: an export with percent.mt (a stand-in list of ids: the test data has no mitochondrial
+    # gene), regressed with nCount_RNA
+    import gzip
+    with gzip.open(os.path.join(COUNTS_IN, "features.tsv.gz"), "rt") as f:
+        feats = [line.rstrip("\n").split("\t") for line in f]
+    ids = [r[0] for r in feats if r[1].startswith(("Rpl", "Rps"))][:5]
+    ids_file = d / "mt_genes.txt"
+    ids_file.write_text("# a stand-in list\n" + "\n".join(ids) + "\nNOT_A_FEATURE\n")
+    _run("cluster", "--counts", COUNTS_IN, "--preset", "workflow", "--export", "--vars-to-regress", "percent.mt,nCount_RNA",
+         "--mt-genes", str(ids_file), "--out", out["export_percent_mt"], "--threads", "2")
     return out
 
 

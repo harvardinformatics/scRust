@@ -15,7 +15,8 @@
 #
 # The chain's input is the object's RNA counts layer as saved (C1). The scripts' other work
 # (reading 10x files, emptyDrops, SoupX, decontX, DoubletFinder, scDblFinder, subset(),
-# percent.mt) is not part of the chain and is not run: SCTransform reads only the counts and the
+# percent.mt) is not part of the chain and is not run, except, for milestone M15b's runs with
+# vars.to.regress (cl_covariates below), percent.mt as the scripts compute it before SCTransform: SCTransform reads only the counts and the
 # cell names (Seurat passes meta.data to vst() as cell_attr, which uses only the columns umi,
 # gene, log_umi, log_gene, umi_per_gene and log_umi_per_gene if present; export_clustering.R
 # checks that no saved object has them), and every later step reads only what the chain made.
@@ -174,6 +175,58 @@ cl_load_input <- function(input, assay = c("v5", "v3")) {
   list(seurat = seu, source = if (grepl("\\.rds$", input)) "rds" else "export")
 }
 
+# Milestone M15b: the covariates of SCTransform's vars.to.regress, made on the object before the
+# chain. percent.mt as every workflow script computes it before SCTransform (pipeline repo,
+# workflow/scripts/*.R at ea053fa: seurat_obj[["percent.mt"]] <- PercentageFeatureSet(seurat_obj,
+# pattern = "(?i)^mt-")), or with the features a file of ids names (one per line, blank lines and
+# lines starting with # skipped, each line trimmed; matched against column 1 of the input's
+# features.tsv.gz, taken in the counts' row order); a table's columns (`metadata`: a TSV with a
+# barcode column) added with AddMetaData(), its numbers read by read.delim() (R_strtod). Returns
+# the object and what was done, for summary.json.
+cl_covariates <- function(seu, input, percent_mt = FALSE, mt_genes = "", metadata = "") {
+  info <- list()
+  if (percent_mt || nzchar(mt_genes)) {
+    if (!nzchar(mt_genes)) {
+      seu[["percent.mt"]] <- PercentageFeatureSet(seu, pattern = "(?i)^mt-")
+      info$percent_mt <- list(definition = "pattern", pattern = "(?i)^mt-",
+                              features = I(grep("(?i)^mt-", rownames(seu), value = TRUE)))
+    } else {
+      ids <- trimws(readLines(mt_genes, warn = FALSE))
+      ids <- ids[nzchar(ids) & !startsWith(ids, "#")]
+      feat <- read.delim(file.path(input, "features.tsv.gz"), header = FALSE, colClasses = "character",
+                         quote = "", comment.char = "")
+      if (nrow(feat) != nrow(seu)) stop("features.tsv.gz does not have one line per row of the counts")
+      listed <- rownames(seu)[feat[[1]] %in% ids]
+      if (!length(listed)) stop("none of the ids in ", mt_genes, " is among the features")
+      seu[["percent.mt"]] <- PercentageFeatureSet(seu, features = listed)
+      info$percent_mt <- list(definition = "ids", file = mt_genes, sha256 = sha256_file(mt_genes),
+                              features = I(listed), ids_not_found = I(unique(setdiff(ids, feat[[1]]))))
+    }
+    info$percent_mt$cells_zero <- sum(seu$percent.mt == 0)
+  }
+  if (nzchar(metadata)) {
+    md <- read.delim(metadata, check.names = FALSE, stringsAsFactors = FALSE)
+    bc <- if ("barcode" %in% names(md)) "barcode" else names(md)[1]
+    rownames(md) <- md[[bc]]
+    cols <- setdiff(names(md), bc)
+    seu <- AddMetaData(seu, md[colnames(seu), cols, drop = FALSE])
+    info$metadata <- list(file = metadata, sha256 = sha256_file(metadata), columns = I(cols),
+                          classes = as.list(vapply(md[cols], function(x) class(x)[1], "")))
+  }
+  list(seurat = seu, info = info)
+}
+
+# The QR RegressOutMatrix() takes, made again from the object's metadata for the record (M15b):
+# lm(GENE ~ vars, qr = TRUE)$qr's rank and pivot (the response does not change the QR).
+cl_regression_qr <- function(seu, vars) {
+  latent <- seu@meta.data[, vars, drop = FALSE]
+  fmla <- as.formula(paste("GENE ~", paste(vars, collapse = "+")))
+  m <- cbind(latent, GENE = 0)
+  colnames(m) <- c(vars, "GENE")
+  qr <- lm(fmla, data = m, qr = TRUE)$qr
+  list(vars = I(vars), rank = qr$rank, pivot = I(qr$pivot), n_columns = ncol(qr$qr))
+}
+
 cl_rng_digest <- function() {
   s <- rng_state()
   if (is.null(s)) return("none")
@@ -184,10 +237,11 @@ cl_rng_digest <- function() {
 # changes nothing downstream). mark(name) is called after each step. FindClusters' printed
 # output (the modularity optimizer's numbers) and its messages (GroupSingletons) are captured
 # and still printed. Returns the object and what the steps printed, with a digest of R's
-# .Random.seed after each step.
-cl_chain <- function(seu, umap = TRUE, mark = function(name) invisible(NULL)) {
+# .Random.seed after each step. `vars.to.regress` (M15b) goes to SCTransform as the workflow's
+# scripts passed it before their commit 8d34de1 (NULL, the default, is the call as it is now).
+cl_chain <- function(seu, umap = TRUE, mark = function(name) invisible(NULL), vars.to.regress = NULL) {
   rng <- list()
-  seu <- SCTransform(seu, seed.use = WORKFLOW_SEED, verbose = FALSE)
+  seu <- SCTransform(seu, vars.to.regress = vars.to.regress, seed.use = WORKFLOW_SEED, verbose = FALSE)
   rng$SCTransform <- cl_rng_digest()
   mark("SCTransform")
   require_min_cells_for_pca(seu, context = "reference_clustering")
@@ -324,17 +378,20 @@ cl_check_names <- function(seu) {
 #                                 %.17g; rows and columns are the cells), graphs/graphs.json
 # Returns the facts for object.json: dimensions, checks and digests.
 cl_write_object <- function(seu, dir, level = c("full", "standard", "light", "labels"),
-                            software = "scRust validation/R/lib/clustering.R") {
+                            software = "scRust validation/R/lib/clustering.R", extra = character()) {
   level <- match.arg(level)
   cl_check_names(seu)
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
   cells <- colnames(seu)
   md <- seu@meta.data
   facts <- list(level = level, n_cells = length(cells))
-  missing <- setdiff(CL_META, colnames(md))
+  missing <- setdiff(c(CL_META, extra), colnames(md))
   if (length(missing)) stop("metadata columns missing: ", paste(missing, collapse = ", "))
   meta <- data.frame(barcode = cells, stringsAsFactors = FALSE)
-  for (col in CL_META) meta[[col]] <- md[[col]]
+  # M15b: percent.mt after the counts' columns, the other extra columns (a table's) at the end, as
+  # scrust cluster's metadata.tsv orders them
+  cols <- c(CL_META[1:2], intersect(extra, "percent.mt"), CL_META[-(1:2)], setdiff(extra, "percent.mt"))
+  for (col in cols) meta[[col]] <- md[[col]]
   tsv_write(meta, file.path(dir, "metadata.tsv"))
   for (col in c("seurat_clusters", "SCT_snn_res.0.8")) {
     if (!is.factor(md[[col]])) stop(col, " is not a factor")
@@ -469,6 +526,13 @@ CL_PACKAGES <- c("Seurat", "SeuratObject", "sctransform", "glmGamPoi", "irlba", 
 # (timings, peak RSS after each step, current RSS, fingerprint).
 cl_main <- function(args, kind, hooks = NULL) {
   umap <- switch(args$umap, yes = TRUE, no = FALSE, stop("--umap must be yes or no"))
+  # M15b: vars.to.regress and its covariates (empty: the chain as the workflow runs it now)
+  opt <- function(x) if (is.null(x)) "" else x
+  vars <- strsplit(opt(args$vars_to_regress), ",", fixed = TRUE)[[1]]
+  vars <- trimws(vars[nzchar(trimws(vars))])
+  percent_mt <- identical(opt(args$percent_mt), "yes") || "percent.mt" %in% vars
+  mt_genes <- opt(args$mt_genes)
+  metadata <- opt(args$metadata)
   assay <- if (identical(args$assay, "auto")) readLines(file.path(args$input, "assay.txt")) else args$assay
   dir.create(args$out, recursive = TRUE, showWarnings = FALSE)
   cl_setup()
@@ -482,6 +546,16 @@ cl_main <- function(args, kind, hooks = NULL) {
   inp <- cl_load_input(args$input, assay)
   mark("load")
   seu <- inp$seurat
+  covariates <- NULL
+  extra <- character()
+  if (percent_mt || nzchar(mt_genes) || nzchar(metadata) || length(vars)) {
+    cv <- cl_covariates(seu, args$input, percent_mt = percent_mt, mt_genes = mt_genes, metadata = metadata)
+    seu <- cv$seurat
+    covariates <- cv$info
+    extra <- c(if ("percent.mt" %in% colnames(seu@meta.data)) "percent.mt",
+               intersect(vars, setdiff(colnames(seu@meta.data), c(CL_META, "percent.mt", "orig.ident"))))
+    mark("covariates")
+  }
   run_info <- list(kind = kind, input = args$input, input_source = inp$source, outdir = args$out,
                    level = args$level, umap = umap, assay = assay,
                    start_time = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"),
@@ -489,13 +563,13 @@ cl_main <- function(args, kind, hooks = NULL) {
                    fingerprint = fingerprint(packages = CL_PACKAGES))
   rm(inp)
   if (!is.null(hooks)) hooks$install(seu)
-  res <- cl_chain(seu, umap = umap, mark = mark)
+  res <- cl_chain(seu, umap = umap, mark = mark, vars.to.regress = if (length(vars)) vars else NULL)
   rm(seu)
   seu <- res$seurat
   mark("chain_end")
   if (!is.null(hooks)) hooks$finish(seu, umap)
   write_cluster_metadata(seu, file.path(args$out, "nclusters.txt"), file.path(args$out, "cluster_ids.txt"))
-  facts <- cl_write_object(seu, args$out, args$level, software = paste0("scRust ", kind))
+  facts <- cl_write_object(seu, args$out, args$level, software = paste0("scRust ", kind), extra = extra)
   mark("write")
   result <- c(facts, list(
     rna_assay_class = class(seu[["RNA"]])[1],
@@ -503,6 +577,10 @@ cl_main <- function(args, kind, hooks = NULL) {
     optimizer = cl_parse_printed(res$printed, res$messages),
     rng_after = res$rng,
     rng_end_sha256 = cl_rng_digest()))
+  if (!is.null(covariates)) {
+    result$covariates <- covariates
+    if (length(vars)) result$regression <- cl_regression_qr(seu, vars)
+  }
   json_write(list(result = result,
                   run = c(run_info, list(phases = phases, peak_rss_kib = peak_rss_kib(),
                                          printed = I(res$printed), messages = I(res$messages)))),

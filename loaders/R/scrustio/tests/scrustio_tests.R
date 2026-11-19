@@ -4,7 +4,8 @@
 # SCRUST_ROOT (env.sh) locates the committed fixtures and .rlib/; the scrust binary (SCRUST_BIN, else
 # $SCRUST_ROOT/target/release/scrust) makes the outputs the tests load: an export of a tier-T
 # object, scrust sctransform --corrected-counts, scrust doubletfinder (with and without its nested
-# outputs, M15) and scrust cluster without --export. Exit status 1 if a test fails.
+# outputs, M15), scrust cluster without --export, and an export and a scrust sctransform output with
+# percent.mt (M15b). Exit status 1 if a test fails.
 
 root <- Sys.getenv("SCRUST_ROOT")
 if (!nzchar(root)) stop("SCRUST_ROOT is not set (source env.sh)")
@@ -382,6 +383,31 @@ with_hook <- suppressMessages(add_scrust(base, file.path(dfn, "clusters")))
 check(identical(levels(with_hook$seurat_clusters), readLines(file.path(df_in, "seurat_clusters_levels.txt"))) &&
         all(c("silhouette_width", "neighborhood_purity") %in% colnames(with_hook[[]])),
       "nested outputs: clustering on the fly's labels, levels and scores, by add_scrust")
+
+# 7. percent.mt and vars.to.regress (M15b) -----------------------------------------------------------
+# an export with percent.mt (its mitochondrial features given by id: a stand-in list on the test data,
+# which has none) regressed with nCount_RNA: percent.mt loads as a double column, exactly as written,
+# into the Seurat object, the SCE and add_scrust; the scrust sctransform output carries it too
+ids_file <- file.path(tmp, "mt_genes.txt")
+feat <- read.delim(gzfile(file.path(counts_in, "features.tsv.gz")), header = FALSE, colClasses = "character")
+writeLines(c("# a stand-in list", feat$V1[grepl("^Rp[ls]", feat$V2)][1:5], "NOT_A_FEATURE"), ids_file)
+pm_out <- file.path(tmp, "export_percent_mt")
+run("cluster", "--counts", counts_in, "--preset", "workflow", "--export", "--vars-to-regress", "percent.mt,nCount_RNA",
+    "--mt-genes", ids_file, "--out", pm_out, "--threads", "2")
+pm_text <- read.delim(file.path(pm_out, "metadata.tsv"), colClasses = "character")$percent.mt
+pmo <- load_seurat(pm_out)
+check(is.double(pmo$percent.mt) && identical(sprintf("%.17g", pmo$percent.mt), pm_text) && any(pmo$percent.mt > 0),
+      "percent.mt: a double column of meta.data, exactly as written")
+check(identical(colnames(pmo[[]])[1:4], c("orig.ident", "nCount_RNA", "nFeature_RNA", "percent.mt")),
+      "percent.mt: after the counts' columns, as the workflow's objects hold it")
+pms <- load_sce(pm_out)
+check(identical(pms$percent.mt, unname(pmo$percent.mt)), "percent.mt: in the SCE's colData")
+with_pm <- suppressMessages(add_scrust(bare, pm_out))
+check(identical(with_pm$percent.mt, pmo$percent.mt), "percent.mt: added by add_scrust")
+pm_sct <- file.path(tmp, "sctransform_percent_mt")
+run("sctransform", "--counts", counts_in, "--seed", "12345", "--percent-mt", "--mt-genes", ids_file, "--corrected-counts",
+    "--out", pm_sct, "--threads", "2")
+check(identical(load_seurat(pm_sct)$percent.mt, pmo$percent.mt), "percent.mt: scrust sctransform's cell_metadata.tsv")
 
 cat(sprintf("scrustio %s: %d tests, %d failed\n", as.character(packageVersion("scrustio")), n_tests, length(failures)))
 if (length(failures)) quit(status = 1)

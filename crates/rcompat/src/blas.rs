@@ -73,6 +73,8 @@ mod sys {
         );
         pub fn ddot_(n: *const c_int, x: *const f64, incx: *const c_int, y: *const f64, incy: *const c_int) -> f64;
         pub fn dnrm2_(n: *const c_int, x: *const f64, incx: *const c_int) -> f64;
+        pub fn daxpy_(n: *const c_int, alpha: *const f64, x: *const f64, incx: *const c_int, y: *mut f64, incy: *const c_int);
+        pub fn dscal_(n: *const c_int, alpha: *const f64, x: *mut f64, incx: *const c_int);
     }
 }
 
@@ -150,6 +152,23 @@ pub fn dnrm2(x: &[f64]) -> f64 {
     let (n, one) = (int(x.len(), "n"), 1 as c_int);
     // SAFETY: the slice holds n elements.
     unsafe { sys::dnrm2_(&n, x.as_ptr(), &one) }
+}
+
+/// `daxpy(n, alpha, x, 1, y, 1)`: `y := alpha * x + y` (milestone M15b: LINPACK's `dqrdc2` and
+/// `dqrsl`, [`crate::linpack`]). OpenBLAS's kernels fuse the multiply and the add on some CPUs, so
+/// the result is R's only through this call.
+pub fn daxpy(alpha: f64, x: &[f64], y: &mut [f64]) {
+    assert_eq!(x.len(), y.len(), "daxpy: lengths differ");
+    let (n, one) = (int(x.len(), "n"), 1 as c_int);
+    // SAFETY: both slices hold n elements, and they are distinct (`y` is borrowed mutably).
+    unsafe { sys::daxpy_(&n, &alpha, x.as_ptr(), &one, y.as_mut_ptr(), &one) }
+}
+
+/// `dscal(n, alpha, x, 1)`: `x := alpha * x` (M15b, [`crate::linpack`]).
+pub fn dscal(alpha: f64, x: &mut [f64]) {
+    let (n, one) = (int(x.len(), "n"), 1 as c_int);
+    // SAFETY: the slice holds n elements.
+    unsafe { sys::dscal_(&n, &alpha, x.as_mut_ptr(), &one) }
 }
 
 /// The OpenBLAS kernel ("core") in use, as `openblas_get_corename()` reports it: `Haswell`,

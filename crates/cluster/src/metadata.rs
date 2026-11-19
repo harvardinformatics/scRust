@@ -5,7 +5,8 @@
 //!   `.CalcN.default`): `nCount_RNA = Matrix::colSums(counts)`, which sums each column's stored
 //!   values in stored order in double (Matrix 1.7-6's `Csparse_colsum`), and
 //!   `nFeature_RNA = Matrix::colSums(counts > 0)`, the stored values above 0 (explicit zeros do
-//!   not count);
+//!   not count); and, when asked for (milestone M15b), `percent.mt`, as the workflow's scripts
+//!   compute it with `PercentageFeatureSet()` before SCTransform ([`crate::covariates`]);
 //! - **the columns of `--metadata`**, carried over by barcode.
 //!
 //! The staged route needs the counts' columns too, without the counts: `scrust sctransform`
@@ -20,11 +21,13 @@ use std::path::Path;
 /// The file the counts' columns go to in a stage's output directory.
 pub const FILE: &str = "cell_metadata.tsv";
 
-/// `nCount_RNA` and `nFeature_RNA` of every cell, in the counts' column order.
+/// `nCount_RNA` and `nFeature_RNA` of every cell, in the counts' column order, and `percent.mt`
+/// when it was asked for (M15b).
 #[derive(Debug, Clone, PartialEq)]
 pub struct RnaMetadata {
     pub n_count: Vec<f64>,
     pub n_feature: Vec<i64>,
+    pub percent_mt: Option<Vec<f64>>,
 }
 
 impl RnaMetadata {
@@ -41,7 +44,7 @@ impl RnaMetadata {
             n_count.push(s);
             n_feature.push(x.iter().filter(|&&v| v > 0.0).count() as i64);
         }
-        RnaMetadata { n_count, n_feature }
+        RnaMetadata { n_count, n_feature, percent_mt: None }
     }
 
     /// The column texts as R's reference scripts write them (doubles with 17 significant digits,
@@ -50,35 +53,59 @@ impl RnaMetadata {
         (self.n_count.iter().map(|&v| fmt17(v)).collect(), self.n_feature.iter().map(|v| v.to_string()).collect())
     }
 
-    /// Writes [`FILE`]'s layout: `barcode`, `nCount_RNA`, `nFeature_RNA`.
+    /// `percent.mt`'s texts (17 significant digits, `NaN` for a cell with no counts), when computed.
+    pub fn percent_mt_texts(&self) -> Option<Vec<String>> {
+        self.percent_mt.as_ref().map(|v| v.iter().map(|&x| fmt17(x)).collect())
+    }
+
+    /// The columns [`FILE`] holds: 3 (`barcode`, `nCount_RNA`, `nFeature_RNA`), or 4 with `percent.mt`.
+    pub fn n_columns(&self) -> usize {
+        if self.percent_mt.is_some() {
+            4
+        } else {
+            3
+        }
+    }
+
+    /// Writes [`FILE`]'s layout: `barcode`, `nCount_RNA`, `nFeature_RNA`, and `percent.mt` when
+    /// computed.
     pub fn write(&self, path: &Path, barcodes: &[String]) -> io::Result<()> {
         assert_eq!(barcodes.len(), self.n_count.len());
         let (a, b) = self.texts();
-        let mut s = String::from("barcode\tnCount_RNA\tnFeature_RNA\n");
+        let pm = self.percent_mt_texts();
+        let mut s = String::from(if pm.is_some() { "barcode\tnCount_RNA\tnFeature_RNA\tpercent.mt\n" } else { "barcode\tnCount_RNA\tnFeature_RNA\n" });
         for (i, bc) in barcodes.iter().enumerate() {
             s.push_str(bc);
             s.push('\t');
             s.push_str(&a[i]);
             s.push('\t');
             s.push_str(&b[i]);
+            if let Some(p) = &pm {
+                s.push('\t');
+                s.push_str(&p[i]);
+            }
             s.push('\n');
         }
         std::fs::write(path, s).map_err(|e| io::Error::new(e.kind(), format!("{}: {e}", path.display())))
     }
 
-    /// Reads [`FILE`]'s layout: the barcodes and the columns.
+    /// Reads [`FILE`]'s layout: the barcodes and the columns (`percent.mt` when the file has it).
     pub fn read(path: &Path) -> Result<(Vec<String>, RnaMetadata), String> {
         let t = Table::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        if t.header != ["barcode", "nCount_RNA", "nFeature_RNA"] {
-            return Err(format!("{}: expected the columns barcode, nCount_RNA, nFeature_RNA", path.display()));
+        let with_pm = t.header == ["barcode", "nCount_RNA", "nFeature_RNA", "percent.mt"];
+        if !with_pm && t.header != ["barcode", "nCount_RNA", "nFeature_RNA"] {
+            return Err(format!("{}: expected the columns barcode, nCount_RNA, nFeature_RNA (and percent.mt)", path.display()));
         }
         let mut barcodes = Vec::with_capacity(t.rows.len());
-        let mut m = RnaMetadata { n_count: Vec::with_capacity(t.rows.len()), n_feature: Vec::with_capacity(t.rows.len()) };
+        let mut m = RnaMetadata { n_count: Vec::with_capacity(t.rows.len()), n_feature: Vec::with_capacity(t.rows.len()), percent_mt: with_pm.then(|| Vec::with_capacity(t.rows.len())) };
         for (i, r) in t.rows.iter().enumerate() {
             let bad = || format!("{}: row {}", path.display(), i + 1);
             barcodes.push(r[0].clone());
             m.n_count.push(scio::parse17(r.get(1).ok_or_else(bad)?).ok_or_else(bad)?);
             m.n_feature.push(r.get(2).ok_or_else(bad)?.parse().map_err(|_| bad())?);
+            if let Some(p) = m.percent_mt.as_mut() {
+                p.push(scio::parse17(r.get(3).ok_or_else(bad)?).ok_or_else(bad)?);
+            }
         }
         Ok((barcodes, m))
     }
