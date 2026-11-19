@@ -820,6 +820,31 @@ compare = "the combined table, byte for byte"
 # exports, 68 of 68 identical byte for byte (82 to 327 rows on tier T, 22,943 to 81,448 on tier P).
 settled = { tables = 68, identical = 68 }
 
+# K14, vars.to.regress and percent.mt (M15b; docs/PLAN.md C3j, C5): the chain with SCTransform's
+# vars.to.regress, from the counts, on M15b's 134 cases (validation/m15b_cases.tsv: 27 tier-T
+# objects x 4, the 7 tier-P objects 20, the zebrafish and the bearded dragon x 3; percent.mt by
+# the workflow's pattern and by a list of ids, with nCount_RNA, a --metadata column), against R's
+# runs of every case in both profiles (validation/slurm/m15b_references.sbatch, approved for
+# M15b). scrust's runs: validation/slurm/m15b_cluster.sbatch, label m15b-25fe846, validated again
+# by the binary of 390342d (validation/slurm/m15b_revalidate.sbatch, label m15b-390342d;
+# docs/validation/clustering_m15b.tsv, one row per case and pair of profiles).
+[clustering.K14]
+criterion = "exact"
+compare = "(a) against R's run of the same profile, the main criterion: every check of K8's direct comparison, percent.mt as text, the regression's covariates, rank and pivot, scale.data value by value where R kept it (its digest elsewhere); (b) against R's run of the other profile: BLAS-free checks exact, BLAS-dependent checks within [clustering.floor.kernel_regressed]; (c) percent.mt without the regression against the saved objects, as %.17g text; (d) without the options, M15's T and P runs, every file byte for byte; (e) scrust doubletfinder's clusterings with the options against the commands run one after the other, byte for byte"
+# Settled (M15b): (a) exact on all 134 cases in both profiles: production against production and
+# portable against portable, 134 of 134 each, 889,756,126 values compared, none differing (tier P's
+# and the other objects' 26 portable pairs on different CPU types: scrust on Xeon 8268, R on
+# 8480CL); the 31 cases whose pattern finds nothing reproduced through features without counts
+# (rank 1), and the pattern refused in each, naming --mt-genes. (b) 134 of 134 in both directions,
+# 815 checks within [clustering.floor.kernel_regressed] per direction, none beyond it. (c) the 34
+# clustering objects 34 of 34 identical (277,413 cells); the 150 DoubletFinder objects 120 of 150,
+# the 30 with mitochondrial features being the SCT assay's (doubletfinder.R; R's recomputation on
+# SCT reproduces all 150 saved columns, its RNA-based value equals scrust's on all 30, 296,410 cells;
+# validation/slurm/m15b_percent_mt_sct.sbatch). (d) 120 of 120 routes (10 objects, 2 profiles, 6
+# routes), validation/slurm/m15b_unchanged.sbatch with --nested-summaries. (e) 20 of 20 (10 objects,
+# 2 profiles), validation/slurm/m15b_recluster.sbatch.
+settled = { a_cases = 134, a_production = 134, a_portable = 134, a_values = 889756126, a_cross_cpu_pairs = 26, a_refusals = 62, b_cases = 134, b_directions = 2, b_within_floor = 815, c_clustering_objects = 34, c_clustering_identical = 34, c_doubletfinder_objects = 150, c_doubletfinder_identical = 120, c_sct_explained = 30, d_routes = 120, e_runs = 20 }
+
 # Kernel-gated grading shown on deliberately mismatched pairs (M11): each Rust run against the
 # other profile's instrumented R run on Sapphire Rapids, 68 pairs of the 34 objects in both
 # directions: all in tolerance mode, every BLAS-free check identical, 1,028 BLAS-dependent checks

@@ -1,0 +1,537 @@
+object	tier	case	vars_to_regress	scrust_profile	r_profile	grading	floor	pass	identical	within_floor	differing	missing	not_applicable	reported	values_compared	values_differing	scrust_cpu	r_cpu	failing
+filtered_seurat_tenx_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	360471	0	8480+	8480CL	
+filtered_seurat_tenx_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	360470	133800	8480+	8268 CPU @ 2.90GHz	
+filtered_seurat_tenx_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	360470	133800	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_tenx_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	360471	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+filtered_seurat_tenx_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	357998	0	8480+	8480CL	
+filtered_seurat_tenx_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	357997	191374	8480+	8268 CPU @ 2.90GHz	
+filtered_seurat_tenx_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	357997	191374	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_tenx_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	357998	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+filtered_seurat_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	361825	0	8480+	8480CL	
+filtered_seurat_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	361824	202036	8480+	8268 CPU @ 2.90GHz	
+filtered_seurat_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	361824	202036	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	361825	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+filtered_seurat_tenx_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	361738	0	8480+	8480CL	
+filtered_seurat_tenx_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	361737	187738	8480+	8268 CPU @ 2.90GHz	
+filtered_seurat_tenx_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	361737	187738	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_tenx_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	361738	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+filtered_seurat_emptydrops_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	305550	0	8480+	8480CL	
+filtered_seurat_emptydrops_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	305549	123435	8480+	8268 CPU @ 2.90GHz	
+filtered_seurat_emptydrops_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	305549	123435	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_emptydrops_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	305550	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+filtered_seurat_emptydrops_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	307038	0	8480CL	8480CL	
+filtered_seurat_emptydrops_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	7	0	0	9	0	307037	153672	8480CL	8268 CPU @ 2.90GHz	
+filtered_seurat_emptydrops_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	1	307036	153672	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_emptydrops_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	307037	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+filtered_seurat_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	307082	0	8480CL	8480CL	
+filtered_seurat_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	307081	185289	8480CL	8268 CPU @ 2.90GHz	
+filtered_seurat_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	307081	185289	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	307082	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+filtered_seurat_emptydrops_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	305798	0	8480CL	8480CL	
+filtered_seurat_emptydrops_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	305797	154613	8480CL	8268 CPU @ 2.90GHz	
+filtered_seurat_emptydrops_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	305797	154613	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_emptydrops_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	305798	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+soupx_tenx_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	360111	0	8480CL	8480CL	
+soupx_tenx_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	360110	134345	8480CL	8268 CPU @ 2.90GHz	
+soupx_tenx_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	360110	134345	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	360111	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+soupx_tenx_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	354954	0	8480CL	8480CL	
+soupx_tenx_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	354953	163608	8480CL	8268 CPU @ 2.90GHz	
+soupx_tenx_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	354953	163608	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	354954	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	360301	0	8480CL	8480CL	
+soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	360300	182489	8480CL	8268 CPU @ 2.90GHz	
+soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	360300	182489	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	360301	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+soupx_tenx_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	357663	0	8480CL	8480CL	
+soupx_tenx_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	357662	197153	8480CL	8268 CPU @ 2.90GHz	
+soupx_tenx_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	357662	197153	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	357663	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+soupx_emptydrops_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	304667	0	8480CL	8480CL	
+soupx_emptydrops_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	304666	123737	8480CL	8268 CPU @ 2.90GHz	
+soupx_emptydrops_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	304666	123737	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	304667	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+soupx_emptydrops_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	305932	0	8480CL	8480CL	
+soupx_emptydrops_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	305931	179618	8480CL	8268 CPU @ 2.90GHz	
+soupx_emptydrops_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	305931	179618	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	305932	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	306196	0	8480CL	8480CL	
+soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	7	0	0	9	0	306195	198604	8480CL	8268 CPU @ 2.90GHz	
+soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	1	306194	198604	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	306195	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+soupx_emptydrops_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	304467	0	8480CL	8480CL	
+soupx_emptydrops_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	304466	155794	8480CL	8268 CPU @ 2.90GHz	
+soupx_emptydrops_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	304466	155794	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	304467	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+decontx_raw_tenx_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	333110	0	8480CL	8480CL	
+decontx_raw_tenx_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	333109	129477	8480CL	8268 CPU @ 2.90GHz	
+decontx_raw_tenx_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	333109	129477	8268 CPU @ 2.90GHz	8480CL	
+decontx_raw_tenx_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	333110	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+decontx_raw_tenx_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	342281	0	8480CL	8480CL	
+decontx_raw_tenx_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	342280	164816	8480CL	8268 CPU @ 2.90GHz	
+decontx_raw_tenx_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	342280	164816	8268 CPU @ 2.90GHz	8480CL	
+decontx_raw_tenx_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	342281	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	342704	0	8480CL	8480CL	
+decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	342703	189096	8480CL	8268 CPU @ 2.90GHz	
+decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	342703	189096	8268 CPU @ 2.90GHz	8480CL	
+decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	342704	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+decontx_raw_tenx_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	333218	0	8480CL	8480CL	
+decontx_raw_tenx_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	333217	189411	8480CL	8268 CPU @ 2.90GHz	
+decontx_raw_tenx_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	333217	189411	8268 CPU @ 2.90GHz	8480CL	
+decontx_raw_tenx_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	333218	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+decontx_raw_emptydrops_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	291880	0	8480CL	8480CL	
+decontx_raw_emptydrops_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	291879	116749	8480CL	8268 CPU @ 2.90GHz	
+decontx_raw_emptydrops_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	291879	116749	8268 CPU @ 2.90GHz	8480CL	
+decontx_raw_emptydrops_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	291880	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+decontx_raw_emptydrops_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	295206	0	8480CL	8480CL	
+decontx_raw_emptydrops_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	295205	152110	8480CL	8268 CPU @ 2.90GHz	
+decontx_raw_emptydrops_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	295205	152110	8268 CPU @ 2.90GHz	8480CL	
+decontx_raw_emptydrops_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	295206	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	295926	0	8480CL	8480CL	
+decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	295925	184693	8480CL	8268 CPU @ 2.90GHz	
+decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	295925	184693	8268 CPU @ 2.90GHz	8480CL	
+decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	295926	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+decontx_raw_emptydrops_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	291804	0	8480CL	8480CL	
+decontx_raw_emptydrops_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	291803	171296	8480CL	8268 CPU @ 2.90GHz	
+decontx_raw_emptydrops_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	291803	171296	8268 CPU @ 2.90GHz	8480CL	
+decontx_raw_emptydrops_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	291804	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+cellbender_fromraw_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	321818	0	8480CL	8480CL	
+cellbender_fromraw_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	321817	129306	8480CL	8268 CPU @ 2.90GHz	
+cellbender_fromraw_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	321817	129306	8268 CPU @ 2.90GHz	8480CL	
+cellbender_fromraw_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	321818	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+cellbender_fromraw_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	323403	0	8480CL	8480CL	
+cellbender_fromraw_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	323402	187530	8480CL	8268 CPU @ 2.90GHz	
+cellbender_fromraw_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	323402	187530	8268 CPU @ 2.90GHz	8480CL	
+cellbender_fromraw_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	323403	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	324600	0	8480CL	8480CL	
+cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	324599	201654	8480CL	8268 CPU @ 2.90GHz	
+cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	324599	201654	8268 CPU @ 2.90GHz	8480CL	
+cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	324600	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+cellbender_fromraw_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	322050	0	8480CL	8480CL	
+cellbender_fromraw_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	322049	166112	8480CL	8268 CPU @ 2.90GHz	
+cellbender_fromraw_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	322049	166112	8268 CPU @ 2.90GHz	8480CL	
+cellbender_fromraw_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	322050	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_tenx_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	327564	0	8480CL	8480CL	
+doubletfinder_soupx_tenx_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	327563	127951	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_tenx_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	327563	127951	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_soupx_tenx_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	327564	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_tenx_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	327796	0	8480CL	8480CL	
+doubletfinder_soupx_tenx_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	327795	153101	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_tenx_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	327795	153101	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_soupx_tenx_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	327796	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	332884	0	8480+	8480CL	
+doubletfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	332883	166222	8480+	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	332883	166222	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	332884	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_tenx_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	334084	0	8480+	8480CL	
+doubletfinder_soupx_tenx_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	0	334083	159359	8480+	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_tenx_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	0	334083	159359	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_soupx_tenx_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	334084	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_emptydrops_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	269887	0	8480+	8480CL	
+doubletfinder_soupx_emptydrops_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	269886	112178	8480+	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_emptydrops_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	269886	112178	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_soupx_emptydrops_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	269887	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_emptydrops_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	272480	0	8480CL	8480CL	
+doubletfinder_soupx_emptydrops_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	1	272479	161668	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_emptydrops_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	7	0	0	9	0	272480	161668	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_soupx_emptydrops_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	272481	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	272177	0	8480CL	8480CL	
+doubletfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	272176	176719	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	272176	176719	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	272177	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_emptydrops_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	269817	0	8480CL	8480CL	
+doubletfinder_soupx_emptydrops_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	269816	138192	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_soupx_emptydrops_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	269816	138192	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_soupx_emptydrops_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	269817	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_tenx_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	303807	0	8480CL	8480CL	
+doubletfinder_decontx_raw_tenx_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	303806	118533	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_tenx_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	303806	118533	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_decontx_raw_tenx_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	303807	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_tenx_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	319755	0	8480CL	8480CL	
+doubletfinder_decontx_raw_tenx_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	1	319754	154699	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_tenx_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	7	0	0	9	0	319755	154699	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_decontx_raw_tenx_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	319756	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	321190	0	8480CL	8480CL	
+doubletfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	1	321189	167642	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	7	0	0	9	0	321190	167642	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	321191	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_tenx_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	302569	0	8480CL	8480CL	
+doubletfinder_decontx_raw_tenx_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	37	7	0	0	9	1	302568	152655	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_tenx_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	0	302569	152655	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_decontx_raw_tenx_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	302570	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	261414	0	8480+	8480CL	
+doubletfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	261413	106956	8480+	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	261413	106956	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	261414	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	264733	0	8480+	8480CL	
+doubletfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	7	0	0	9	0	264732	134521	8480+	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	1	264731	134521	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	264732	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	265384	0	8480CL	8480CL	
+doubletfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	265383	150334	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	265383	150334	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	265384	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_emptydrops_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	261432	0	8480CL	8480CL	
+doubletfinder_decontx_raw_emptydrops_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	37	7	0	0	9	1	261431	154029	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_decontx_raw_emptydrops_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	0	261432	154029	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_decontx_raw_emptydrops_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	261433	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_cellbender_fromraw_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	286275	0	8480CL	8480CL	
+doubletfinder_cellbender_fromraw_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	37	7	0	0	10	1	286274	115955	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_cellbender_fromraw_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	10	0	286275	115955	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_cellbender_fromraw_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	286276	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_cellbender_fromraw_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	289141	0	8480CL	8480CL	
+doubletfinder_cellbender_fromraw_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	7	0	0	9	0	289140	166977	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_cellbender_fromraw_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	1	289139	166977	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_cellbender_fromraw_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	289140	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	289651	0	8480CL	8480CL	
+doubletfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	7	0	0	9	0	289650	175857	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	1	289649	175857	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	289650	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+doubletfinder_cellbender_fromraw_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	287307	0	8480CL	8480CL	
+doubletfinder_cellbender_fromraw_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	287306	148093	8480CL	8268 CPU @ 2.90GHz	
+doubletfinder_cellbender_fromraw_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	287306	148093	8268 CPU @ 2.90GHz	8480CL	
+doubletfinder_cellbender_fromraw_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	287307	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_tenx_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	346950	0	8480CL	8480CL	
+scdblfinder_soupx_tenx_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	346949	133591	8480CL	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_tenx_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	346949	133591	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_soupx_tenx_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	346950	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_tenx_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	346423	0	8480CL	8480CL	
+scdblfinder_soupx_tenx_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	346422	161964	8480CL	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_tenx_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	346422	161964	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_soupx_tenx_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	346423	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	352744	0	8480+	8480CL	
+scdblfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	352743	180569	8480+	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	352743	180569	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	352744	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_tenx_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	350549	0	8480+	8480CL	
+scdblfinder_soupx_tenx_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	350548	182631	8480+	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_tenx_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	350548	182631	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_soupx_tenx_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	350549	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_emptydrops_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	301277	0	8480+	8480CL	
+scdblfinder_soupx_emptydrops_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	301276	117292	8480+	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_emptydrops_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	301276	117292	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_soupx_emptydrops_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	301277	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_emptydrops_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	302962	0	8480CL	8480CL	
+scdblfinder_soupx_emptydrops_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	302961	175419	8480CL	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_emptydrops_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	302961	175419	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_soupx_emptydrops_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	302962	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	303176	0	8480CL	8480CL	
+scdblfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	303175	187549	8480CL	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	303175	187549	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	303176	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_emptydrops_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	301479	0	8480CL	8480CL	
+scdblfinder_soupx_emptydrops_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	301478	154999	8480CL	8268 CPU @ 2.90GHz	
+scdblfinder_soupx_emptydrops_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	301478	154999	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_soupx_emptydrops_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	301479	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_tenx_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	329779	0	8480CL	8480CL	
+scdblfinder_decontx_raw_tenx_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	329778	124983	8480CL	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_tenx_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	329778	124983	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_decontx_raw_tenx_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	329779	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_tenx_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	338192	0	8480CL	8480CL	
+scdblfinder_decontx_raw_tenx_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	338191	163642	8480CL	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_tenx_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	338191	163642	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_decontx_raw_tenx_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	338192	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	337989	0	8480CL	8480CL	
+scdblfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	337988	195159	8480CL	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	337988	195159	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	337989	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_tenx_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	331227	0	8480CL	8480CL	
+scdblfinder_decontx_raw_tenx_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	331226	164129	8480CL	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_tenx_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	331226	164129	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_decontx_raw_tenx_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	331227	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	285528	0	8480+	8480CL	
+scdblfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	285527	116310	8480+	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	285527	116310	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	285528	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	289190	0	8480+	8480CL	
+scdblfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	289189	147573	8480+	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	289189	147573	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	289190	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	290112	0	8480+	8480CL	
+scdblfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	290111	177213	8480+	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	290111	177213	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	290112	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_emptydrops_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	285584	0	8480+	8480CL	
+scdblfinder_decontx_raw_emptydrops_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	285583	149391	8480+	8268 CPU @ 2.90GHz	
+scdblfinder_decontx_raw_emptydrops_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	285583	149391	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_decontx_raw_emptydrops_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	285584	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_cellbender_fromraw_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	321818	0	8480+	8480CL	
+scdblfinder_cellbender_fromraw_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	321817	129306	8480+	8268 CPU @ 2.90GHz	
+scdblfinder_cellbender_fromraw_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	321817	129306	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_cellbender_fromraw_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	321818	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_cellbender_fromraw_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	323403	0	8480CL	8480CL	
+scdblfinder_cellbender_fromraw_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	323402	187530	8480CL	8268 CPU @ 2.90GHz	
+scdblfinder_cellbender_fromraw_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	323402	187530	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_cellbender_fromraw_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	323403	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	324600	0	8480CL	8480CL	
+scdblfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	324599	201654	8480CL	8268 CPU @ 2.90GHz	
+scdblfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	324599	201654	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	324600	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+scdblfinder_cellbender_fromraw_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	322154	0	8480CL	8480CL	
+scdblfinder_cellbender_fromraw_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	322153	167974	8480CL	8268 CPU @ 2.90GHz	
+scdblfinder_cellbender_fromraw_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	322153	167974	8268 CPU @ 2.90GHz	8480CL	
+scdblfinder_cellbender_fromraw_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	322154	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	172289	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	172288	76000	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	172288	76000	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	172289	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	173121	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	173120	92992	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	173120	92992	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	173121	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	173906	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	173905	104307	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	173905	104307	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	173906	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	171739	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	171738	101452	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	171738	101452	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_tenx_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	171739	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	166900	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	166899	73510	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	166899	73510	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	166900	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	167781	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	167780	92472	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	167780	92472	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	167781	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	168709	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	1	168708	101135	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	7	0	0	9	0	168709	101135	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	168710	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	166712	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	166711	94338	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	166711	94338	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_soupx_emptydrops_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	166712	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	101999	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	101998	54291	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	101998	54291	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	101999	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	103716	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	5	0	0	10	0	103715	64436	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	5	0	0	10	0	103715	64436	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	103716	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	103728	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	5	0	0	10	0	103727	73950	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	5	0	0	10	0	103727	73950	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	103728	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	102017	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	102016	64456	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	102016	64456	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_tenx_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	102017	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	115320	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	115319	59049	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	115319	59049	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	115320	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	115876	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	115875	76275	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	115875	76275	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	115876	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	116036	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	116035	81211	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	116035	81211	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	116036	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	115603	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	115602	76281	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	115602	76281	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_decontx_raw_emptydrops_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	115603	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	164576	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	164575	72192	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	164575	72192	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	164576	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	165583	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	165582	107917	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	165582	107917	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	165583	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	165586	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	165585	117523	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	165585	117523	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	165586	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	164281	0	8480CL	8480CL	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	0	164280	96564	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	37	7	0	0	9	1	164279	96564	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_doubletfinder_cellbender_fromraw_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	164280	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	185487	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	185486	80364	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	185486	80364	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	185487	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	185916	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	185915	97019	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	185915	97019	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	185916	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	186722	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	186721	107428	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	186721	107428	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	186722	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	185579	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	185578	116097	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	185578	116097	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_tenx_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	185579	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	194019	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	194018	84081	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	194018	84081	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	194019	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	194660	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	194659	122911	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	194659	122911	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	194660	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	195495	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	195494	129066	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	195494	129066	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	195495	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	194168	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	0	194167	113160	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	37	7	0	0	9	1	194166	113160	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_soupx_emptydrops_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	194167	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	109454	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	37	7	0	0	10	1	109453	57422	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	10	0	109454	57422	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	109455	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	111320	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	5	0	0	10	0	111319	79287	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	5	0	0	10	0	111319	79287	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	111320	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	111342	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	5	0	0	10	0	111341	83124	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	5	0	0	10	0	111341	83124	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	111342	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	109334	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	109333	69186	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	109333	69186	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	109334	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	136210	0	8480+	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	136209	65401	8480+	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	136209	65401	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	136210	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	137140	0	8480+	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	137139	78429	8480+	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	137139	78429	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	137140	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	136826	0	8480+	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	136825	87195	8480+	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	136825	87195	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	136826	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	136120	0	8480+	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	136119	79675	8480+	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	136119	79675	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_decontx_raw_emptydrops_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	136120	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	198018	0	8480+	8480CL	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	198017	84640	8480+	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	1	198017	84640	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	1	198018	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	198819	0	8480+	8480CL	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	198818	126712	8480+	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	198818	126712	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	198819	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	199187	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	199186	133276	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	199186	133276	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	199187	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	197757	0	8480CL	8480CL	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	197756	107633	8480CL	8268 CPU @ 2.90GHz	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	197756	107633	8268 CPU @ 2.90GHz	8480CL	
+posthocfilt_threshold_scdblfinder_cellbender_fromraw_test	T	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	197757	0	8268 CPU @ 2.90GHz	8268 CPU @ 2.90GHz	
+soupx_tenx_SRR18256555	P	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	9938306	0	8480CL	8480CL	
+soupx_tenx_SRR18256555	P	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	9938305	6006351	8480CL	8480CL	
+soupx_tenx_SRR18256555	P	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	9938305	6006351	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_SRR18256555	P	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	9938306	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_SRR18256555	P	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	9938306	0	8480CL	8480CL	
+soupx_tenx_SRR18256555	P	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	9938305	6006351	8480CL	8480CL	
+soupx_tenx_SRR18256555	P	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	9938305	6006351	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_SRR18256555	P	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	9938306	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_SRR18256555	P	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	9938565	0	8480CL	8480CL	
+soupx_tenx_SRR18256555	P	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	9938564	6434176	8480CL	8480CL	
+soupx_tenx_SRR18256555	P	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	9938564	6434176	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_SRR18256555	P	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	9938565	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_SRR18256555	P	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	9947354	0	8480CL	8480CL	
+soupx_tenx_SRR18256555	P	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	9947353	4988145	8480CL	8480CL	
+soupx_tenx_SRR18256555	P	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	9947353	4988145	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_SRR18256555	P	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	9947354	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_10xmousebrain	P	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	37316735	0	8480CL	8480CL	
+soupx_tenx_10xmousebrain	P	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	37316734	16523676	8480CL	8480CL	
+soupx_tenx_10xmousebrain	P	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	37316734	16523676	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_10xmousebrain	P	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	37316735	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_10xmousebrain	P	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	37316735	0	8480CL	8480CL	
+soupx_tenx_10xmousebrain	P	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	37316734	16523676	8480CL	8480CL	
+soupx_tenx_10xmousebrain	P	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	37316734	16523676	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_10xmousebrain	P	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	37316735	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_10xmousebrain	P	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	37317993	0	8480CL	8480CL	
+soupx_tenx_10xmousebrain	P	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	37317992	21638785	8480CL	8480CL	
+soupx_tenx_10xmousebrain	P	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	37317992	21638785	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_10xmousebrain	P	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	37317993	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_10xmousebrain	P	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	37316553	0	8480CL	8480CL	
+soupx_tenx_10xmousebrain	P	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	37316552	18404382	8480CL	8480CL	
+soupx_tenx_10xmousebrain	P	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	9	1	37316552	18404382	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_10xmousebrain	P	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	8	1	37316553	0	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	37316545	0	8480CL	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	1	37316544	19433501	8480CL	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	7	0	0	9	0	37316545	19433501	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	37316546	0	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	37316545	0	8480CL	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	7	0	0	9	1	37316544	19433501	8480CL	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	7	0	0	9	0	37316545	19433501	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	37316546	0	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	37318264	0	8480CL	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	37318263	22391876	8480CL	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	1	37318263	22391876	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	1	37318264	0	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	37317538	0	8480CL	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	37317537	19141503	8480CL	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	37317537	19141503	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_tenx_10xmousebrain	P	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	37317538	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_4500871lane	P	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	83566977	0	8480+	8480CL	
+soupx_emptydrops_4500871lane	P	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	83566976	45550988	8480+	8480CL	
+soupx_emptydrops_4500871lane	P	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	83566976	45550988	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_4500871lane	P	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	83566977	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_4500871lane	P	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	83566977	0	8480+	8480CL	
+soupx_emptydrops_4500871lane	P	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	83566976	45550988	8480+	8480CL	
+soupx_emptydrops_4500871lane	P	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	83566976	45550988	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_4500871lane	P	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	83566977	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_4500871lane	P	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	83589946	0	8480+	8480CL	
+soupx_emptydrops_4500871lane	P	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	83589945	51975105	8480+	8480CL	
+soupx_emptydrops_4500871lane	P	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	83589945	51975105	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_4500871lane	P	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	83589946	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_4500871lane	P	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	83526690	0	8480+	8480CL	
+soupx_emptydrops_4500871lane	P	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	83526689	44743317	8480+	8480CL	
+soupx_emptydrops_4500871lane	P	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	9	0	83526689	44743317	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_4500871lane	P	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	8	0	83526690	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_sscovelli	P	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	44	0	0	0	9	1	9635222	0	8480+	8480CL	
+soupx_emptydrops_sscovelli	P	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	37	6	0	0	10	1	9635221	4189943	8480+	8480CL	
+soupx_emptydrops_sscovelli	P	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	6	0	0	10	0	9635222	4189943	8268 CPU @ 2.90GHz	8480CL	
+soupx_emptydrops_sscovelli	P	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	45	0	0	0	9	0	9635223	0	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_emptydrops_sscovelli	P	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	44	0	0	0	9	1	9466507	0	8480+	8480CL	
+filtered_seurat_emptydrops_sscovelli	P	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	5	0	0	10	1	9466506	4192509	8480+	8480CL	
+filtered_seurat_emptydrops_sscovelli	P	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	5	0	0	10	1	9466506	4192509	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_emptydrops_sscovelli	P	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	44	0	0	0	9	1	9466507	0	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_emptydrops_sscovelli	P	meta	score	production	production	exact	clustering.floor.kernel_regressed	yes	44	0	0	0	8	1	9465942	0	8480+	8480CL	
+filtered_seurat_emptydrops_sscovelli	P	meta	score	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	5	0	0	9	1	9465941	4190312	8480+	8480CL	
+filtered_seurat_emptydrops_sscovelli	P	meta	score	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	5	0	0	9	1	9465941	4190312	8268 CPU @ 2.90GHz	8480CL	
+filtered_seurat_emptydrops_sscovelli	P	meta	score	portable	portable	exact	clustering.floor.kernel_regressed	yes	44	0	0	0	8	1	9465942	0	8268 CPU @ 2.90GHz	8480CL	
+cellbender_fromraw_ghirsutum2	P	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	44	0	0	0	9	1	6992930	0	8480+	8480CL	
+cellbender_fromraw_ghirsutum2	P	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	38	5	0	0	10	1	6992929	3166704	8480+	8480CL	
+cellbender_fromraw_ghirsutum2	P	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	38	5	0	0	10	1	6992929	3166704	8268 CPU @ 2.90GHz	8480CL	
+cellbender_fromraw_ghirsutum2	P	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	44	0	0	0	9	1	6992930	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_drerio	X	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	26378775	0	8480+	8480CL	
+soupx_tenx_drerio	X	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	26378774	17006121	8480+	8480CL	
+soupx_tenx_drerio	X	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	26378774	17006121	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_drerio	X	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	26378775	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_drerio	X	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	26413123	0	8480+	8480CL	
+soupx_tenx_drerio	X	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	26413122	15674618	8480+	8480CL	
+soupx_tenx_drerio	X	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	26413122	15674618	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_drerio	X	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	26413123	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_drerio	X	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	26410977	0	8480CL	8480CL	
+soupx_tenx_drerio	X	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	26410976	17928052	8480CL	8480CL	
+soupx_tenx_drerio	X	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	26410976	17928052	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_drerio	X	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	26410977	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_pvitticeps	X	pm	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	24954086	0	8480CL	8480CL	
+soupx_tenx_pvitticeps	X	pm	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	24954085	8364487	8480CL	8480CL	
+soupx_tenx_pvitticeps	X	pm	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	39	6	0	0	10	0	24954085	8364487	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_pvitticeps	X	pm	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	46	0	0	0	9	0	24954086	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_pvitticeps	X	ids	percent.mt	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	24956204	0	8480CL	8480CL	
+soupx_tenx_pvitticeps	X	ids	percent.mt	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	24956203	13272043	8480CL	8480CL	
+soupx_tenx_pvitticeps	X	ids	percent.mt	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	24956203	13272043	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_pvitticeps	X	ids	percent.mt	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	24956204	0	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_pvitticeps	X	ids_ncount	percent.mt,nCount_RNA	production	production	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	24949006	0	8480CL	8480CL	
+soupx_tenx_pvitticeps	X	ids_ncount	percent.mt,nCount_RNA	production	portable	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	24949005	15217085	8480CL	8480CL	
+soupx_tenx_pvitticeps	X	ids_ncount	percent.mt,nCount_RNA	portable	production	tolerance	clustering.floor.kernel_regressed	yes	40	6	0	0	9	0	24949005	15217085	8268 CPU @ 2.90GHz	8480CL	
+soupx_tenx_pvitticeps	X	ids_ncount	percent.mt,nCount_RNA	portable	portable	exact	clustering.floor.kernel_regressed	yes	47	0	0	0	8	0	24949006	0	8268 CPU @ 2.90GHz	8480CL	
