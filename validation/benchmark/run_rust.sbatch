@@ -14,7 +14,9 @@
 #     milestone M15, with one binary: d and r as above; h: scrust doubletfinder without --clusters
 #     (clustering on the fly); p: the whole rule in one process, scrust doubletfinder --clusters ...
 #     --recluster --recluster-export (the singlets re-clustered from memory, with the export as r
-#     has it), at 1 and 32 threads: variants d1, r1, h1, p1, d32, r32, h32, p32, in that order
+#     has it), at 1 and 32 threads: variants d1, r1, h1, p1, d32, r32, h32, p32, in that order.
+#     VARIANTS="<some of d r h p>" runs only those, into the repeat's existing directory, replacing
+#     them there (a later binary measured for the variants whose code it changes)
 #
 # Submit from the repository's top directory (the paths below are the repository's). The binary is
 # $SCRUST_BIN, by default main's code as verified for M13 (data/benchmarks/bin/scrust-b6f6e4e,
@@ -56,7 +58,11 @@ BIN=${SCRUST_BIN:-$B/bin/scrust-b6f6e4e}
 PY="env PYTHONNOUSERSITE=1 /usr/bin/python3 -I"
 
 final=$B/runs/rust/$tool/$obj/rep$rep
-[ -e "$final" ] && { echo "$final exists" >&2; exit 0; }
+if [ -e "$final" ] && [ -z "${VARIANTS:-}" ]; then
+    echo "$final exists" >&2
+    exit 0
+fi
+want() { [[ " ${VARIANTS:-d r h p} " == *" $1 "* ]]; }
 run=$final.partial.${SLURM_JOB_ID:-local}
 rm -rf "$run"
 mkdir -p "$run"
@@ -164,24 +170,35 @@ doubletfinder_m15)
     ref=$S/data/doubletfinder/$obj/runs/direct-production-sapphirerapids
     for t in 1 32; do
         out=$scratch/d$t
-        measure "d$t" "$input" "$out" -- doubletfinder --counts "$input" --clusters "$input/seurat_clusters.tsv" --out "$out" --threads "$t"
-        same "d$t" "$out" "$ref" cells.tsv sweep_stats.tsv bcmvn.tsv
         out2=$scratch/r$t
-        measure "r$t" "$out/singlets" "$out2" -- cluster --counts "$out/singlets" --preset workflow --export --out "$out2" --threads "$t"
-        cp "$out2/nclusters.txt" "$run/r$t/nclusters.txt" 2>/dev/null
-        cp "$out2/cluster_ids.txt" "$run/r$t/cluster_ids.txt" 2>/dev/null
+        if want d; then
+            measure "d$t" "$input" "$out" -- doubletfinder --counts "$input" --clusters "$input/seurat_clusters.tsv" --out "$out" --threads "$t"
+            same "d$t" "$out" "$ref" cells.tsv sweep_stats.tsv bcmvn.tsv
+        fi
+        if want r; then
+            measure "r$t" "$out/singlets" "$out2" -- cluster --counts "$out/singlets" --preset workflow --export --out "$out2" --threads "$t"
+            cp "$out2/nclusters.txt" "$run/r$t/nclusters.txt" 2>/dev/null
+            cp "$out2/cluster_ids.txt" "$run/r$t/cluster_ids.txt" 2>/dev/null
+        fi
         # clustering on the fly: R's labels and levels, and so R's DoubletFinder files
         out3=$scratch/h$t
-        measure "h$t" "$input" "$out3" -- doubletfinder --counts "$input" --out "$out3" --threads "$t"
-        same "h$t" "$out3" "$ref" cells.tsv sweep_stats.tsv bcmvn.tsv
-        same "h$t" "$out3/clusters" "$input" seurat_clusters.tsv seurat_clusters_levels.txt
+        if want h; then
+            measure "h$t" "$input" "$out3" -- doubletfinder --counts "$input" --out "$out3" --threads "$t"
+            same "h$t" "$out3" "$ref" cells.tsv sweep_stats.tsv bcmvn.tsv
+            same "h$t" "$out3/clusters" "$input" seurat_clusters.tsv seurat_clusters_levels.txt
+        fi
         # the whole rule in one process: the two-command route's files
         out4=$scratch/p$t
-        measure "p$t" "$input" "$out4" -- doubletfinder --counts "$input" --clusters "$input/seurat_clusters.tsv" --out "$out4" \
-            --recluster --recluster-export --threads "$t"
-        same "p$t" "$out4" "$out" cells.tsv sweep_stats.tsv bcmvn.tsv singlets/matrix.mtx.gz
-        same "p$t" "$out4/recluster" "$out2" seurat_clusters.tsv metadata.tsv pca/embeddings.tsv neighbors/snn.mtx.gz \
-            sct/corrected_counts.mtx.gz sct/scale_data.npy counts/matrix.mtx.gz
+        if want p; then
+            measure "p$t" "$input" "$out4" -- doubletfinder --counts "$input" --clusters "$input/seurat_clusters.tsv" --out "$out4" \
+                --recluster --recluster-export --threads "$t"
+            same "p$t" "$out4" "$ref" cells.tsv sweep_stats.tsv bcmvn.tsv
+            if want d && want r; then
+                same "p$t" "$out4" "$out" singlets/matrix.mtx.gz
+                same "p$t" "$out4/recluster" "$out2" seurat_clusters.tsv metadata.tsv pca/embeddings.tsv neighbors/snn.mtx.gz \
+                    sct/corrected_counts.mtx.gz sct/scale_data.npy counts/matrix.mtx.gz
+            fi
+        fi
         prune "$out"; prune "$out2"; prune "$out3"; prune "$out4"
     done
     ;;
@@ -189,7 +206,16 @@ doubletfinder_m15)
 esac
 rm -rf "$scratch"
 echo "end=$(date -u +%Y-%m-%dT%H:%M:%SZ) status=$status" >> "$run/env.txt"
-if [ "$status" = 0 ]; then
+if [ "$status" = 0 ] && [ -e "$final" ]; then
+    # VARIANTS: these variants replace the repeat's own; the record says which binary made which
+    for v in "$run"/*/; do
+        v=$(basename "$v")
+        rm -rf "${final:?}/$v"
+        mv "$run/$v" "$final/$v"
+    done
+    { echo "== variants ${VARIANTS} replaced:"; cat "$run/env.txt"; } >> "$final/env_replaced.txt"
+    rm -rf "$run"
+elif [ "$status" = 0 ]; then
     mv "$run" "$final"
 else
     echo "FAILED or differing outputs: kept in $run" >&2

@@ -1400,3 +1400,50 @@ obj <- load_seurat("export")           # or load_sce("export"); save_rds("export
 ```bash
 python -m scrustio h5ad export object.h5ad    # with loaders/python/scrustio on the path or installed
 ```
+
+## M15: clustering on the fly and the singlets' re-clustering
+
+M15 makes the clustering chain one library entry point and runs it inside `scrust doubletfinder` twice: before DoubletFinder, to cluster an input given no labels (clustering on the fly, plan C3h), and after the calls, to re-cluster the singlets as the workflow's `doubletfinder.R` does before saving them (the user's request of 2026-11-18). It is the pilot of A3's in-memory rule: one function from typed inputs in memory to a complete typed result, the command a thin layer around it, and the first hand-offs between tools in memory.
+
+### What M15 built
+
+| Where | Contents |
+|---|---|
+| `crates/cluster` | `chain::cluster_counts`, the entry point: `scio::Counts` (borrowed or taken) and `ChainParams` in, `Clustered` out; `Options::keep_reductions`, `keep_sct` and `guard_context`; `chain_output::Writer::write_clustered`, which writes the result through the observer's own code, and `clustered_result_json`. `from_counts` keeps its observer-only form on the same code; the staged starts are unchanged. |
+| `crates/scio` | `Counts` (a count matrix with its barcodes and feature lines: `read`, `keep_cells` in place, `write`, `features`) and `Factor` (labels with their levels, moved from `cluster`, which re-exports it); `tenx::write_columns` digests each file as it writes it (`Written::files`); `Manifest::fill_digests` keeps a digest it is given; nested outputs (`NESTED_OUTPUT`) in `Manifest::check`. |
+| `crates/doubletfinder` | `singlets::singlets` (the singlets kept in memory) and `write_counts`; `write_singlets` is the two. |
+| `crates/scrust` | `scrust cluster --counts` as read–call–write (`run_counts`; the output's tail `finish_run` shared by every route); `scrust doubletfinder` without `--clusters` (`--cluster-preset`, `--cluster-params`, `--cluster-stats`; `clusters/`) and with `--recluster` (`--recluster-preset`, `--recluster-params`, `--recluster-export`; `recluster/`); the in-process clusterings' stages on the command's clock; `cli::settle_memory` (below). |
+| `loaders/` | `nested_output` in both role lists; tests that a DoubletFinder output with nested outputs loads as before, and that each nested output loads on its own. |
+| `validation/` | `python/compare_runs.py`, `python/compare_saved_clustering.py`, `python/report_m15.py`; `slurm/m15_export.sbatch`, `m15_panel.sbatch`, `m15_recluster.sbatch`, `m15_memory.sbatch`, `m15_tests.sbatch`, `m15_cargo_tests.sbatch`, `m15_manifest.sh`; `benchmark/`, the benchmark's harness, moved from `data/benchmarks/scripts/` and extended. |
+
+### The entry point
+
+`cluster_counts(counts: Cow<scio::Counts>, params, threads, opts, observer) -> Clustered` runs SCTransform, the PCA guard (with the preset), RunPCA, FindNeighbors, FindClusters and, when asked, the silhouette widths and the purities, and opens no file.
+
+- **The counts are borrowed or taken.** Taken, the matrix goes as soon as SCTransform's setup has kept the rows it needs, as `scrust cluster` did before; borrowed, the caller keeps it (clustering on the fly, where DoubletFinder reads the same counts next).
+- **The result is complete.** It holds the cells and features, `nCount_RNA` and `nFeature_RNA`, FindClusters' result with `seurat_clusters` (a `scio::Factor`), the scores, and every stage's summary for `summary.json` (R's digests of `.Random.seed` after SCTransform and RunPCA, and of `scale.data`, among them). As `Options` asks, it also keeps RunPCA's and FindNeighbors' results (`keep_reductions`: `pca/` and `neighbors/`) and SCTransform's model, `scale.data` and corrected counts (`keep_sct`, with `correct`: `sct/` and the export).
+- **Each stage is freed once the next has what it needs.** The kept genes' counts and the full residual matrix always go after SCTransform; `scale.data` after RunPCA unless the model is kept; FindNeighbors' index and lists once the SNN graph is made, unless kept. The corrected counts are computed only for the export. Keeping `scale.data` and the corrected counts until the end does not raise `scrust cluster --export`'s peak, which SCTransform's own pass sets with both of them and the kept genes' counts alive.
+- **The observer** sees each stage by reference as it is made, for the stage dumps and the timings; it keeps nothing.
+- **Writing.** `Writer::write_clustered` takes the result's stages and writes the files the observer writes on the staged starts, through the same functions, then the labels and `metadata.tsv` follow as on every route. `scrust cluster --counts` reads the counts (`scio::Counts::read`), calls the entry point and writes the result (`run_counts`). The staged starts (`--sct`, `--pca`, `--snn`) keep their observer-only form (`from_scale_data`, `from_embeddings`, `from_snn`), which writes each stage as it is made: they start from files, so there is no in-memory input to hand over, and cargo test's route comparison shows them writing the same files as `--counts`.
+- **The in-memory rule's test** (`crates/scrust/tests/m15.rs`): the entry point called in the test's process, its result written by the library's writer, gives `scrust cluster --counts --export`'s files byte for byte (every file the writer writes; the command adds `counts/`, `README.txt` and `summary.json` around them), and the same `result` section.
+
+### Clustering on the fly
+
+`scrust doubletfinder --counts <dir> --out <dir>` without `--clusters` reads the counts once, clusters them with the entry point (borrowed; the workflow preset by default), and hands the labels and their levels to DoubletFinder in memory. DoubletFinder then takes the counts. Only the labels are kept, with the scores when `--cluster-stats` asks for them.
+
+- **`clusters/`** is a nested scrust output (below): `seurat_clusters.tsv` and `seurat_clusters_levels.txt` in `--clusters`' layout, `clusters.tsv` and its levels, `cluster_ids.txt`, `nclusters.txt`, `optimizer_ids.tsv` and `metadata.tsv`, as `scrust cluster` writes them, with its own `summary.json`. No `pca/`, `neighbors/` or `sct/`: only the labels are kept. Its manifest's `command` is `scrust cluster --counts <dir> --preset workflow --stats none`, whose values it reproduces.
+- **The DoubletFinder run's `summary.json`** gains `result.clustering` (the `result` section `scrust cluster` writes) and `run.parameters.clustering`; `run.clusters` names `clusters/`.
+- **`--clusters` stays,** and with it every output, byte for byte (check (c)).
+
+### The re-clustering
+
+`--recluster` re-clusters the singlets after the calls, as `doubletfinder.R` (lines 56–69) does before saving: SCTransform at the workflow's seed, `require_min_cells_for_pca(context = "doubletfinder")`, RunPCA, FindNeighbors, FindClusters, silhouette and purity (RunUMAP changes nothing downstream, C1). The chain's parameters match the script's calls, which are the workflow preset's.
+
+- **In memory.** The counts are read again after the calls, as since M6b (they were freed for the final run); the singlets are kept in memory, in place (`Counts::keep_cells`), and written as `singlets/`, each file digested as it is written; then they go to the entry point, taken. `singlets/` is not read back: the provenance takes the written files' digests. With `--recluster-export`, the export's `counts/` is a copy of `singlets/` (the export's definition: the input counts, copied byte for byte with their checksums).
+- **`recluster/`** holds what `scrust cluster --counts <out>/singlets --preset workflow [--export]` writes, through the same code (`run_counts`), as a nested output. Its `summary.json` differs from that command's only in the timings and the provenance's `command_line`, the one given; its `command`, which the normalised matrices' comment lines give, is that `scrust cluster` command, whose values it reproduces.
+- **The guard** names `doubletfinder`'s context in its message, as R's does; should it stop the re-clustering, DoubletFinder's own files are already written and the command fails with R's message, as the workflow's rule would.
+- **Memory.** DoubletFinder's stages are freed before the re-clustering starts, so the run's peak is the larger of DoubletFinder's and the chain's, not their sum.
+
+### Nested outputs
+
+A subdirectory that is itself a scrust output (`clusters/`, `recluster/`) keeps its own `summary.json` and manifest. The parent's manifest lists that `summary.json` with the role `nested_output` and its size and SHA-256; the checks recurse into it (`docs/output_manifest.md`, "Nested outputs"). Listed file by file under their own roles, the re-clustering's files would have broken the loaders, which take one file per role: two `raw_counts` with `--recluster-export` (`singlets/` and `recluster/counts/`), and the singlets' metadata, PCA and graphs offered to the DoubletFinder object. The loaders read the parent's own files as before and load a nested output on their own (`load_seurat("<out>/recluster")`, `add_scrust(obj, "<out>/clusters")`); their tests show both.

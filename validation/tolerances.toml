@@ -716,6 +716,45 @@ round_trip = "identical"
 # every load that draws.
 settled = { comparisons = 264, export_comparisons = 204, doubletfinder_comparisons = 60, production_identical_seurat = 1834, production_identical_sce = 1462, production_identical_anndata = 1619, portable_within_floor_seurat = 249, portable_within_floor_sce = 201, portable_within_floor_anndata = 198, beyond_floor = 0, values_checked_r = 3627555688, values_checked_python = 3627049492, round_trips = 264, readers_exports = 68, read10x_directories = 340, read_10x_mtx_attempts = 52088, wrong_combinations_r = 8496, wrong_combinations_python = 4248, cells_step1_comparisons = 136, cells_step1_drawn = 24 }
 
+# K12, clustering on the fly (M15; docs/PLAN.md C3h, C5): scrust doubletfinder given no --clusters
+# clusters its own input in process with the workflow's chain, as the workflow clustered the 150
+# production DoubletFinder inputs, and DoubletFinder runs on those labels. Against the inputs'
+# exported seurat_clusters and levels (M2's and M7's exports), byte for byte; DoubletFinder's files
+# (cells.tsv, the sweep tables, singlets/) and summary.json's result against M7's runs (label
+# m7-b8c8a8c), byte for byte, the clustering's own outputs (clusters/, result.clustering) aside;
+# M7's nine checks against the saved outputs; and the clustering's numbers against those the
+# inputs' workflow jobs logged. Production profile, on each workflow job's CPU type, 8 threads.
+[clustering.K12]
+criterion = "exact"
+compare = "labels and levels byte for byte; DoubletFinder's files byte for byte and its result member by member; M7's saved-output checks; the logged numbers"
+# Settled (M15, label m15-429a636; validation/slurm/m15_panel.sbatch, array job 61949383): all 150
+# objects, every check identical: the labels and levels of all 150 inputs; DoubletFinder's files
+# and result as M7's; M7's nine checks against the saved outputs, 1,350 of 1,350, 3,295,570,596
+# values (M7's own count); the logged nodes, edges, maximum modularity, communities, singletons and
+# clusters of all 150 inputs. Memory: see docs/validation/clustering.md ("M15").
+settled = { objects = 150, labels_identical = 150, files_identical = 150, saved_checks = 1350, saved_checks_identical = 1350, saved_values = 3295570596, logged_identical = 150 }
+
+# The singlets' re-clustering (M15; C3h): scrust doubletfinder --recluster clusters the singlets
+# in process, from memory, as doubletfinder.R does before saving. (a) Against the two-command route
+# (scrust doubletfinder, then scrust cluster --counts <out>/singlets --preset workflow [--export]),
+# run in a working directory of its own with the same relative paths: every file byte for byte,
+# summary.json as JSON with its timings and the provenance's command line aside. (b) Against the
+# saved DoubletFinder objects' re-clustering (M8's exports on T, M15's label-level exports of the
+# 150): seurat_clusters and SCT_snn_res.0.8 with their levels, silhouette_width,
+# neighborhood_purity, nCount_RNA, nFeature_RNA (and nCount_SCT, nFeature_SCT with the export),
+# as %.17g text, so bitwise; and the numbers each job logged. (c) Without the new options, M7's files.
+[clustering.K12_recluster]
+criterion = "exact"
+compare = "(a) files byte for byte, summary.json but its timings and command line; (b) metadata columns as %.17g text and levels byte for byte, logged numbers; (c) M7's files byte for byte"
+# Settled (M15, label m15-429a636): (a) on the 150 without the export (3,600 files; array job
+# 61949383) and on T and P with and without the export in both profiles (validation/slurm/
+# m15_recluster.sbatch: 20 runs, 24 and 31 files each); (b) on the 150 and on T in the production
+# profile, identical (8,869,312 labels, widths and purities on the 150); in the portable profile
+# (b) differs from the saved (SapphireRapids) objects only where M11 and M12 measured the floor:
+# silhouette widths in the last bits and purities of cells on the radius, the labels identical;
+# (c) on the 150, identical.
+settled = { a_objects = 150, a_files = 3600, a_tp_runs = 20, b_objects = 150, b_tier_t = 5, b_values = 8869312, c_objects = 150 }
+
 # K13, markers (M14; docs/PLAN.md C4 "Markers"): the workflow's find_markers.R and combine_markers.R
 # steps on the Seurat loader's object (validation/R/markers_from_loader.R), the clusters combined
 # in the saved table's order, against the saved <prefix>_markergenes.csv.

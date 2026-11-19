@@ -65,11 +65,19 @@ For a 10x input, `inputs[].files` lists the matrix, the barcodes and the feature
 
 ### Completeness
 
-- Every file in the output directory, in any subdirectory, is listed once.
+- Every file in the output directory, in any subdirectory, is listed once, except the files of a nested output (below), which its own manifest lists.
 - Every listed file exists, with the listed size and SHA-256.
 - Every file named in `rows` or `columns` is listed.
 
 A command checks its own manifest before writing `summary.json` and fails if any rule does not hold.
+
+### Nested outputs (M15)
+
+A subdirectory can itself be a scrust output, with its own `summary.json` and manifest: `scrust doubletfinder`'s `clusters/` (clustering on the fly) and `recluster/` (`--recluster`, the singlets' re-clustering), each as `scrust cluster` writes its output.
+
+- The parent's manifest lists the nested output's `summary.json` alone, with role `nested_output` (format `json`, scale `none`), its size and its SHA-256. It lists none of the nested output's other files: the nested manifest does, under the nested directory.
+- The checks recurse: a nested output's files must satisfy the completeness rules of its own manifest, and the naming rules hold within each manifest. `scrust validate manifest` reports a nested problem under the nested directory's name.
+- Loaders find the parent's own files by role, one per role, as before, and ignore `nested_output`. A nested output loads on its own, from its directory. So the singlets' re-clustering, which has its own `raw_counts` with `--recluster-export`, its own metadata and graphs, never shadows the DoubletFinder output's files.
 
 ### Identifiers
 
@@ -150,6 +158,7 @@ The scale tells a loader which slot a matrix may go into. Only `raw_counts` is r
 | `doublet_calls` | `cells.tsv` (`doubletfinder`): barcode, pANN, classification | tsv | cells (`barcode`) |
 | `doublet_sweep_stats`, `doublet_bcmvn` | `sweep_stats.tsv`, `bcmvn.tsv` (`doubletfinder`) | tsv | |
 | `stage_dump`, `stage_index`, `stage_scalars`, `start_partitions` | `stages/` (`--dump-stages`, `--keep-stages`): the instrumented R runs' layout, for validation | npy, tsv, json | |
+| `nested_output` | `clusters/summary.json`, `recluster/summary.json` (`doubletfinder`, M15): a nested scrust output's own summary, whose manifest lists its files ([Nested outputs](#nested-outputs-m15)) | json | |
 
 In `scrust cluster`'s output these files sit under `sct/`, `pca/` and `neighbors/` as listed; in `scrust sctransform`'s, `scrust pca`'s and `scrust neighbors`' outputs, at the top. A `path` is always the full relative path.
 

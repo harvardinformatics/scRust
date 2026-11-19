@@ -101,7 +101,9 @@ homotypic adjustment. The counts are read once for both; only the labels are kep
   Writes clusters/: seurat_clusters.tsv and seurat_clusters_levels.txt (the layout --clusters
   reads), the other label files and metadata.tsv as scrust cluster writes them (with the scores
   when asked), and its own summary.json (the clustering's numbers and manifest). No pca/,
-  neighbors/ or sct/: only the labels are kept.
+  neighbors/ or sct/: only the labels are kept. Afterwards glibc's mmap threshold is fixed at
+  128 KiB and the free pages returned, so that the clustering's freed buffers do not raise
+  DoubletFinder's peak (SCRUST_NO_SETTLE=1 in the environment skips it, for measuring).
 
 Re-clustering the singlets (--recluster; M15): after the calls, the singlets are clustered in
 this process, from memory, as the workflow's doubletfinder.R re-clusters them before saving
@@ -310,9 +312,10 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         ProvInput::digest("counts", &counts, &scio::tenx::input_files(&counts).map_err(|e| e.to_string())?.iter().map(|p| p.as_path()).collect::<Vec<_>>()).map_err(|e| e.to_string())
     };
     let mut counts_prov: Option<ProvInput> = None;
-    // clusters/: the labels the run computed, as a nested scrust cluster output
-    let mut hook_done: Option<cmd_cluster::Done> = None;
-    if let (Some(c), Some((hp, preset, file, stats))) = (&hook_result, &hook) {
+    // clusters/: the labels the run computed, as a nested scrust cluster output; then the result
+    // goes, but for the clustering's numbers (result.clustering) and its number of clusters
+    let mut hook_done: Option<(Json, usize)> = None;
+    if let (Some(c), Some((hp, preset, file, stats))) = (hook_result.take(), &hook) {
         let dir = out.join(CLUSTERS);
         let s = Settings { params: hp.clone(), threads, keep: false, export: false, dumps: None, purity_lists: false, annoy: false };
         let rec = Record {
@@ -330,11 +333,17 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         let mut w = Writer::new(&dir, c.cells.clone(), threads);
         w.write_stages = false;
-        w.write_clustered(c).map_err(|e| e.to_string())?;
+        w.write_clustered(&c).map_err(|e| e.to_string())?;
         let mut p = Phases::new();
         p.mark("load");
-        hook_done = Some(cmd_cluster::finish_run(&dir, "counts", &s, rec, w, c.chain.clone(), p)?);
+        let Clustered { chain: ch, .. } = c;
+        let d = cmd_cluster::finish_run(&dir, "counts", &s, rec, w, ch, p)?;
+        hook_done = Some((d.result, d.chain.clusters.seurat_clusters.levels.len()));
         phases.borrow_mut().mark("clustering: write");
+        // the clustering's memory is freed: DoubletFinder's peak starts from what is in use
+        if std::env::var_os("SCRUST_NO_SETTLE").is_none() {
+            cli::settle_memory();
+        }
     }
 
     let mut rng_end = None;
@@ -586,8 +595,8 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     m.fill_shapes(&out).map_err(|e| e.to_string())?;
     let files = crate::cli::finish_manifest(&out, &mut m, threads)?;
     let mut result = result;
-    if let (Json::Object(items), Some(d)) = (&mut result, &hook_done) {
-        items.push(("clustering".into(), d.result.clone()));
+    if let (Json::Object(items), Some((r, _))) = (&mut result, &hook_done) {
+        items.push(("clustering".into(), r.clone()));
     }
     if let (Json::Object(items), Some(d)) = (&mut result, &re_done) {
         let levels = &d.chain.clusters.seurat_clusters.levels;
@@ -613,7 +622,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         SINGLETS,
         written.ncol,
         written.nnz,
-        hook_done.as_ref().map(|d| format!(" {CLUSTERS}/: {} clusters (on the fly);", d.chain.clusters.seurat_clusters.levels.len())).unwrap_or_default(),
+        hook_done.as_ref().map(|(_, n)| format!(" {CLUSTERS}/: {n} clusters (on the fly);")).unwrap_or_default(),
         re_done.as_ref().map(|d| format!(" {RECLUSTER}/: {} clusters;", d.chain.clusters.seurat_clusters.levels.len())).unwrap_or_default(),
         phases.elapsed(),
         threads,

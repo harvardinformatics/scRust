@@ -234,6 +234,25 @@ def test_doubletfinder_output(outputs):
     assert set(a.obs[res["classification_column"]].astype(str)) == {"Singlet"}
 
 
+def test_nested_outputs(outputs):
+    """M15: scrust doubletfinder's clusters/ and recluster/ are nested outputs. The DoubletFinder
+    output loads as before, by its own files' roles; each nested output loads on its own."""
+    d = outputs["doubletfinder_nested"]
+    m = scrustio.read_manifest(d)
+    assert len(m.entries_by_role("nested_output")) == 2
+    assert len(m.entries_by_role("raw_counts")) == 1
+    a = scrustio.load_anndata(d)
+    b = scrustio.load_anndata(outputs["doubletfinder"])
+    assert list(a.obs_names) == list(b.obs_names)
+    res = m.summary["result"]
+    assert (a.obs[res["pANN_column"]].to_numpy() == b.obs[res["pANN_column"]].to_numpy()).all()
+    r = scrustio.load_anndata(os.path.join(d, "recluster"))
+    assert list(r.obs_names) == list(a.obs_names)
+    assert "X_pca" in r.obsm and r.X is not None and "seurat_clusters" in r.obs.columns
+    c = scrustio.read_manifest(os.path.join(d, "clusters"))
+    assert c.command == "cluster" and c.has_role("cell_metadata")
+
+
 def test_cluster_output_without_export_holds_no_matrices(outputs):
     m = scrustio.read_manifest(outputs["cluster"])
     assert not m.has_role("raw_counts") and not m.has_role("sct_counts")
