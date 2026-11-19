@@ -17,7 +17,8 @@
 //! - **clustering on the fly:** given no `--clusters`, the command clusters its own input first,
 //!   as the workflow's upstream script did, and hands the labels with their levels to DoubletFinder
 //!   in memory. Only the labels are kept (and the scores, with `--cluster-stats`); the counts read
-//!   once serve both. The clustering is written to `clusters/`;
+//!   once serve both. The clustering is written to `clusters/`; at the hand-off the allocator is
+//!   settled ([`scio::memory::settle`]), so that DoubletFinder's peak is its own;
 //! - **re-clustering the singlets** (`--recluster`): after the calls, the singlets go from memory
 //!   to the chain, as `doubletfinder.R` re-clusters them before saving, and `singlets_clusters/` gets
 //!   what `scrust cluster --counts <out>/singlets` writes, through the same code.
@@ -105,9 +106,9 @@ homotypic adjustment. The counts are read once for both; only the labels are kep
   Writes clusters/: seurat_clusters.tsv and seurat_clusters_levels.txt (the layout --clusters
   reads), the other label files and metadata.tsv (with the scores when asked), and its own
   summary.json (the clustering's numbers and manifest), as scrust cluster --counts <dir> writes
-  them. No pca/, neighbors/ or sct/: only the labels are kept. Afterwards glibc's mmap threshold is fixed at
-  128 KiB and the free pages returned, so that the clustering's freed buffers do not raise
-  DoubletFinder's peak (SCRUST_NO_SETTLE=1 in the environment skips it, for measuring).
+  them. No pca/, neighbors/ or sct/: only the labels are kept. At the hand-off to DoubletFinder,
+  glibc's mmap threshold is fixed at 128 KiB and the free pages returned, so that the
+  clustering's freed buffers do not raise DoubletFinder's peak (Linux with glibc).
 
 Re-clustering the singlets (--recluster; M15): after the calls, the singlets are clustered in
 this process, from memory, as the workflow's doubletfinder.R re-clusters them before saving
@@ -358,10 +359,10 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         let d = cmd_cluster::finish_run(&dir, "counts", &s, rec, w, ch, p)?;
         hook_done = Some((nested_result(CLUSTERS, &d.chain), d.chain.clusters.seurat_clusters.levels.len()));
         phases.borrow_mut().mark("clustering: write");
-        // the clustering's memory is freed: DoubletFinder's peak starts from what is in use
-        if std::env::var_os("SCRUST_NO_SETTLE").is_none() {
-            cli::settle_memory();
-        }
+        // the hand-off to DoubletFinder: the clustering's freed memory goes back to the system and
+        // glibc's mmap threshold is fixed, so that DoubletFinder's peak is its own (scio::memory)
+        scio::memory::settle();
+        phases.borrow_mut().mark("clustering: settle");
     }
 
     let mut rng_end = None;

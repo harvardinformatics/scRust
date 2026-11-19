@@ -80,32 +80,6 @@ pub fn threads(args: &Args) -> Result<usize, String> {
     Ok(t.max(1))
 }
 
-extern "C" {
-    /// glibc's `mallopt(3)`.
-    fn mallopt(param: std::os::raw::c_int, value: std::os::raw::c_int) -> std::os::raw::c_int;
-    /// glibc's `malloc_trim(3)`: returns the heap's free pages, in every arena, to the system.
-    fn malloc_trim(pad: usize) -> std::os::raw::c_int;
-}
-
-/// glibc's `M_MMAP_THRESHOLD` (malloc.h).
-const M_MMAP_THRESHOLD: std::os::raw::c_int = -3;
-
-/// After one stage of a process, before the next (M15: clustering on the fly before DoubletFinder):
-/// fixes glibc's mmap threshold at its default, 128 KiB, and returns the heap's free pages to the
-/// system. glibc raises the threshold each time a large block is freed (up to 32 MiB), so after the
-/// clustering's large buffers are freed, the next stage's medium-sized blocks would come from the
-/// heap and stay resident when freed; DoubletFinder's peak then grew by up to a fifth on small
-/// objects. With the threshold fixed, blocks of 128 KiB or more are mapped and unmapped as they
-/// come and go, so the next stage's peak is its own. Changes no result.
-pub fn settle_memory() {
-    // SAFETY: mallopt and malloc_trim only change the allocator's policy and release free pages;
-    // both may be called at any time
-    unsafe {
-        mallopt(M_MMAP_THRESHOLD, 128 * 1024);
-        malloc_trim(0);
-    }
-}
-
 /// Peak resident set size of this process so far (`VmHWM`), in KiB.
 pub fn peak_rss_kib() -> Option<u64> {
     let s = std::fs::read_to_string("/proc/self/status").ok()?;

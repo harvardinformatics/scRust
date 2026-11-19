@@ -1,8 +1,9 @@
 #!/bin/bash
 # Milestone M15: the manifest's section for M15's data (validation/manifest.toml), from the files on
 # disk. From the repository's top directory:
-#   bash validation/slurm/m15_manifest.sh <label> <cargo tests job> <loader tests job> > /path/to/section.toml
-# and put the section in the manifest after M14's. Lists the one-time exports of the 150 saved
+#   bash validation/slurm/m15_manifest.sh <label> <cargo tests job> <loader tests job> [<memory label>] > /path/to/section.toml
+# and put the section in the manifest after M14's. <memory label> is the memory measurements'
+# label (default: <label>), when they were made with an earlier binary. Lists the one-time exports of the 150 saved
 # DoubletFinder objects' re-clustering (validation/slurm/m15_export.sbatch), the panel's check
 # records and summary rows (validation/slurm/m15_panel.sbatch), the T and P re-clustering checks in
 # both profiles (validation/slurm/m15_recluster.sbatch), the memory measurements
@@ -12,6 +13,7 @@ set -euo pipefail
 label=${1:?label}
 cargo_job=${2:-}
 tests_job=${3:-}
+mem_label=${4:-$label}
 cat <<'EOF'
 # M15: clustering on the fly and the singlets' re-clustering (plan C3h, C5: K12, C6) ---------------
 #
@@ -25,7 +27,7 @@ cat <<'EOF'
 #               object.json, a copy of its marker table; input/ links to M7's export of its RNA
 #               counts (data/doubletfinder/<object>/saved/singlets/), checked against the object
 #   data/doubletfinder/<object>/rust/<label>/production/   validation/slurm/m15_panel.sbatch: the
-#               checks (checks/*.json), the summary row (row.tsv), /usr/bin/time -v of the four
+#               checks (checks/*.json), the summary row (row.tsv), /usr/bin/time -v of the five
 #               runs (time_*.txt) and the fingerprint
 #   data/doubletfinder/<object>/rust/<label>/<profile>_recluster/   validation/slurm/m15_recluster.sbatch
 #               on T and P: the checks (checks/*.json), time_*.txt, the fingerprint
@@ -77,13 +79,15 @@ for d in data/doubletfinder/*/rust/"$label"/*_recluster; do
         [ -f "$f" ] && entry "$f" run-record "the re-clustering's runs, $prof profile: $(basename "$f")" "$obj"
     done
 done
-for f in data/doubletfinder/*/rust/"$label"/memory/memory.tsv; do
+for f in data/doubletfinder/*/rust/"$mem_label"/memory/memory.tsv; do
     [ -f "$f" ] && entry "$f" check "peak memory of clustering on the fly, settled or not, and with the labels given, repeated" "$(echo "$f" | cut -d/ -f3)"
 done
-for f in data/doubletfinder/*/rust/"$label"-rc/memory/memory.tsv; do
+for f in data/doubletfinder/*/rust/"$mem_label"-rc/memory/memory.tsv; do
     [ -f "$f" ] && entry "$f" check "peak memory of the whole rule in process and of the two commands, repeated" "$(echo "$f" | cut -d/ -f3)"
 done
-for f in data/doubletfinder/logs/bin/scrust-"$label" data/benchmarks/bin/scrust-*; do
+bins=(data/doubletfinder/logs/bin/scrust-"$label")
+[ "$mem_label" != "$label" ] && bins+=(data/doubletfinder/logs/bin/scrust-"$mem_label")
+for f in "${bins[@]}" data/benchmarks/bin/scrust-*; do
     case $f in *b6f6e4e) continue ;; esac
     [ -f "$f" ] && entry "$f" run-record "a pinned scrust binary of M15's runs"
 done

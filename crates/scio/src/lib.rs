@@ -23,7 +23,9 @@
 //! - [`copy`]: copying files with their checksums (the export's `counts/`, M13);
 //! - [`counts`] and [`factor`]: what one tool hands to the next in memory (A3's in-memory
 //!   hand-offs, M15): a count matrix with its barcodes and feature lines, and cluster labels
-//!   with their levels.
+//!   with their levels;
+//! - [`memory`]: the allocator at those hand-offs, so that a chain's peak is its largest step's
+//!   (glibc's mmap threshold, M15).
 
 pub mod copy;
 pub mod counts;
@@ -33,6 +35,7 @@ pub mod grade;
 pub mod gz;
 pub mod json;
 pub mod manifest;
+pub mod memory;
 pub mod mtx;
 pub mod npy;
 pub mod sha256;

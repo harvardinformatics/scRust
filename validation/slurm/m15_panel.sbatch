@@ -10,8 +10,9 @@
 #   hook/        scrust doubletfinder --counts <input> --out run: clustering on the fly (K12)
 #   inprocess/   scrust doubletfinder --counts <input> --clusters <input labels> --out run
 #                --recluster: the whole rule in one process
-#   alone/       scrust cluster --counts <input> --preset workflow --out run/clusters: the command
-#                whose output hook/run/clusters/ is, pca/ and neighbors/ aside
+#   alone/       scrust cluster --counts <input> --preset workflow --stats none --out run/clusters:
+#                the command whose output hook/run/clusters/ is, pca/ and neighbors/ aside (the
+#                hook's --cluster-stats is none by default; the workflow preset's [stats] is not)
 # The checks, each into checks/<name>.json (and printed):
 #   c_step1          given/run against M7's run (label m7-b8c8a8c): cells.tsv, the sweep tables,
 #                    singlets/, byte for byte, and summary.json's result
@@ -135,7 +136,7 @@ run given "$tmp/given" doubletfinder --counts "$inp" --clusters "$inp/seurat_clu
 run recluster2 "$tmp/given" cluster --counts run/singlets --preset workflow --out run/singlets_clusters --threads "$threads"
 run hook "$tmp/hook" doubletfinder --counts "$inp" --out run --threads "$threads"
 run inprocess "$tmp/inprocess" doubletfinder --counts "$inp" --clusters "$inp/seurat_clusters.tsv" --out run --recluster --threads "$threads"
-run alone "$tmp/alone" cluster --counts "$inp" --preset workflow --out run/clusters --threads "$threads"
+run alone "$tmp/alone" cluster --counts "$inp" --preset workflow --stats none --out run/clusters --threads "$threads"
 
 status=0
 cmp_runs() { $py "$root/validation/python/compare_runs.py" "$@"; }
