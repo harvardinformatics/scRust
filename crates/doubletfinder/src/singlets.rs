@@ -5,41 +5,50 @@
 //! its later SCTransform and clustering add assays without touching the RNA counts.
 //!
 //! The run frees the counts when it builds the final run's input, which keeps its memory peak
-//! down; [`write_singlets`] reads them again from the input directory once the calls are made.
+//! down; the command reads them again once the calls are made. [`singlets`] keeps the singlets'
+//! columns in memory ([`scio::Counts`], the type tools hand each other: `scrust doubletfinder
+//! --recluster` clusters them without reading `singlets/` back, M15), and [`write_singlets`]
+//! reads, keeps and writes in one call.
 
 use crate::run::Output;
 use crate::DfError;
-use scio::tenx::{self, Written};
+use scio::tenx::Written;
+use scio::Counts;
 use std::path::Path;
 
 /// The singlets' directory in a run's output.
 pub const DIR: &str = "singlets";
 
-/// Writes `<out>/singlets/` (`matrix.mtx.gz`, `barcodes.tsv.gz`, `features.tsv.gz`): the
-/// columns of the counts in `counts_dir` that `output` calls singlets, in input order, each
-/// exactly as stored; the input's feature lines, as they are. `software` goes in the matrix's
-/// `%metadata_json` line. The files do not depend on `threads`.
-pub fn write_singlets(counts_dir: &Path, output: &Output, out: &Path, software: &str, threads: usize) -> Result<Written, DfError> {
-    let barcodes = tenx::read_barcodes(counts_dir)?;
-    if barcodes != output.barcodes {
-        return Err(DfError::Input(format!("{}: the barcodes are not the run's", counts_dir.display())));
+/// The counts of the cells `output` calls singlets, in input order, each column exactly as stored;
+/// the feature lines as they are. `counts` must be the run's input (its cells and genes).
+pub fn singlets(counts: Counts, output: &Output) -> Result<Counts, DfError> {
+    if counts.barcodes != output.barcodes {
+        return Err(DfError::Input("the counts' barcodes are not the run's".into()));
     }
-    let features = tenx::read_lines(&tenx::find(counts_dir, "features.tsv")?)?;
-    let m = scio::sparse::read_mtx(counts_dir)?;
-    if m.nrow != features.len() || m.ncol != barcodes.len() || m.nrow != output.n_genes || output.doublet.len() != m.ncol {
+    if counts.n_features() != output.n_genes || output.doublet.len() != counts.n_cells() {
         return Err(DfError::Input(format!(
-            "{}: the matrix is {} x {}, with {} features and {} barcodes; the run had {} genes and {} cells",
-            counts_dir.display(),
-            m.nrow,
-            m.ncol,
-            features.len(),
-            barcodes.len(),
+            "the matrix is {} x {}; the run had {} genes and {} cells",
+            counts.n_features(),
+            counts.n_cells(),
             output.n_genes,
             output.doublet.len()
         )));
     }
-    let cols: Vec<usize> = (0..m.ncol).filter(|&j| !output.doublet[j]).collect();
-    let kept: Vec<String> = cols.iter().map(|&j| barcodes[j].clone()).collect();
-    drop(barcodes);
-    Ok(tenx::write_columns(&out.join(DIR), &m, &cols, &kept, &features, software, threads)?)
+    let keep: Vec<bool> = output.doublet.iter().map(|&d| !d).collect();
+    Ok(counts.keep_cells(&keep))
+}
+
+/// Writes the singlets as `<out>/singlets/` (`matrix.mtx.gz`, `barcodes.tsv.gz`,
+/// `features.tsv.gz`); `software` goes in the matrix's `%metadata_json` line. The files do not
+/// depend on `threads`.
+pub fn write_counts(singlets: &Counts, out: &Path, software: &str, threads: usize) -> Result<Written, DfError> {
+    Ok(singlets.write(&out.join(DIR), software, threads)?)
+}
+
+/// Reads the counts in `counts_dir` again, keeps the singlets ([`singlets`]) and writes them
+/// ([`write_counts`]).
+pub fn write_singlets(counts_dir: &Path, output: &Output, out: &Path, software: &str, threads: usize) -> Result<Written, DfError> {
+    let counts = Counts::read(counts_dir)?;
+    let s = singlets(counts, output).map_err(|e| DfError::Input(format!("{}: {e}", counts_dir.display())))?;
+    write_counts(&s, out, software, threads)
 }

@@ -4,7 +4,8 @@
 //! as one binary: `doubletfinder` (milestone M6: the whole tool; M3: on R's own embeddings), `knn` (the shared
 //! neighbour stage on its own), `sctransform` (SCTransform v2, milestone M4), `pca` (RunPCA,
 //! milestone M5), `neighbors` (FindNeighbors: Annoy and the SNN graph, milestone M9), `cluster`
-//! (FindClusters: the modularity optimizer and GroupSingletons, milestone M10), `validate` (Rust
+//! (the clustering chain, milestones M10 to M13, through the `cluster` crate's library entry
+//! point since M15, which `doubletfinder` also calls), `validate` (Rust
 //! against R, plan A4) and `fingerprint` (the environment fingerprint of plan
 //! A5b, which the R reference runs record too).
 
@@ -25,8 +26,9 @@ Usage: scrust <COMMAND> [ARGS]...
 
 Commands:
   doubletfinder  Doublet detection reproducing DoubletFinder 2.0.6, from the counts and the
-                 cluster labels (milestone M6; --from-stages: on an instrumented R run's
-                 embeddings, M3)
+                 cluster labels, or clustering its own input in process (milestone M6; M15:
+                 clustering on the fly and --recluster, the singlets' re-clustering;
+                 --from-stages: on an instrumented R run's embeddings, M3)
   knn            Exact nearest neighbours as DoubletFinder ranks them
   sctransform    SCTransform v2 as Seurat 5.5.1 runs it (sctransform 0.4.3, glmGamPoi 1.22.0):
                  Pearson residuals, variable features and scale.data (milestone M4)
@@ -34,8 +36,9 @@ Commands:
                  (milestone M5)
   neighbors      FindNeighbors as Seurat 5.5.1 runs it (RcppAnnoy 0.0.23's Annoy, the SNN
                  graph) on cell embeddings (milestone M9)
-  cluster        FindClusters as Seurat 5.5.1 runs it (the modularity optimizer,
-                 GroupSingletons, the columns and levels) on an SNN graph (milestone M10)
+  cluster        The workflow's clustering chain as Seurat 5.5.1 runs it, from the counts
+                 (SCTransform, RunPCA, FindNeighbors, FindClusters, silhouette and purity;
+                 --export: the normalised data) or from any stage's output (milestones M10-M13)
   validate       Compare a Rust run with an R reference run
                  (validate doubletfinder|sctransform|pca|neighbors|cluster)
   fingerprint    Print the environment fingerprint as JSON: node, CPU, OpenBLAS kernel

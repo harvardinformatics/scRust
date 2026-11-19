@@ -16,7 +16,7 @@
             "sct_cells", "pca_embeddings", "pca_loadings", "pca_stdev", "rng_state", "knn_index",
             "knn_distance", "graph_nn", "graph_snn", "annoy_index", "doublet_calls",
             "doublet_sweep_stats", "doublet_bcmvn", "stage_dump", "stage_index", "stage_scalars",
-            "start_partitions")
+            "start_partitions", "nested_output")
 .SCALES <- c("raw_counts", "corrected_counts", "log1p_corrected_counts", "residuals",
              "pca_embeddings", "pca_loadings", "pca_stdev", "graph_nn", "graph_snn",
              "neighbour_indices", "neighbour_distances", "none")

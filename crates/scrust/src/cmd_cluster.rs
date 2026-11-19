@@ -6,13 +6,14 @@
 //! per-cell metadata, as plain files that cannot be taken for raw counts.
 
 use crate::cli::{self, Args, Phases};
-use cluster::chain::{self, Options};
+use cluster::chain::{self, Chain, Options};
 use cluster::chain_output::Writer;
 use cluster::chain_params::{self, ChainParams, PARAM_FLAGS, PARAM_SWITCHES};
 use cluster::metadata::RnaMetadata;
 use scio::manifest::{Entry, Ids, Input, InputFile, Manifest, Provenance};
 use scio::stages::DumpLevel;
 use scio::{tenx, Json, Table};
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 pub const USAGE: &str = "\
@@ -110,7 +111,7 @@ vst's residuals, which only a run from the counts has.
 
 /// Options that change no value of any file the normalised matrices' comment lines describe:
 /// left out of the command those lines give, so that the files do not depend on them.
-const OUTPUT_ONLY: [&str; 7] = ["out", "threads", "keep-stages", "dump-stages", "purity-lists", "annoy", "metadata"];
+pub const OUTPUT_ONLY: [&str; 7] = ["out", "threads", "keep-stages", "dump-stages", "purity-lists", "annoy", "metadata"];
 
 /// The files of a staged start's directories that the run reads, for the provenance.
 fn digest_existing(option: &str, dir: &Path, names: &[&str]) -> Result<Input, String> {
@@ -119,7 +120,7 @@ fn digest_existing(option: &str, dir: &Path, names: &[&str]) -> Result<Input, St
 }
 
 /// The seeds the chain reproduces, as the manifest records them.
-fn seeds_json(p: &ChainParams) -> Json {
+pub fn seeds_json(p: &ChainParams) -> Json {
     let opt = |v: Option<i32>| v.map(|x| Json::Int(x as i64)).unwrap_or(Json::Null);
     Json::obj(vec![
         ("SCTransform seed.use", opt(p.sct.seed_use)),
@@ -212,6 +213,128 @@ fn carried_rna(dirs: &[&Path], barcodes: &[String]) -> Result<Option<RnaMetadata
     Ok(None)
 }
 
+/// How a run of the chain writes its output: the options that shape the files (the same for
+/// every route).
+#[derive(Debug, Clone)]
+pub struct Settings {
+    pub params: ChainParams,
+    pub threads: usize,
+    /// `--keep-stages`: `sct/` and every random start's partition.
+    pub keep: bool,
+    /// `--export` (from the counts only).
+    pub export: bool,
+    pub dumps: Option<DumpLevel>,
+    pub purity_lists: bool,
+    /// `--annoy yes`: `neighbors/annoy.ann`.
+    pub annoy: bool,
+}
+
+impl Settings {
+    /// What the chain computes and keeps for these files ([`chain::cluster_counts`]'s result keeps
+    /// every stage the files hold).
+    pub fn options(&self) -> Options {
+        Options {
+            keep_partitions: self.keep,
+            keep_residuals: self.dumps == Some(DumpLevel::Full),
+            keep_purity_lists: self.purity_lists,
+            correct: self.export,
+            keep_reductions: true,
+            keep_sct: self.keep || self.export,
+            guard_context: None,
+        }
+    }
+}
+
+/// What a run's `summary.json` records of how it was asked for.
+#[derive(Debug, Clone)]
+pub struct Record {
+    /// The command line as given (`provenance.command_line`).
+    pub command_line: Vec<String>,
+    /// The command as the normalised matrices' comment lines give it (`provenance.command`).
+    pub command: String,
+    pub start_time: String,
+    /// `run.inputs`: each input option and its path.
+    pub inputs: Vec<(&'static str, Json)>,
+    /// `provenance.inputs`: each input's files, with their sizes and checksums.
+    pub provenance_inputs: Vec<Input>,
+    /// With `--export`: `counts/`'s entries in the manifest.
+    pub counts_entries: Vec<Entry>,
+    /// Seconds spent copying `counts/` (`run.export_counts_copy_s`).
+    pub export_s: f64,
+    /// `--metadata`: a table whose columns `metadata.tsv` carries over, by barcode.
+    pub metadata: Option<String>,
+    /// Notes on the scores (`run.stats.note`), such as scores asked for that a route cannot make.
+    pub stats_note: Vec<String>,
+}
+
+/// The input counts of a run from a 10x directory, as the manifest records them: with `export`,
+/// `counts/` (the directory's three files copied into `out` byte for byte, with their checksums)
+/// and its entries; otherwise the files' checksums. Returns the provenance input, `counts/`'s
+/// entries and the seconds the copy took.
+pub fn counts_input(dir: &Path, out: &Path, export: bool) -> Result<(Input, Vec<Entry>, f64), String> {
+    let files = tenx::input_files(dir).map_err(|e| e.to_string())?;
+    if !export {
+        let input = Input::digest("counts", dir, &files.iter().map(|p| p.as_path()).collect::<Vec<_>>()).map_err(|e| e.to_string())?;
+        return Ok((input, Vec::new(), 0.0));
+    }
+    let t = std::time::Instant::now();
+    let copied = scio::copy::copy_files(&files.iter().map(|p| p.as_path()).collect::<Vec<_>>(), &out.join("counts")).map_err(|e| e.to_string())?;
+    let export_s = t.elapsed().as_secs_f64();
+    let names: Vec<String> = copied.iter().map(|c| c.name.clone()).collect();
+    let input = Input { option: "counts".into(), path: dir.display().to_string(), files: copied.into_iter().map(|c| InputFile { name: c.name, bytes: c.bytes, sha256: c.sha256 }).collect() };
+    let (m, b, f) = (format!("counts/{}", names[0]), format!("counts/{}", names[1]), format!("counts/{}", names[2]));
+    let entries = vec![
+        Entry::new(&m, "raw_counts", "raw_counts", "matrix_market", "the input counts, copied byte for byte: genes x cells, Cell Ranger's layout (the export's only 10x directory, and its only raw counts)").rows(Ids::numbered("features", &f, 2)).columns(Ids::numbered("cells", &b, 1)),
+        Entry::new(&b, "raw_counts_cells", "none", "tsv", "the input counts' barcodes, one per line (their columns)").header(false),
+        Entry::new(&f, "raw_counts_features", "none", "tsv", "the input counts' features: id, name, type (their rows); Seurat's rows are the names").header(false),
+    ];
+    Ok((input, entries, export_s))
+}
+
+/// What a run of the chain from the counts leaves to its caller, besides its files.
+#[derive(Debug, Clone)]
+pub struct Done {
+    /// FindClusters' result and the scores (the stages are freed once written).
+    pub chain: Chain,
+    /// The run's phases (`run.phases`: name, seconds since `started`, peak RSS), for a caller
+    /// that records them on its own clock.
+    pub phases: Vec<(String, f64, Option<u64>)>,
+    pub started: std::time::Instant,
+}
+
+/// The chain from counts in memory, written into `out` as `scrust cluster --counts` writes it: the
+/// entry point ([`chain::cluster_counts`]; docs/PLAN.md A3, C3h), then its result written by the
+/// same code as every route, the manifest and `summary.json`. `scrust cluster --counts` reads the
+/// counts and calls this; `scrust doubletfinder --recluster` hands over its singlets from memory
+/// (M15). `phases` holds the caller's marks so far (`load`); `guard_context` is the PCA guard's
+/// (`doubletfinder.R` calls it with "doubletfinder").
+pub fn run_counts(counts: scio::Counts, out: &Path, s: &Settings, mut rec: Record, phases: Phases, guard_context: Option<&'static str>) -> Result<Done, String> {
+    if let Some(e) = rec.counts_entries.first_mut() {
+        *e = e.clone().shape(&[counts.n_features(), counts.n_cells()]).nnz(counts.matrix.nnz());
+    }
+    std::fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    let mut w = Writer::new(out, counts.barcodes.clone(), s.threads);
+    // the files come from the result; the writer observes only the stage dumps and the timings
+    w.write_stages = false;
+    w.keep_stages = s.keep;
+    w.export = s.export;
+    w.command = rec.command.clone();
+    w.input_checksums = cli::input_checksums(&rec.provenance_inputs);
+    w.sct_bin_size = s.params.sct.bin_size;
+    w.annoy = s.annoy;
+    w.purity_lists = s.purity_lists;
+    w.neighbor_params = Some(s.params.neighbors.clone());
+    if let Some(level) = s.dumps {
+        w = w.with_dumps(level);
+    }
+    let opts = Options { guard_context, ..s.options() };
+    let c = chain::cluster_counts(Cow::Owned(counts), &s.params, s.threads, opts, &mut w).map_err(|e| e.to_string())?;
+    w.write_clustered(&c).map_err(|e| e.to_string())?;
+    // the stages are written: only the clustering and the scores go on
+    let r = c.chain;
+    finish_run(out, "counts", s, rec, w, r, phases)
+}
+
 pub fn main(argv: &[String]) -> Result<(), String> {
     let mut phases = Phases::new();
     let start_time = cli::utc_now();
@@ -257,59 +380,35 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     if out.join("summary.json").exists() || out.join("clusters.tsv").exists() {
         return Err(format!("{}: holds a previous run; choose another --out", out.display()));
     }
-    let opts = Options { keep_partitions: keep, keep_residuals: dumps == Some(DumpLevel::Full), keep_purity_lists: purity_lists, correct: export };
+    let settings = Settings { params, threads, keep, export, dumps, purity_lists, annoy };
+    let opts = settings.options();
     std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
+    let mut rec = Record {
+        command_line: cli::command_line("cluster", argv),
+        command,
+        start_time,
+        inputs: Vec::new(),
+        provenance_inputs: Vec::new(),
+        counts_entries: Vec::new(),
+        export_s: 0.0,
+        metadata: args.get("metadata").map(str::to_string),
+        stats_note: Vec::new(),
+    };
+    let params = &settings.params;
 
-    let mut inputs: Vec<(&str, Json)> = Vec::new();
-    let mut provenance_inputs: Vec<Input> = Vec::new();
-    // with --export: counts/, the input copied with its checksums, and its entries in the manifest
-    let mut counts_entries: Vec<Entry> = Vec::new();
-    let mut export_s = 0.0f64;
-    let mut stats_note: Vec<String> = Vec::new();
-    let result = match start {
+    let (r, w) = match start {
         "counts" => {
+            // read, call the entry point, write (docs/PLAN.md A3): run_counts
             let dir = args.path("counts")?;
-            let files = tenx::input_files(&dir).map_err(|e| e.to_string())?;
-            if export {
-                let t = std::time::Instant::now();
-                let copied = scio::copy::copy_files(&files.iter().map(|p| p.as_path()).collect::<Vec<_>>(), &out.join("counts")).map_err(|e| e.to_string())?;
-                export_s += t.elapsed().as_secs_f64();
-                let names: Vec<String> = copied.iter().map(|c| c.name.clone()).collect();
-                provenance_inputs.push(Input { option: "counts".into(), path: dir.display().to_string(), files: copied.into_iter().map(|c| InputFile { name: c.name, bytes: c.bytes, sha256: c.sha256 }).collect() });
-                let (m, b, f) = (format!("counts/{}", names[0]), format!("counts/{}", names[1]), format!("counts/{}", names[2]));
-                counts_entries.push(Entry::new(&m, "raw_counts", "raw_counts", "matrix_market", "the input counts, copied byte for byte: genes x cells, Cell Ranger's layout (the export's only 10x directory, and its only raw counts)").rows(Ids::numbered("features", &f, 2)).columns(Ids::numbered("cells", &b, 1)));
-                counts_entries.push(Entry::new(&b, "raw_counts_cells", "none", "tsv", "the input counts' barcodes, one per line (their columns)").header(false));
-                counts_entries.push(Entry::new(&f, "raw_counts_features", "none", "tsv", "the input counts' features: id, name, type (their rows); Seurat's rows are the names").header(false));
-            } else {
-                provenance_inputs.push(Input::digest("counts", &dir, &files.iter().map(|p| p.as_path()).collect::<Vec<_>>()).map_err(|e| e.to_string())?);
-            }
-            let barcodes = tenx::read_barcodes(&dir).map_err(|e| e.to_string())?;
-            let features = tenx::read_features(&dir).map_err(|e| e.to_string())?;
-            let counts = scio::sparse::read_mtx(&dir).map_err(|e| e.to_string())?;
-            if counts.nrow != features.len() || counts.ncol != barcodes.len() {
-                return Err(format!("{}: the matrix is {} x {}, with {} features and {} barcodes", dir.display(), counts.nrow, counts.ncol, features.len(), barcodes.len()));
-            }
-            inputs.push(("counts", Json::Str(dir.display().to_string())));
-            if let Some(e) = counts_entries.first_mut() {
-                *e = e.clone().shape(&[counts.nrow, counts.ncol]).nnz(counts.nnz());
-            }
-            let mut w = Writer::new(&out, barcodes, threads);
-            w.features = Some(features.iter().map(|f| (f.id.clone(), f.name.clone())).collect());
-            w.rna = Some(RnaMetadata::of(&counts));
-            w.keep_stages = keep;
-            w.export = export;
-            w.command = command.clone();
-            w.input_checksums = cli::input_checksums(&provenance_inputs);
-            w.sct_bin_size = params.sct.bin_size;
-            w.annoy = annoy;
-            w.purity_lists = purity_lists;
-            w.neighbor_params = Some(params.neighbors.clone());
-            if let Some(level) = dumps {
-                w = w.with_dumps(level);
-            }
+            let (input, entries, export_s) = counts_input(&dir, &out, export)?;
+            rec.provenance_inputs.push(input);
+            rec.counts_entries = entries;
+            rec.export_s = export_s;
+            rec.inputs.push(("counts", Json::Str(dir.display().to_string())));
+            let counts = scio::Counts::read(&dir).map_err(|e| e.to_string())?;
             phases.mark("load");
-            let r = chain::from_counts(counts, &params, threads, opts, &mut w);
-            (r, w)
+            run_counts(counts, &out, &settings, rec, phases, None)?;
+            return Ok(());
         }
         "sct" => {
             let dir = args.path("sct")?;
@@ -319,8 +418,8 @@ pub fn main(argv: &[String]) -> Result<(), String> {
             if nf != vf.rows.len() || nc != barcodes.len() {
                 return Err(format!("{}: scale_data.npy is {nf} x {nc}, with {} variable features and {} cells", dir.display(), vf.rows.len(), barcodes.len()));
             }
-            inputs.push(("sct", Json::Str(dir.display().to_string())));
-            provenance_inputs.push(digest_existing("sct", &dir, &["cell_attr.tsv", "variable_features.tsv", "scale_data.npy", "summary.json", cluster::metadata::FILE])?);
+            rec.inputs.push(("sct", Json::Str(dir.display().to_string())));
+            rec.provenance_inputs.push(digest_existing("sct", &dir, &["cell_attr.tsv", "variable_features.tsv", "scale_data.npy", "summary.json", cluster::metadata::FILE])?);
             let rna = carried_rna(&[&dir], &barcodes)?;
             let mut w = Writer::new(&out, barcodes, threads);
             // the PCA's input rows are the variable features, in order
@@ -339,14 +438,14 @@ pub fn main(argv: &[String]) -> Result<(), String> {
                 }
             }
             phases.mark("load");
-            let r = chain::from_scale_data(rows, (0..nf).collect(), nc, &params, threads, opts, &mut w);
+            let r = chain::from_scale_data(rows, (0..nf).collect(), nc, params, threads, opts, &mut w);
             (r, w)
         }
         "pca" => {
             let dir = args.path("pca")?;
             let emb = crate::cmd_neighbors::read_embeddings(&dir)?;
-            inputs.push(("pca", Json::Str(dir.display().to_string())));
-            provenance_inputs.push(digest_existing("pca", &dir, &["embeddings.tsv", "embeddings.npy", cluster::metadata::FILE])?);
+            rec.inputs.push(("pca", Json::Str(dir.display().to_string())));
+            rec.provenance_inputs.push(digest_existing("pca", &dir, &["embeddings.tsv", "embeddings.npy", cluster::metadata::FILE])?);
             let rna = carried_rna(&[&dir], &emb.barcodes)?;
             let mut w = Writer::new(&out, emb.barcodes.clone(), threads);
             w.rna = rna;
@@ -355,27 +454,27 @@ pub fn main(argv: &[String]) -> Result<(), String> {
             w.neighbor_params = Some(params.neighbors.clone());
             w.pca_result = w.copy_stage(&dir, "pca", &pca::output::FILES).map_err(|e| e.to_string())?;
             phases.mark("load");
-            let r = chain::from_embeddings(emb.data, emb.n, emb.ncol, &params, threads, opts, &mut w);
+            let r = chain::from_embeddings(emb.data, emb.n, emb.ncol, params, threads, opts, &mut w);
             (r, w)
         }
         _ => {
             let dir = args.path("snn")?;
             let input = cluster::input::read_snn_dir(&dir)?;
-            inputs.push(("snn", Json::Str(input.source.display().to_string())));
-            inputs.push(("barcodes", Json::Str(input.barcodes_source.display().to_string())));
+            rec.inputs.push(("snn", Json::Str(input.source.display().to_string())));
+            rec.inputs.push(("barcodes", Json::Str(input.barcodes_source.display().to_string())));
             let mut read: Vec<&Path> = vec![input.source.as_path()];
             if input.barcodes_source != input.source {
                 read.push(input.barcodes_source.as_path());
             }
-            provenance_inputs.push(Input::digest("snn", &dir, &read).map_err(|e| e.to_string())?);
+            rec.provenance_inputs.push(Input::digest("snn", &dir, &read).map_err(|e| e.to_string())?);
             let emb = match args.get("pca") {
                 Some(p) => {
                     let e = crate::cmd_neighbors::read_embeddings(Path::new(p))?;
                     if e.barcodes != input.barcodes {
                         return Err(format!("--pca {p}: its cells are not the SNN graph's"));
                     }
-                    inputs.push(("pca", Json::Str(p.to_string())));
-                    provenance_inputs.push(digest_existing("pca", Path::new(p), &["embeddings.tsv", "embeddings.npy", cluster::metadata::FILE])?);
+                    rec.inputs.push(("pca", Json::Str(p.to_string())));
+                    rec.provenance_inputs.push(digest_existing("pca", Path::new(p), &["embeddings.tsv", "embeddings.npy", cluster::metadata::FILE])?);
                     Some((PathBuf::from(p), e))
                 }
                 None => None,
@@ -399,16 +498,28 @@ pub fn main(argv: &[String]) -> Result<(), String> {
                 if asked && emb.is_none() {
                     let m = format!("{name} asked for, but not computed: the scores need the PCA (give --pca with --snn)");
                     eprintln!("scrust cluster: {m}");
-                    stats_note.push(m);
+                    rec.stats_note.push(m);
                 }
             }
             phases.mark("load");
-            let r = chain::from_snn(&input.snn, emb.as_ref().map(|(_, e)| (e.data.as_slice(), e.ncol)), &params, threads, opts, &mut w);
+            let r = chain::from_snn(&input.snn, emb.as_ref().map(|(_, e)| (e.data.as_slice(), e.ncol)), params, threads, opts, &mut w);
             (r, w)
         }
     };
-    let (r, mut w) = result;
     let r = r.map_err(|e| e.to_string())?;
+    finish_run(&out, start, &settings, rec, w, r, phases)?;
+    Ok(())
+}
+
+/// The tail of every route: what FindClusters printed, the labels' files and `metadata.tsv` (with
+/// `--metadata`'s columns), the stage dumps, the manifest (with `--export`, `counts/` and the
+/// README) and `summary.json`. `w` has written or copied the stages; `r` is the clustering.
+pub fn finish_run(out: &Path, start: &str, s: &Settings, rec: Record, mut w: Writer, r: Chain, mut phases: Phases) -> Result<Done, String> {
+    let params = &s.params;
+    let threads = s.threads;
+    let mut inputs = rec.inputs;
+    let mut provenance_inputs = rec.provenance_inputs;
+    let mut stats_note = rec.stats_note;
     // the chain's stages, timed from the writer's making, on the command's clock
     let offset = w.started().saturating_duration_since(phases.started()).as_secs_f64();
     for (name, t, rss) in &w.phases {
@@ -423,7 +534,7 @@ pub fn main(argv: &[String]) -> Result<(), String> {
             eprintln!("{m}");
         }
     }
-    if let Some(m) = args.get("metadata") {
+    if let Some(m) = &rec.metadata {
         let mut taken: Vec<&str> = vec!["barcode", "nCount_RNA", "nFeature_RNA", "seurat_clusters", "silhouette_width", "silhouette_other", "neighborhood_purity", "purity_maximum", "nCount_SCT", "nFeature_SCT"];
         let cols: Vec<String> = r.clusters.resolutions.iter().map(|x| x.column.name.clone()).collect();
         taken.extend(cols.iter().map(String::as_str));
@@ -442,8 +553,8 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         "cluster",
         Provenance {
             scrust_version: env!("CARGO_PKG_VERSION").into(),
-            command_line: cli::command_line("cluster", argv),
-            command: command.clone(),
+            command_line: rec.command_line,
+            command: rec.command,
             inputs: provenance_inputs,
             reproduces: vec![
                 sctransform::REFERENCE.into(),
@@ -452,22 +563,22 @@ pub fn main(argv: &[String]) -> Result<(), String> {
                 cluster::REFERENCE.into(),
                 "bluster 1.20.0 approxSilhouette and neighborPurity (BiocNeighbors 2.4.0, knncolle's KMKNN: searched exhaustively with its arithmetic), as the workflow's add_silhouette_to_metadata calls them; the workflow's write_cluster_metadata".into(),
             ],
-            parameters: params_json(&params),
-            seeds: seeds_json(&params),
+            parameters: params_json(params),
+            seeds: seeds_json(params),
         },
     );
     manifest.push(Manifest::summary_entry());
     manifest.entries.extend(w.manifest_entries().map_err(|e| e.to_string())?);
-    manifest.entries.extend(counts_entries);
-    if export {
+    manifest.entries.extend(rec.counts_entries);
+    if s.export {
         manifest.push(Entry::new("README.txt", "readme", "none", "text", "this file: what the export holds and how to load each file"));
     }
-    manifest.fill_shapes(&out).map_err(|e| e.to_string())?;
-    if export {
+    manifest.fill_shapes(out).map_err(|e| e.to_string())?;
+    if s.export {
         let text = scio::manifest::readme(&manifest, "scrust cluster --export", &export_intro());
         write(&out.join("README.txt"), &text)?;
     }
-    let files_json = cli::finish_manifest(&out, &mut manifest, threads)?;
+    let files_json = cli::finish_manifest(out, &mut manifest, threads)?;
     let manifest_s = t_manifest.elapsed().as_secs_f64();
     phases.mark("manifest");
 
@@ -501,15 +612,16 @@ pub fn main(argv: &[String]) -> Result<(), String> {
     let version = env!("CARGO_PKG_VERSION");
     let fingerprint = Json::parse(&crate::fingerprint::json()).unwrap_or(Json::Null);
     let t = &r.timings;
+    let result = w.result_json(&r.clusters);
     let summary = Json::obj(vec![
         ("tool", Json::Str("scrust cluster".into())),
         ("reference", Json::Str(format!("{}; {}; {}; {}; bluster 1.20.0 approxSilhouette and neighborPurity (BiocNeighbors 2.4.0, knncolle's KMKNN: searched exhaustively with its arithmetic, with a certificate)", sctransform::REFERENCE, pca::REFERENCE, neighbors::REFERENCE, cluster::REFERENCE))),
         ("scrust_version", Json::Str(version.into())),
-        ("result", w.result_json(&r.clusters)),
+        ("result", result),
         (
             "run",
             Json::obj(vec![
-                ("parameters", params_json(&params)),
+                ("parameters", params_json(params)),
                 ("start", Json::Str(start.into())),
                 ("inputs", Json::obj(inputs)),
                 ("outdir", Json::Str(out.display().to_string())),
@@ -518,14 +630,14 @@ pub fn main(argv: &[String]) -> Result<(), String> {
                     "stats",
                     Json::obj(vec![("requested", Json::strs(&params.stats.names())), ("computed", Json::strs(&computed)), ("note", Json::Str(stats_note.join("; ")))]),
                 ),
-                ("keep_stages", Json::Bool(keep)),
-                ("export", Json::Bool(export)),
-                ("export_counts_copy_s", Json::Num(export_s)),
+                ("keep_stages", Json::Bool(s.keep)),
+                ("export", Json::Bool(s.export)),
+                ("export_counts_copy_s", Json::Num(rec.export_s)),
                 ("manifest_s", Json::Num(manifest_s)),
-                ("dump_stages", Json::Str(dumps.map_or("none", |d| d.name()).into())),
-                ("purity_lists", Json::Bool(purity_lists)),
+                ("dump_stages", Json::Str(s.dumps.map_or("none", |d| d.name()).into())),
+                ("purity_lists", Json::Bool(s.purity_lists)),
                 ("threads", Json::Int(threads as i64)),
-                ("start_time", Json::Str(start_time)),
+                ("start_time", Json::Str(rec.start_time)),
                 ("slurm_job_id", cli::env_json("SLURM_JOB_ID")),
                 ("sctransform_s", Json::Num(t.sctransform)),
                 ("pca_s", Json::Num(t.pca)),
@@ -571,5 +683,5 @@ pub fn main(argv: &[String]) -> Result<(), String> {
         t.purity,
         phases.elapsed()
     );
-    Ok(())
+    Ok(Done { chain: r, started: phases.started(), phases: phases.marks })
 }

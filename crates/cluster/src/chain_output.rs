@@ -21,8 +21,15 @@
 //! Each staged start writes what its stages make, and copies what it was given (`pca/` and
 //! `neighbors/` from `scrust pca`'s and `scrust neighbors`' directories), so every route writes
 //! the same files.
+//!
+//! **Two ways to write** (M15). On the staged starts the writer is the chain's [`Observer`] and
+//! writes each stage as it is made (`write_stages`). From the counts, the chain is
+//! [`crate::chain::cluster_counts`], whose result holds every stage the files need: the writer then
+//! only observes (the stage dumps and the timings) and writes the files from the result afterwards
+//! ([`Writer::write_clustered`]), through the same code, so both give the same bytes. That is how
+//! `scrust cluster --counts` and `scrust doubletfinder --recluster` write theirs.
 
-use crate::chain::Observer;
+use crate::chain::{Clustered, Observer};
 use crate::find_clusters::FindClusters;
 use crate::metadata::RnaMetadata;
 use crate::purity::Purity;
@@ -92,6 +99,10 @@ pub struct Writer {
     /// Elapsed time (since the writer was made, [`Writer::started`]) and peak memory after each
     /// stage, for the run record.
     pub phases: Vec<(String, f64, Option<u64>)>,
+    /// As the chain's observer, write each stage's files as it is made (the staged starts; the
+    /// default). Off when the files come from a [`Clustered`] result ([`Writer::write_clustered`]):
+    /// the observer then records only the stage dumps and the timings.
+    pub write_stages: bool,
     start: std::time::Instant,
 }
 
@@ -137,6 +148,7 @@ impl Writer {
             scale_data_sha256: None,
             files: Vec::new(),
             phases: Vec::new(),
+            write_stages: true,
             start: std::time::Instant::now(),
         }
     }
@@ -265,22 +277,111 @@ impl Writer {
     /// `summary.json`'s `result` section: FindClusters' result (as `scrust cluster --snn` writes
     /// it), then each stage this run made or was given, R's digests and the scores.
     pub fn result_json(&self, r: &FindClusters) -> Json {
-        let Json::Object(mut m) = crate::output::result_json(r) else { unreachable!() };
-        let opt = |j: &Option<Json>| j.clone().unwrap_or(Json::Null);
-        m.push(("sctransform".into(), opt(&self.sct_result)));
-        m.push(("scale_data_sha256".into(), self.scale_data_sha256.clone().map(Json::Str).unwrap_or(Json::Null)));
-        m.push(("pca".into(), opt(&self.pca_result)));
-        m.push((
-            "rng_after_sha256".into(),
-            Json::obj(vec![
-                ("SCTransform", self.rng_after_sct.clone().map(Json::Str).unwrap_or(Json::Null)),
-                ("RunPCA", self.rng_after_pca.clone().map(Json::Str).unwrap_or(Json::Null)),
-            ]),
-        ));
-        m.push(("neighbors".into(), opt(&self.neighbors_result)));
-        m.push(("silhouette".into(), opt(&self.silhouette_result)));
-        m.push(("purity".into(), opt(&self.purity_result)));
-        Json::Object(m)
+        result_sections(
+            r,
+            &ResultParts {
+                sctransform: self.sct_result.clone(),
+                scale_data_sha256: self.scale_data_sha256.clone(),
+                pca: self.pca_result.clone(),
+                rng_after_sct: self.rng_after_sct.clone(),
+                rng_after_pca: self.rng_after_pca.clone(),
+                neighbors: self.neighbors_result.clone(),
+                silhouette: self.silhouette_result.clone(),
+                purity: self.purity_result.clone(),
+            },
+        )
+    }
+
+    /// Takes the stages from the entry point's result ([`crate::chain::cluster_counts`]) and
+    /// writes the files the observer writes on the staged starts, through the same code: `sct/`
+    /// (with `--keep-stages` or `--export`, from the kept model), `pca/` and `neighbors/` (when the
+    /// result kept them), and fills `summary.json`'s stage sections. The labels' files and
+    /// `metadata.tsv` follow with [`Writer::finish_labels`], as on every route.
+    pub fn write_clustered(&mut self, c: &Clustered) -> io::Result<()> {
+        if c.cells != self.barcodes {
+            return Err(io::Error::other("the result's cells are not the writer's"));
+        }
+        self.features = Some(c.features.clone());
+        self.rna = Some(c.rna.clone());
+        let s = &c.sct;
+        self.sct_result = Some(s.summary.clone());
+        self.scale_data_sha256 = Some(s.scale_data_sha256.clone());
+        self.rng_after_sct = Some(rng_digest(&s.rng_exit));
+        self.sct_columns = s.sct_columns.clone();
+        if let Some(sct) = &s.kept {
+            self.write_sct(sct)?;
+        } else if self.keep_stages || self.export {
+            return Err(io::Error::other("sct/ is asked for (--keep-stages, --export), but the result did not keep SCTransform's model"));
+        }
+        let p = &c.pca;
+        self.pca_result = Some(p.summary.clone());
+        self.rng_after_pca = Some(rng_digest(&p.rng_exit));
+        if let Some((rows, pca)) = &p.kept {
+            self.write_pca(rows, pca, &p.rng_exit)?;
+        }
+        let nb = &c.neighbors;
+        self.neighbors_result = Some(nb.summary.clone());
+        self.graph_nnz = Some(nb.nnz);
+        if let Some(r) = &nb.kept {
+            self.write_neighbors(r)?;
+        }
+        self.levels = c.chain.clusters.seurat_clusters.levels.clone();
+        self.silhouette_result = c.chain.silhouette.as_ref().map(silhouette_json);
+        self.purity_result = c.chain.purity.as_ref().map(|p| purity_json(p, &self.levels, &self.barcodes));
+        Ok(())
+    }
+
+    /// `sct/` in `scrust sctransform`'s layout, with the corrected counts under `--export`, and
+    /// its manifest entries (`--keep-stages` or `--export`; nothing otherwise).
+    fn write_sct(&mut self, sct: &Sct) -> io::Result<()> {
+        if !(self.keep_stages || self.export) {
+            return Ok(());
+        }
+        let s = &sct.setup;
+        let d = self.out.join("sct");
+        mkdir(&d)?;
+        let genes: Vec<sctransform::output::Gene> = self
+            .features
+            .as_ref()
+            .expect("the counts' features")
+            .iter()
+            .map(|(id, name)| sctransform::output::Gene { id: id.clone(), name: name.clone() })
+            .collect();
+        let files = sctransform::output::write_outputs(&d, &self.barcodes, &genes, sct)?;
+        self.files.extend(files.into_iter().map(|f| format!("sct/{f}")));
+        let written = if self.export { sct.corrected.as_ref() } else { None };
+        if let Some(c) = written {
+            let names: Vec<String> = s.genes.iter().map(|&g| genes[g].name.clone()).collect();
+            let (cc, dc) = sctransform::output::corrected_comments(&self.command, &self.input_checksums, c);
+            let files = c.write(&d, &names, &self.barcodes, &cc, &dc, self.threads)?;
+            self.files.extend(files.into_iter().map(|f| format!("sct/{f}")));
+        }
+        self.sct_entries = sctransform::output::manifest_entries("sct", s.n_cells, s.genes.len(), s.genes_step1.len(), sct.residuals.top_features.len(), written);
+        Ok(())
+    }
+
+    /// `pca/` in `scrust pca`'s layout: `input_rows` are the PCA's input rows (rows of the
+    /// counts), `exit` R's state after RunPCA.
+    fn write_pca(&mut self, input_rows: &[usize], p: &Pca, exit: &[i32]) -> io::Result<()> {
+        let d = self.out.join("pca");
+        mkdir(&d)?;
+        let feats: Vec<(String, String)> = match &self.features {
+            Some(f) => input_rows.iter().map(|&r| f[r].clone()).collect(),
+            None => return Err(io::Error::other("the PCA's features are not known")),
+        };
+        pca::output::write_outputs(&d, &self.barcodes, &feats, p, exit)?;
+        self.files.extend(pca::output::FILES.iter().map(|f| format!("pca/{f}")));
+        Ok(())
+    }
+
+    /// `neighbors/` in `scrust neighbors`' layout.
+    fn write_neighbors(&mut self, r: &Neighbors) -> io::Result<()> {
+        let d = self.out.join("neighbors");
+        mkdir(&d)?;
+        self.graph_nnz = Some((r.nn.nnz(), r.snn.nnz()));
+        let files = neighbors::output::write_outputs(&d, &self.barcodes, r, self.annoy, self.threads)?;
+        self.files.extend(files.into_iter().map(|f| format!("neighbors/{f}")));
+        Ok(())
     }
 
     fn rec(&mut self) -> Option<&mut StageRecorder> {
@@ -346,34 +447,15 @@ impl Writer {
 
 impl Observer for Writer {
     fn sct(&mut self, sct: &Sct) -> io::Result<()> {
-        let nf = self.features.as_ref().map_or(0, |f| f.len());
-        self.sct_result = Some(sctransform::output::result_json(sct, nf));
-        self.scale_data_sha256 = Some(sctransform::output::scale_data_sha256_r_order(&sct.residuals));
-        self.rng_after_sct = Some(rng_digest(&sct.rng_exit));
-        let s = &sct.setup;
-        if self.keep_stages || self.export {
-            let d = self.out.join("sct");
-            mkdir(&d)?;
-            let genes: Vec<sctransform::output::Gene> = self
-                .features
-                .as_ref()
-                .expect("the counts' features")
-                .iter()
-                .map(|(id, name)| sctransform::output::Gene { id: id.clone(), name: name.clone() })
-                .collect();
-            let files = sctransform::output::write_outputs(&d, &self.barcodes, &genes, sct)?;
-            self.files.extend(files.into_iter().map(|f| format!("sct/{f}")));
-            let written = if self.export { sct.corrected.as_ref() } else { None };
-            if let Some(c) = written {
-                let names: Vec<String> = s.genes.iter().map(|&g| genes[g].name.clone()).collect();
-                let (cc, dc) = sctransform::output::corrected_comments(&self.command, &self.input_checksums, c);
-                let files = c.write(&d, &names, &self.barcodes, &cc, &dc, self.threads)?;
-                self.files.extend(files.into_iter().map(|f| format!("sct/{f}")));
+        if self.write_stages {
+            let nf = self.features.as_ref().map_or(0, |f| f.len());
+            self.sct_result = Some(sctransform::output::result_json(sct, nf));
+            self.scale_data_sha256 = Some(sctransform::output::scale_data_sha256_r_order(&sct.residuals));
+            self.rng_after_sct = Some(rng_digest(&sct.rng_exit));
+            self.write_sct(sct)?;
+            if let Some(c) = &sct.corrected {
+                self.sct_columns = Some((c.n_count(), c.n_feature()));
             }
-            self.sct_entries = sctransform::output::manifest_entries("sct", s.n_cells, s.genes.len(), s.genes_step1.len(), sct.residuals.top_features.len(), written);
-        }
-        if let Some(c) = &sct.corrected {
-            self.sct_columns = Some((c.n_count(), c.n_feature()));
         }
         let bin_size = self.sct_bin_size;
         if let Some(r) = self.rec() {
@@ -386,16 +468,11 @@ impl Observer for Writer {
     }
 
     fn pca(&mut self, input_rows: &[usize], input: &[f64], p: &Pca, entry: Option<&[i32]>, exit: &[i32]) -> io::Result<()> {
-        let d = self.out.join("pca");
-        mkdir(&d)?;
-        let feats: Vec<(String, String)> = match &self.features {
-            Some(f) => input_rows.iter().map(|&r| f[r].clone()).collect(),
-            None => return Err(io::Error::other("the PCA's features are not known")),
-        };
-        pca::output::write_outputs(&d, &self.barcodes, &feats, p, exit)?;
-        self.files.extend(pca::output::FILES.iter().map(|f| format!("pca/{f}")));
-        self.pca_result = Some(pca::output::result_json(p, input_rows.len()));
-        self.rng_after_pca = Some(rng_digest(exit));
+        if self.write_stages {
+            self.write_pca(input_rows, p, exit)?;
+            self.pca_result = Some(pca::output::result_json(p, input_rows.len()));
+            self.rng_after_pca = Some(rng_digest(exit));
+        }
         if let Some(r) = self.rec() {
             pca::record::record(r, CTX, input_rows, input, p, entry, exit)?;
         }
@@ -403,12 +480,10 @@ impl Observer for Writer {
     }
 
     fn neighbors(&mut self, r: &Neighbors, ncol: usize) -> io::Result<()> {
-        let d = self.out.join("neighbors");
-        mkdir(&d)?;
-        self.graph_nnz = Some((r.nn.nnz(), r.snn.nnz()));
-        let files = neighbors::output::write_outputs(&d, &self.barcodes, r, self.annoy, self.threads)?;
-        self.files.extend(files.into_iter().map(|f| format!("neighbors/{f}")));
-        self.neighbors_result = Some(neighbors::output::result_json(r, ncol));
+        if self.write_stages {
+            self.write_neighbors(r)?;
+            self.neighbors_result = Some(neighbors::output::result_json(r, ncol));
+        }
         let stages = self.out.join("stages");
         let np = self.neighbor_params.clone();
         if let Some(rec) = self.rec() {
@@ -508,13 +583,7 @@ impl Observer for Writer {
         let n = s.width.len();
         let self_levels = self.levels.clone();
         let computed = s.computed;
-        self.silhouette_result = Some(Json::obj(vec![
-            ("computed", Json::Bool(computed)),
-            ("dims", Json::Vector(s.dims.iter().map(|&d| Json::Int(d as i64)).collect())),
-            ("n_clusters", Json::Int(s.uclust.len() as i64)),
-            ("cluster_var", Json::nums(&s.cluster_var)),
-            ("widths_sha256", Json::Str(scio::sha256::hex(&s.width.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>()))),
-        ]));
+        self.silhouette_result = Some(silhouette_json(s));
         if let Some(rec) = self.rec() {
             if computed {
                 let nk = s.uclust.len();
@@ -604,6 +673,65 @@ impl Observer for Writer {
         self.phases.push((name.to_string(), self.start.elapsed().as_secs_f64(), peak_rss_kib()));
     }
 
+}
+
+/// `summary.json`'s `result.silhouette`.
+pub fn silhouette_json(s: &Silhouette) -> Json {
+    Json::obj(vec![
+        ("computed", Json::Bool(s.computed)),
+        ("dims", Json::Vector(s.dims.iter().map(|&d| Json::Int(d as i64)).collect())),
+        ("n_clusters", Json::Int(s.uclust.len() as i64)),
+        ("cluster_var", Json::nums(&s.cluster_var)),
+        ("widths_sha256", Json::Str(scio::sha256::hex(&s.width.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>()))),
+    ])
+}
+
+/// The stage sections of `summary.json`'s `result`, each `None` (null) when the run neither made
+/// nor was given that stage.
+#[derive(Debug, Clone, Default)]
+pub struct ResultParts {
+    pub sctransform: Option<Json>,
+    pub scale_data_sha256: Option<String>,
+    pub pca: Option<Json>,
+    pub rng_after_sct: Option<String>,
+    pub rng_after_pca: Option<String>,
+    pub neighbors: Option<Json>,
+    pub silhouette: Option<Json>,
+    pub purity: Option<Json>,
+}
+
+/// `summary.json`'s `result` section: FindClusters' result, then the stages' sections.
+pub fn result_sections(r: &FindClusters, p: &ResultParts) -> Json {
+    let Json::Object(mut m) = crate::output::result_json(r) else { unreachable!() };
+    let opt = |j: &Option<Json>| j.clone().unwrap_or(Json::Null);
+    let text = |t: &Option<String>| t.clone().map(Json::Str).unwrap_or(Json::Null);
+    m.push(("sctransform".into(), opt(&p.sctransform)));
+    m.push(("scale_data_sha256".into(), text(&p.scale_data_sha256)));
+    m.push(("pca".into(), opt(&p.pca)));
+    m.push(("rng_after_sha256".into(), Json::obj(vec![("SCTransform", text(&p.rng_after_sct)), ("RunPCA", text(&p.rng_after_pca))])));
+    m.push(("neighbors".into(), opt(&p.neighbors)));
+    m.push(("silhouette".into(), opt(&p.silhouette)));
+    m.push(("purity".into(), opt(&p.purity)));
+    Json::Object(m)
+}
+
+/// The `result` section `scrust cluster --counts` writes for this result: the clustering's numbers
+/// (C3h), also for a run that writes no files of its own.
+pub fn clustered_result_json(c: &Clustered) -> Json {
+    let levels = &c.chain.clusters.seurat_clusters.levels;
+    result_sections(
+        &c.chain.clusters,
+        &ResultParts {
+            sctransform: Some(c.sct.summary.clone()),
+            scale_data_sha256: Some(c.sct.scale_data_sha256.clone()),
+            pca: Some(c.pca.summary.clone()),
+            rng_after_sct: Some(rng_digest(&c.sct.rng_exit)),
+            rng_after_pca: Some(rng_digest(&c.pca.rng_exit)),
+            neighbors: Some(c.neighbors.summary.clone()),
+            silhouette: c.chain.silhouette.as_ref().map(silhouette_json),
+            purity: c.chain.purity.as_ref().map(|p| purity_json(p, levels, &c.cells)),
+        },
+    )
 }
 
 /// The K10 stage dumps (M13), in the layout of the instrumented R runs' hooks on `correct()`

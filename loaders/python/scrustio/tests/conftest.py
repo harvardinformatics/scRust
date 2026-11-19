@@ -33,12 +33,16 @@ def _run(*args):
 @pytest.fixture(scope="session")
 def outputs(tmp_path_factory):
     d = tmp_path_factory.mktemp("scrust")
-    out = {k: str(d / k) for k in ("export", "sctransform", "cluster", "doubletfinder")}
+    out = {k: str(d / k) for k in ("export", "sctransform", "cluster", "doubletfinder", "doubletfinder_nested")}
     _run("cluster", "--counts", COUNTS_IN, "--preset", "workflow", "--export", "--out", out["export"], "--threads", "2")
     _run("sctransform", "--counts", COUNTS_IN, "--seed", "12345", "--corrected-counts", "--out", out["sctransform"], "--threads", "2")
     _run("cluster", "--counts", COUNTS_IN, "--preset", "workflow", "--out", out["cluster"], "--threads", "2")
     _run("doubletfinder", "--counts", DF_IN, "--clusters", os.path.join(DF_IN, "seurat_clusters.tsv"),
          "--out", out["doubletfinder"], "--threads", "2")
+    # M15: clustering on the fly (clusters/) and the singlets' re-clustering with the export
+    # (singlets_clusters/), nested outputs
+    _run("doubletfinder", "--counts", DF_IN, "--out", out["doubletfinder_nested"], "--cluster-stats", "silhouette,purity",
+         "--recluster", "--recluster-export", "--threads", "2")
     return out
 
 

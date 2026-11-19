@@ -3,8 +3,8 @@
 #   Rscript loaders/R/scrustio/tests/scrustio_tests.R
 # SCRUST_ROOT (env.sh) locates the committed fixtures and .rlib/; the scrust binary (SCRUST_BIN, else
 # $SCRUST_ROOT/target/release/scrust) makes the outputs the tests load: an export of a tier-T
-# object, scrust sctransform --corrected-counts, scrust doubletfinder and scrust cluster without
-# --export. Exit status 1 if a test fails.
+# object, scrust sctransform --corrected-counts, scrust doubletfinder (with and without its nested
+# outputs, M15) and scrust cluster without --export. Exit status 1 if a test fails.
 
 root <- Sys.getenv("SCRUST_ROOT")
 if (!nzchar(root)) stop("SCRUST_ROOT is not set (source env.sh)")
@@ -359,6 +359,29 @@ check(sum(with_calls[[res$classification_column, drop = TRUE]] == "Doublet") == 
 bare <- CreateSeuratObject(Read10X(counts_in))
 with_cl <- suppressMessages(add_scrust(bare, cl_out))
 check(identical(with_cl$seurat_clusters, obj$seurat_clusters), "add_scrust: scrust cluster's labels with their levels")
+
+# 6. Nested outputs (M15) ----------------------------------------------------------------------------
+# scrust doubletfinder clustering its own input (clusters/) and re-clustering the singlets with the
+# export (singlets_clusters/): the DoubletFinder output loads as before, by its own files' roles; each nested
+# output loads on its own
+dfn <- file.path(tmp, "doubletfinder_nested")
+run("doubletfinder", "--counts", df_in, "--out", dfn, "--cluster-stats", "silhouette,purity", "--recluster",
+    "--recluster-export", "--threads", "2")
+nm <- read_manifest(dfn)
+roles <- vapply(nm$entries, `[[`, "", "role")
+check(sum(roles == "nested_output") == 2 && sum(roles == "raw_counts") == 1,
+      "nested outputs: listed by their summary.json; the parent's one raw_counts")
+dfno <- load_seurat(dfn)
+check(identical(colnames(dfno), colnames(dfo)) && identical(SeuratObject::Assays(dfno), "RNA") &&
+        identical(dfno[[res$pANN_column, drop = TRUE]], dfo[[res$pANN_column, drop = TRUE]]),
+      "nested outputs: the DoubletFinder output loads as before")
+rc <- load_seurat(file.path(dfn, "singlets_clusters"))
+check(identical(colnames(rc), singlets) && identical(DefaultAssay(rc), "SCT") && "pca" %in% names(rc@reductions) &&
+        is.factor(rc$seurat_clusters), "nested outputs: the re-clustering loads on its own, with the export")
+with_hook <- suppressMessages(add_scrust(base, file.path(dfn, "clusters")))
+check(identical(levels(with_hook$seurat_clusters), readLines(file.path(df_in, "seurat_clusters_levels.txt"))) &&
+        all(c("silhouette_width", "neighborhood_purity") %in% colnames(with_hook[[]])),
+      "nested outputs: clustering on the fly's labels, levels and scores, by add_scrust")
 
 cat(sprintf("scrustio %s: %d tests, %d failed\n", as.character(packageVersion("scrustio")), n_tests, length(failures)))
 if (length(failures)) quit(status = 1)
