@@ -134,7 +134,8 @@ def r_runs(out, cases):
 #   data/clustering/m15b/saved_rust/<label>/   validation/slurm/m15b_saved_rust.sbatch and
 #               validation/python/m15b_percent_mt.py: scrust's percent.mt against the saved objects'
 #   data/clustering/m15b/floor/   validation/python/m15b_floor.py: R against R across kernels with
-#               the regression, and scrust's portable runs against R's production runs
+#               the regression, every case, array and direction (r_vs_r.tsv), and the maxima by tier
+#               with the case that sets each ([clustering.floor.kernel_regressed]; summary.md)
 #   data/clustering/m15b/unchanged/<label>/   validation/slurm/m15b_unchanged.sbatch: without the
 #               options, M15's runs (validation/slurm/m15_recluster.sbatch) route by route
 #   data/doubletfinder/<object>/rust/<label>/<profile>_m15b/   validation/slurm/m15b_recluster.sbatch:

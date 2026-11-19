@@ -1,4 +1,4 @@
-# Clustering in Rust (Step 2; milestones M11 to M15)
+# Clustering in Rust (Step 2; milestones M11 to M15b)
 
 M11 runs the workflow's clustering chain end to end in Rust, from the counts to the labels and the silhouette widths (docs/PLAN.md C1, C3, C5, C6): SCTransform at seed 12345, the workflow's PCA guard, RunPCA with 50 PCs, FindNeighbors (Annoy, k = 20, dims 1:30), FindClusters (Louvain, resolution 0.8, seed 12345, singletons grouped) and bluster's `approxSilhouette`. It chains the `sctransform` and `pca` crates of Step 1 with M9's `neighbors` and M10's `cluster`, and adds the silhouette widths, `scrust cluster --counts` with its staged starts, parameters, preset and TOML file, and `scrust validate cluster` for the whole chain. It also adds kernel-gated grading (A5b mechanism 3) to both validators and a kernel check to the fixture tests.
 
@@ -8,9 +8,31 @@ M13 adds the rest of the SCT assay, the corrected counts of sctransform's `corre
 
 M14 adds the loaders: an R package (Seurat, SingleCellExperiment) and a Python package (AnnData) that read any scrust output through its manifest and put each matrix only into a slot meant for its scale. Each loader's object is compared with the saved workflow object (K11), and the workflow's own marker steps run on the Seurat loader's object (K13). Its outcome comes after M15's ([M14 outcome](#m14-outcome)), its details after M13's ([M14: the loaders](#m14-the-loaders)).
 
-M15 makes the chain one library entry point and runs it inside `scrust doubletfinder`: to cluster an input given no labels (K12, on all 150 DoubletFinder inputs) and, when asked, to re-cluster the singlets as the workflow's rule does before saving them, the singlets handed over in memory. Its outcome comes first ([M15 outcome](#m15-outcome)), its details last ([M15: clustering on the fly and the singlets' re-clustering](#m15-clustering-on-the-fly-and-the-singlets-re-clustering)).
+M15 makes the chain one library entry point and runs it inside `scrust doubletfinder`: to cluster an input given no labels (K12, on all 150 DoubletFinder inputs) and, when asked, to re-cluster the singlets as the workflow's rule does before saving them, the singlets handed over in memory. Its outcome comes after M15b's ([M15 outcome](#m15-outcome)), its details after M14's ([M15: clustering on the fly and the singlets' re-clustering](#m15-clustering-on-the-fly-and-the-singlets-re-clustering)).
+
+M15b ports SCTransform's `vars.to.regress` and the workflow's `percent.mt`, at the user's request: regressing `percent.mt`, the counts' columns or a column of a per-cell table out of `scale.data`, and `percent.mt` by the workflow's pattern or by a list of mitochondrial gene ids, none by default (K14). Its outcome comes first ([M15b outcome](#m15b-outcome)), its details last ([M15b: SCTransform's vars.to.regress and the workflow's percent.mt](#m15b-sctransforms-varstoregress-and-the-workflows-percentmt)).
 
 This is Step 2's main report, as [doubletfinder.md](doubletfinder.md) is Step 1's; M13 to M17 extend it. The milestones before it have their own: [clustering_m8.md](clustering_m8.md) (the R reference data and the R-vs-R floor), [clustering_m9.md](clustering_m9.md) (Annoy and the SNN graph), [clustering_m10.md](clustering_m10.md) (FindClusters).
+
+## M15b outcome
+
+| Done when (plan C6's M15b row, and the brief) | Result |
+|---|---|
+| The code path researched in the pinned env | **Recorded** in [PLAN C3j](../PLAN.md#c3-rust-design): `vars.to.regress` reaches only `scale.data` (one `RegressOutMatrix()` call: `lm()`'s QR once, `qr.resid()` per row, then the centring); `vst()`, the variable features and the corrected counts are those without it; LINPACK's `dqrdc2` with R's limited pivoting at `tol = 1e-07` calls OpenBLAS. Every function on the path is `identical()` to its source tarball's (13; [`regress_vectors.R`](../../validation/R/regress_vectors.R)). |
+| The port, as a library, the covariates in memory (A3) | **Built:** `rcompat::linpack` (`dqrdc2`, `dqrsl`, `lm_qr`, through the same OpenBLAS), `sctransform::regress`, `scio::features` (`PercentageFeatureSet()`, the pattern as TRE matches it, Seurat's row names), `cluster::covariates`; `chain::cluster_counts_with` takes the covariates in memory ([What M15b built](#what-m15b-built)). |
+| The options, as shared with the workflow; none by default | **Built** in `scrust sctransform`, `scrust cluster --counts` (the staged starts refuse them) and both of `scrust doubletfinder`'s clusterings (the `[sctransform]` keys of their parameter files, `--cluster-metadata`, `--recluster-metadata`); DoubletFinder's own SCTransform does not regress. The records: `run.parameters.sctransform`, `result.sctransform.regression` and `.percent_mt`, `run.notes`, the input files' digests ([percent.mt and the options](#percentmt-and-the-options)). |
+| K14 (a): exact against R's run of the same profile, every case (the main criterion) | **134 of 134 in the production profile and 134 of 134 in the portable one**, 889,756,126 values compared each, none differing: the labels and levels, both graphs, the PCA, `scale.data` value by value (130 cases) or its digest, the scores, `percent.mt`, the regression's covariates, rank and pivot. The 31 cases whose pattern finds nothing reproduce R's all-zero column (rank 1) through `--mt-genes`, and scrust refused the pattern in each, naming `--mt-genes` ([the main criterion](#against-rs-run-of-the-same-profile-the-main-criterion)). |
+| K14 (b): across kernels | **134 of 134 in both directions,** BLAS-free checks identical, 815 BLAS-dependent checks per direction within `[clustering.floor.kernel_regressed]`, none beyond it ([Across kernels](#across-kernels)). |
+| The floor (the coordinator's decision of 2026-11-19) | **`[clustering.floor.kernel_regressed]`,** R against R across kernels with the regression, measured on all 134 cases (T, P and the two other objects; R's portable runs of P added) with the grader's statistics, as M8 and M11 measured `[clustering.floor.kernel]`, which is unchanged; used only when both runs record the same non-empty `vars.to.regress` ([the measurement, and the two floors side by side](#the-r-vs-r-measurement-with-the-regression)). |
+| K14 (c): `percent.mt` without the regression against the saved objects | **The 34 clustering objects identical** (277,413 cells). **The 150 DoubletFinder objects: 120 identical; the other 30 are the SCT assay's** (`doubletfinder.R` computes it on the default assay, SCT): R's recomputation on SCT reproduces all 150 saved columns, and its RNA-based value equals scrust's on all 30 (296,410 cells). scrust keeps the shared rule, the RNA counts ([percent.mt against the saved objects](#percentmt-against-the-saved-objects)). |
+| K14 (d): without the options, M15's outputs | **120 of 120 routes byte-identical** to M15's final label on T and P in both profiles: DoubletFinder given the labels, the re-clustering in process and in two commands (with and without the export), clustering on the fly, `scrust cluster --counts` ([Without the options](#without-the-options)). |
+| K14 (e): `scrust doubletfinder` with the options; the in-memory rule | **20 of 20:** in process equal to the commands run one after the other, clustering on the fly equal to `scrust cluster --counts` with the same file, DoubletFinder's own files equal to M15's; and in cargo test, the entry point given the covariates in memory writes the command's files ([scrust doubletfinder with the options](#scrust-doubletfinder-with-the-options)). |
+| The loaders carry `percent.mt` | **Done:** a double column, exactly as written, in Seurat (after `nFeature_RNA`, as the workflow's objects hold it), SingleCellExperiment and AnnData; listed among what the loaders do not rebuild when the output did not compute it ([The loaders](#the-loaders)). |
+| Benchmark (A7 step 6) | <!-- M15b: benchmark outcome --> |
+| Plan corrections | A3, A5, A5b, C1, C3 (the refused list, the commands, the outputs, C3g, C3h, a new C3j), C5 (K14), C6 (M15b's row, the order, Step 2) ([M15b corrections](#m15b-corrections-to-the-plan)). |
+| User documentation | **For M14b:** M14b has not landed on main; it will document M15b's options with M15's. The commands' `--help` and the README describe them. |
+| Documentation | This report and [clustering_m15b.tsv](clustering_m15b.tsv); `[clustering.K14]` and `[clustering.floor.kernel_regressed]` in `validation/tolerances.toml`; M15b's section of `validation/manifest.toml`; `docs/output_manifest.md`; the README; the commands' `--help`; NOTICE; `docs/benchmarks.md`. |
+| Tests | `cargo test --workspace`: 316 tests in 47 suites, debug and release, none failing, no warnings (commit `aed8f74`, job 62091694); the loaders' tests: R 87, Python 14, all passing (job 62091155) ([M15b tests](#m15b-tests)). |
 
 ## M15 outcome
 
@@ -1756,3 +1778,361 @@ bash validation/slurm/m15_manifest.sh m15-<commit> <cargo tests job> <loaders' t
 ```
 
 The benchmark: [docs/benchmarks.md](../benchmarks.md), "Updating this page".
+
+## M15b: SCTransform's vars.to.regress and the workflow's percent.mt
+
+M15b ports SCTransform's `vars.to.regress` and Seurat's `PercentageFeatureSet()`, at the user's request of 2026-11-19: "Can we create an option for regressing on percent.mt, and an option to either use the current regex, or supply a list of mitochondrial gene ids? The behavior of not using vars.to.regress should be the default". The workflow gets the same options, with the same names and rules, on its own branch (`vars_to_regress_dev`, another session). The code path, as researched in the pinned env, is in [PLAN C3j](../PLAN.md#c3-rust-design); this section gives what was built and how it was checked.
+
+### What M15b built
+
+| Where | Contents |
+|---|---|
+| `crates/rcompat` | `linpack`: R's modified LINPACK QR, statement by statement: `dqrdc2` (Householder reflections with limited column pivoting at `tol = 1e-07`, and the rank), `dqrsl` with job 10 (`QrResid`: `Q'y`, its first `rank` entries zeroed, multiplied by `Q`), `lm_qr` (`lm(GENE ~ v1 + ...)`'s design matrix with the intercept, and its QR) and `model_matrix`. Their BLAS calls go to the same OpenBLAS as R's: `daxpy_` and `dscal_` join `ddot_` and `dnrm2_` in `rcompat::blas`. |
+| `crates/sctransform` | `regress`: `Regression` (the covariates' names and the QR, made once) and `regress_rows` (`qr.resid()` on every row; threads share the rows, each row's arithmetic serial). `residuals_with` and `vst::finish_full` regress `scale.data`'s clipped variable-feature rows before the centring, then set NaN to 0, as `ScaleData` does; `SctParams::vars_to_regress`; `summary.json`'s `regression` record. Without the option the code path is the one before M15b. |
+| `crates/scio` | `features`: Seurat's row names (`make_unique`, R's `do_makeunique`; `seurat_names`: `_` and `|` to `-`), the workflow's pattern as R's TRE matches `"(?i)^mt-"`, a list of ids (`parse_id_list`, `id_rows`), and `Counts::percent_feature_set` (`Csparse_colsum`'s order, then `/ nCount_RNA * 100`). |
+| `crates/cluster` | `covariates`: `MtGenes` (the pattern or a list), `PercentMt` (the column and its record), `CellCovariates` (the covariates' names and values, in memory) and the names' rules; `chain::cluster_counts_with`, the entry point with the covariates handed in memory (A3); `ChainParams`' `percent_mt` and `mt_genes`, their flags and TOML keys; `percent.mt` in `metadata.tsv` after `nFeature_RNA`; `scrust validate cluster`'s M15b checks (`percent.mt`, the regression's record, `percent.mt`'s features, `scale.data` value by value). |
+| `crates/scrust` | `--vars-to-regress`, `--mt-genes`, `--percent-mt` (and `--metadata` as a covariate) in `scrust sctransform` and `scrust cluster --counts`, refused on the staged starts; `scrust pca` and `scrust neighbors` carry `percent.mt` in `cell_metadata.tsv`; `scrust doubletfinder`'s `--cluster-metadata` and `--recluster-metadata`, the options in both parameter files' `[sctransform]`. |
+| `loaders/` | `percent.mt` typed as a double in R and Python; the Seurat loader puts it after the RNA assay's columns, where the workflow's objects hold it; tests in both. |
+| `validation/` | `R/regress_vectors.R`, `R/lib/clustering.R` (`cl_covariates`, `cl_regression_qr`, the chain with `vars.to.regress`), `R/reference_clustering.R`'s options, `R/export_percent_mt.R`, `R/percent_mt_sct.R`; `python/m15b_cases.py`, `m15b_percent_mt.py`, `m15b_floor.py`, `m15b_manifest.py`, `compare_runs.py --nested-summaries`; `slurm/m15b_*.sbatch`; the benchmark's tool `cluster_regress` (`benchmark/workflow_regress/`, the workflow's scripts as they were before its commit 8d34de1). |
+
+### The regression
+
+SCTransform's `vars.to.regress` changes one step of the chain: `scale.data`, the residuals of the variable features that RunPCA reads. `vst()`'s model, its residual statistics, the variable features and `correct()`'s corrected counts are those without it (C3j, item 1). `SCTransform.default` clips the variable features' residuals to `clip.range` and calls `ScaleData()` with the covariates; with the sequential `future` plan that is one `RegressOutMatrix()` call on all rows: the QR of `lm(GENE ~ v1 + v2 + ..., qr = TRUE)` once, then `qr.resid(qr, row)` for each row. The rows are then centred and `NA` becomes 0.
+
+- **The QR** is LINPACK's `dqrdc2` as R modifies it, called through `lm.fit` → `Cdqrls` → `dqrls` with `tol = 1e-07`. Its limited pivoting moves a column whose norm falls below `tol` times its original norm to the right-hand edge, and gives the rank. An all-zero covariate (`percent.mt` where no feature matches), a constant one or a collinear one is moved there and lowers the rank: R regresses on the rest, the intercept alone for an all-zero `percent.mt`. The port follows the routine statement by statement and calls OpenBLAS with the same arguments; each Householder vector is passed as a contiguous copy with `qraux(j)` in place of `x(j,j)`, as `dqrsl` swaps it in for the call.
+- **BLAS.** `dqrdc2` and `dqrsl` call `dnrm2`, `dscal`, `ddot` and `daxpy`, whose kernels sum in different orders and fuse multiply-adds: every regressed row is kernel-dependent, in R as in the port. Without the regression, `scale.data` differs across kernels in 0.72% of its entries at most (`[clustering.floor.kernel]` `S2d_scale_data`); with it, in most of them ([The R-vs-R measurement](#the-r-vs-r-measurement-with-the-regression)).
+- **Refusals,** besides the shared rules: a name R would not regress as given (not syntactic in R, `make.names(x) != x`, reserved words included), `GENE` (the formula's response), a name that is also a feature's; the staged starts given the options, since the regression is SCTransform's (`percent.mt` reaches them in `cell_metadata.tsv`); `scrust sctransform --metadata` without a regressed column of it.
+
+### percent.mt and the options
+
+The options are the workflow's, with its rules:
+
+- **`--vars-to-regress <name>[,<name>...]`** (`[sctransform] vars_to_regress`), none by default: `percent.mt`, `nCount_RNA`, `nFeature_RNA`, or a numeric column of `--metadata`, whose numbers are read as R's `read.table()` reads them (`R_strtod`). An unknown or repeated name, or a missing, non-numeric or non-finite value, is an error.
+- **`percent.mt`** is `PercentageFeatureSet()`: the counts of the mitochondrial features summed per cell, divided by `nCount_RNA`, times 100, in R's order of operations. Its features are, by default, those the workflow's pattern `"(?i)^mt-"` finds among Seurat's row names (`features.tsv`'s column 2 made unique, `_` and `|` to `-`). **`--mt-genes <file>`** lists their ids instead: one per line, each line trimmed, blank lines and `#` lines skipped, matched against column 1, each feature once; ids not found are reported and skipped, none found is an error.
+- **No feature matched:** with `percent.mt` regressed, an error naming `--mt-genes`, since R would regress an all-zero column without a word; without, a column of zeros and a warning.
+- **The column** is written only when asked for (`--vars-to-regress percent.mt`, `--mt-genes` or `--percent-mt`): in `metadata.tsv` after `nFeature_RNA`, and in `scrust sctransform`'s `cell_metadata.tsv`. Without any of them, every output is byte for byte what it was.
+- **Records** (`summary.json`): `run.parameters.sctransform` (`vars_to_regress`, `percent_mt`, `mt_genes`, each only when set); `result.sctransform.regression` (the covariates, the model, the QR's columns, rank, pivot and tolerance); `result.sctransform.percent_mt` (the pattern, or the file and its SHA-256; the features matched, their number and the first 50; the ids not found, their number and the first 10; the cells at 0 and the cells without counts); `run.notes` (the warnings). The `--mt-genes` file and a regressed `--metadata` file are inputs, digested in the manifest's provenance.
+- **`scrust doubletfinder`:** the parameter files of clustering on the fly and of the re-clustering take the `[sctransform]` keys, and `--cluster-metadata` and `--recluster-metadata` give each its `--metadata`; `clusters/` and `singlets_clusters/` then hold what `scrust cluster --counts` writes with the same options. DoubletFinder's own SCTransform never regresses, as DoubletFinder's R code calls it.
+
+### How the checks work
+
+- **The code path and the vectors** ([`validation/R/regress_vectors.R`](../../validation/R/regress_vectors.R), in the production R env, by sbatch; log `data/clustering/logs/m15b/regress_vectors.txt`): every function of the code path, installed, is `identical()` to the source tarball's; fourteen QR models from R's `lm()` (n from 2 to 613, p 2 or 3; rank-deficient: an all-zero, a constant, a nearly constant and a collinear covariate, and a wide matrix) with their `qr`, `qraux`, rank and pivot, and `qr.resid()` on rows of each; the pattern's matches on 22 names (case, the hyphen, look-alike characters, a name that only starts like it); Seurat's row names (`make.unique`, `_` and `|` to `-`); `PercentageFeatureSet()` on integer and real counts. All in the portable profile (`dqrdc2` and `dqrsl` call BLAS). The committed fixtures: `tests/fixtures/rcompat/linpack_*.tsv.gz`, `tests/fixtures/clustering/percent_mt/` and `tests/fixtures/clustering/m15b/`.
+- **The cases** ([`validation/m15b_cases.tsv`](../../validation/m15b_cases.tsv), by [`m15b_cases.py`](../../validation/python/m15b_cases.py)), 134:
+  - the 27 tier-T objects (no mitochondrial gene by the pattern; a stand-in list, the ribosomal protein genes): `pm` (`percent.mt` by the pattern, all 0), `ids` (by a list of ids), `ids_ncount` (`percent.mt` and `nCount_RNA`), `meta` (a `--metadata` column, `score`, written with R's number formats and a leading `+`);
+  - the four mouse tier-P objects (13 mitochondrial genes named `mt-`), the same four cases;
+  - the three other tier-P objects, whose pattern finds nothing: `pm`, and `meta` on filtered_seurat_emptydrops_sscovelli;
+  - two objects whose annotation names them otherwise: the zebrafish (soupx_tenx_drerio: the pattern finds its two `mt-` rRNAs; the list names those and its 13 protein genes, `ND1`, `COX1`, ...) and the bearded dragon (soupx_tenx_pvitticeps: the pattern finds none; the list names its 13), each `pm`, `ids`, `ids_ncount`. Their lists hold repeated ids, ids with spaces around them, comment lines and two ids that are no feature's.
+- **R's runs** ([`m15b_references.sbatch`](../../validation/slurm/m15b_references.sbatch); approved for M15b): `validation/R/reference_clustering.R` runs the chain as `lib/clustering.R` runs the workflow's, with `PercentageFeatureSet()` before SCTransform and `vars.to.regress` given, in both profiles, as direct runs at level full on tier T, standard elsewhere (both keep `scale.data`), and light on the three largest objects (`scale.data`'s digest only). 268 runs: each case in the production profile (SapphireRapids) and in the portable one (Haswell).
+- **Scrust's runs** ([`m15b_cluster.sbatch`](../../validation/slurm/m15b_cluster.sbatch), label `m15b-25fe846`): `scrust cluster --counts <input> --preset workflow` with the case's options, in both profiles, `--keep-stages` where R kept `scale.data`; `scrust validate cluster` against both R runs of the case. Where R's pattern finds no feature, scrust is given R's all-zero column through `--mt-genes` with features that have no counts, and the task checks that `--vars-to-regress percent.mt` by the pattern is refused, naming `--mt-genes`. [`m15b_revalidate.sbatch`](../../validation/slurm/m15b_revalidate.sbatch) validated the same runs again with the final binary's validator.
+- **`scrust validate cluster`** compares, besides M11's checks (the labels and levels, every `res.` column, the PCA, the graphs, the silhouette widths, the purities, R's digests): `percent.mt` as text (from the counts: BLAS-free, so exact on any kernel), the regression's record (the covariates, rank, pivot and tolerance), `percent.mt`'s features (when both runs define it the same way), and `scale.data` value by value, rows matched by name, where R kept it. The grading is M11's: exact when both runs recorded the same OpenBLAS kernel, otherwise the BLAS-dependent checks against the floor.
+- **`percent.mt` against the saved objects, without the regression:** [`m15b_saved.sbatch`](../../validation/slurm/m15b_saved.sbatch) exports the saved objects' `percent.mt` (`validation/R/export_percent_mt.R`, reading each `.rds` in a batch job): M8's 34 clustering objects and M7's 150 DoubletFinder objects. [`m15b_saved_rust.sbatch`](../../validation/slurm/m15b_saved_rust.sbatch) computes scrust's by the workflow's pattern (`scrust cluster --counts <input> --percent-mt --stats none`; for the DoubletFinder objects, the singlets' re-clustering with `percent_mt = true`), and [`m15b_percent_mt.py`](../../validation/python/m15b_percent_mt.py) compares the columns as `%.17g` text, so bit for bit. [`m15b_percent_mt_sct.sbatch`](../../validation/slurm/m15b_percent_mt_sct.sbatch) computes `PercentageFeatureSet()` on each saved DoubletFinder input's SCT and RNA assays, at the singlets ([`percent_mt_sct.R`](../../validation/R/percent_mt_sct.R)).
+- **The defaults:** [`m15b_unchanged.sbatch`](../../validation/slurm/m15b_unchanged.sbatch) compares the M15b binary's runs of M15's T and P check ([`m15_recluster.sbatch`](../../validation/slurm/m15_recluster.sbatch): DoubletFinder given the labels; the re-clustering in process with and without the export; the two-command route with and without it; clustering on the fly; `scrust cluster --counts`) with M15's final label's (`m15-a5de5e3`), route by route: every file byte for byte, `summary.json` as JSON without the timings, the command line and what records the node.
+- **`scrust doubletfinder` with the options** ([`m15b_recluster.sbatch`](../../validation/slurm/m15b_recluster.sbatch), on the five T and five P DoubletFinder objects, both profiles): clustering on the fly with `percent.mt` and `nCount_RNA` regressed (`--cluster-params`; the mouse objects by the pattern, the others by a list), and the re-clustering with `percent.mt` and a `--metadata` column (`--recluster-params`, `--recluster-metadata`): in process against the commands run one after the other; DoubletFinder's own files against M15's run; the manifests.
+
+### M15b results
+
+Every case's four comparisons (scrust's run in each profile against R's run in each) are in [clustering_m15b.tsv](clustering_m15b.tsv), one row each: the grading, the floor, the checks by status, the values compared and differing, and both runs' CPU models (scrust's runs label `m15b-25fe846`, validated by `390342d`'s binary, label `m15b-390342d`).
+
+#### Against R's run of the same profile (the main criterion)
+
+**Exact on all 134 cases in both profiles:** scrust's production runs against R's production runs (OpenBLAS's SapphireRapids kernel) and scrust's portable runs against R's portable runs (Haswell), every check identical, in exact mode.
+
+| profile | cases (T · P · X) | pass | checks identical | differing or missing | reported (purity's flagged pairs) | values compared | values differing |
+|---|---|---|---|---|---|---|---|
+| production | 134 (108 · 20 · 6) | **134** | 6,183 | 0 | 44 | 889,756,126 | 0 |
+| portable | 134 (108 · 20 · 6) | **134** | 6,187 | 0 | 40 | 889,756,130 | 0 |
+
+- **What is compared:** the labels and levels (`seurat_clusters`, `SCT_snn_res.0.8`, the identities) and FindClusters' result; both graphs (`SCT_nn`, `SCT_snn`, 30,395,764 stored entries of `SCT_snn` over the 134 cases); the PCA (embeddings, loadings, standard deviations, total variance); `scale.data` value by value in the 130 cases whose R runs kept it (804,975,008 values), its digest in the other four; the silhouette widths and the purities; the counts' columns; `percent.mt` as text in the 102 cases that write it; a regressed `--metadata` column, R's double against the candidate's text parsed as R parses it; the regression's covariates, columns, rank and pivot; R's digests of `.Random.seed` after SCTransform and RunPCA, of the corrected counts and of `scale.data`; the manifest.
+- **Reported, not failed:** the purity certificate's flagged pairs, the median pair of each odd-sized object (M12's decision), 40 to 44 per profile.
+- **The rank-deficient path:** the 31 `pm` cases whose pattern finds nothing (tier T, the three other tier-P objects and the bearded dragon) regress an all-zero column, rank 1, pivot `1,2`: scrust's runs, given that column through `--mt-genes` with features without counts, are R's bit for bit, and in each, scrust refused the pattern itself, naming `--mt-genes` (`refusal.txt`).
+- **The CPU type:** tier P's and the other objects' 26 portable pairs ran on different CPU types (scrust on Xeon 8268 nodes, R on 8480CL), and are exact too, the regressed `scale.data` included.
+
+#### Across kernels
+
+**Within `[clustering.floor.kernel_regressed]` on all 134 cases, in both directions:** scrust's portable runs against R's production runs, and scrust's production runs against R's portable runs, in tolerance mode, the BLAS-free checks identical and the BLAS-dependent ones within the regressed floor, none beyond it.
+
+| scrust against R | cases | pass | checks identical | within the floor | differing | values compared | values differing |
+|---|---|---|---|---|---|---|---|
+| portable against production | 134 | **134** | 5,238 | 815 | 0 | 889,755,996 | 482,340,726 |
+| production against portable | 134 | **134** | 5,234 | 815 | 0 | 889,755,992 | 482,340,726 |
+
+The checks within the floor, per direction: `scale.data` (130), the embeddings' dims 1:30 and 31:50, the loadings and the standard deviations (134 each), the silhouette widths (130), the purities (18) and the total variance (1). Since scrust's runs are R's of the same profile bit for bit, these are R's own differences across kernels, the ones the floor was measured from. The labels, the levels, both graphs, `percent.mt`, the counts' columns and the regression's rank and pivot are identical across kernels in every case.
+
+#### The R-vs-R measurement with the regression
+
+With `vars.to.regress`, R's own runs differ across kernels well beyond `[clustering.floor.kernel]`, which M8 and M11 measured without the regression. The regression's QR calls OpenBLAS's level-1 routines for every row, so `scale.data` differs in 27% to 72% of its entries between R's production and portable runs of the same case. Without the regression the figure is at most 0.72% (`S2d_scale_data`). The PCA and the scores after it move with it, and the labels do not: they are identical in every case. Even the all-zero `percent.mt` of the `pm` cases on tier T, which leaves the intercept alone (rank 1), makes 27% to 33% of `scale.data` differ: the intercept's own reflection and every row's products go through the same routines.
+
+| scale.data's entries differing across kernels | `pm` | `ids` | `ids_ncount` | `meta` |
+|---|---|---|---|---|
+| tier T (27 objects) | 27.0–33.4% | 42.2–65.2% | 50.7–71.5% | 44.9–58.2% |
+| tier P (4 objects at level standard) | 44.4–61.1% | 44.4–61.1% | 58.9–65.7% | 49.7–54.2% |
+| the zebrafish and the bearded dragon | 33.1–65.8% | 53.8–60.5% | 62.0–69.5% | – |
+
+The decision (2026-11-19): a floor of its own, `[clustering.floor.kernel_regressed]`, measured R against R as `[clustering.floor.kernel]` was, used only when both runs record the same non-empty `vars.to.regress`; `[clustering.floor.kernel]` and every unregressed grading stay as they are, and exactness against R's run of the same profile stays the main criterion.
+
+**How it was measured** ([`m15b_floor.py`](../../validation/python/m15b_floor.py); `data/clustering/m15b/floor/r_vs_r.tsv` and `summary.md`):
+
+- **The runs:** R's direct runs of all 134 cases in the production profile (OpenBLAS's SapphireRapids kernel, Xeon 8480CL) and in the portable one (Haswell): tier T's portable runs on Xeon 8268 nodes, the others' on 8480CL. Under one kernel the CPU type changes nothing: M8 found every file identical across the two CPU types without the regression, and this milestone found it with the regression too ([below](#against-rs-run-of-the-same-profile-the-main-criterion)).
+- **The statistics** are the grader's: `scio::grade::stats`, ported line for line (bitwise differences; a column's sign flipped when its negation is closer in L1; max abs; max scaled, over the reference's largest absolute value; rows with a difference). On a tier-T case the port gives the validator's own figures to every printed digit.
+- **The arrays** are those `scrust validate cluster` grades against the floor in these runs: `scale.data` value by value (rows matched by name), the embeddings' dims 1:30 and 31:50, the loadings, the standard deviations, the total variance, the silhouette widths and the purities. Each case is measured in both directions, either run as the reference, as a validation run may be graded against either.
+- **The bounds:** each the maximum over the 134 cases, rounded up to two significant digits; `cells_differing` the total over the cases, so it bounds one case too, as in `[clustering.floor.kernel]`.
+- **Identical across kernels in every case**, and so not listed (exact): the labels and levels, both graphs, the variable features, the corrected counts, `percent.mt` (102 cases write it) and the counts' columns, the regression's rank and pivot.
+
+**The two floors side by side** (the bounds in `validation/tolerances.toml`; T, P and X are the maxima on tier T, tier P and the two other objects):
+
+| array | statistic | `[clustering.floor.kernel]` (M8, M11; without the regression) | `[clustering.floor.kernel_regressed]` (M15b) | measured maximum with the regression (T · P · X) | the case that sets it |
+|---|---|---|---|---|---|
+| scale.data | max abs | 4.3e-14 | 5.6e-13 | 9.596e-15 · 5.578e-13 · 4.547e-13 | soupx_emptydrops_4500871lane `ids_ncount` |
+| | max fraction differing | 0.0072 | 0.72 | 0.7145 · 0.6572 · 0.6953 | posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test `ids_ncount` |
+| embeddings, dims 1:30 | max abs | 1.6e-10 | 6.2e-10 | 3.793e-11 · 6.181e-10 · 2.229e-10 | soupx_emptydrops_sscovelli `pm` |
+| | max scaled | 2.4e-12 | 2.6e-12 | 2.542e-12 · 2.323e-12 · 8.556e-13 | decontx_raw_tenx_test `ids` |
+| embeddings, dims 31:50 | max abs | 4.3e-6 | 5.5e-6 | 5.462e-6 · 5.128e-10 · 1.038e-10 | posthocfilt_threshold_scdblfinder_cellbender_fromraw_test `pm` |
+| loadings | max abs | 1.2e-7 | 1.7e-7 | 1.666e-7 · 2.331e-12 · 1.14e-12 | posthocfilt_threshold_scdblfinder_cellbender_fromraw_test `pm` |
+| | max scaled | 4.5e-7 | 6.0e-7 | 5.947e-7 · 4.424e-12 · 2.692e-12 | the same |
+| standard deviations | max abs | 1.9e-13 | 2.7e-13 | 2.618e-13 · 1.013e-13 · 3.464e-14 | the same |
+| | max scaled | 3.6e-14 | 5.0e-14 | 4.959e-14 · 5.493e-15 · 1.52e-15 | the same |
+| total variance | max abs, max scaled | identical (not listed) | 1.2e-13, 2.2e-16 | 1.137e-13 · 0 · 0 (one case) | doubletfinder_soupx_tenx_test `meta` |
+| silhouette widths | max abs | 3.3e-13 | 2.0e-12 | 6.409e-14 · 1.945e-12 · 6.581e-14 | soupx_emptydrops_sscovelli `pm` |
+| purities | cells differing | 19 (10 objects) | 34 (18 cases, at most 2 in one) | 30 · 4 · 0 cells | the total over the cases |
+| | max abs | 0.019 | 0.026 | 0.0258 · 0.005554 · 0 | doubletfinder_cellbender_fromraw_test `ids` |
+
+The bounds come from different tiers: the absolute bounds of `scale.data`, the first 30 embeddings and the silhouette widths from tier P's large objects, the relative ones and the trailing components from tier T's smallest objects, where the PCA's last components are least determined, as in `[clustering.floor.kernel]`. A cargo test (`crates/cluster/tests/m15b_floor.rs`) grades the measured maxima against both floors as built: within the regressed floor, beyond the unregressed one, and past each bound a difference.
+
+#### percent.mt against the saved objects
+
+Without the regression, scrust's `percent.mt` by the workflow's pattern against the saved objects' column, as `%.17g` text, so bit for bit ([`m15b_percent_mt.py`](../../validation/python/m15b_percent_mt.py), label `m15b-25fe846`; `data/clustering/m15b/saved_rust/m15b-25fe846/summary.tsv`):
+
+| saved objects | objects | cells | with mitochondrial features (by the pattern) | identical |
+|---|---|---|---|---|
+| M8's clustering objects (T and P) | 34 | 277,413 | 4 (13 features each; 53,368 cells; up to 94.4%) | **34 of 34** |
+| M7's DoubletFinder objects (the singlets' re-clustering) | 150 | 2,217,328 | 30 (six samples, five inputs each: 13 features, or 2 for the zebrafish; 296,410 cells) | 120 of 150: the 120 without such features (every value 0); the 30 with them differ, as the workflow's script made them |
+
+**The 30 differences are the SCT assay's.** `doubletfinder.R` (and `scdblfinder.R`) call `PercentageFeatureSet(seurat_singlets, pattern = "(?i)^mt-")` without an assay on the singlets of an input whose default assay is SCT, so their `percent.mt` is the SCT assay's corrected counts over `nCount_SCT`, not the RNA counts over `nCount_RNA` as in the scripts that build their objects (PLAN C1). [`percent_mt_sct.R`](../../validation/R/percent_mt_sct.R) checked it on every saved DoubletFinder input, in batch jobs that read the `.rds` files:
+
+| check (on the saved input object, at the saved object's singlets) | objects | result |
+|---|---|---|
+| the default assay | 150 | SCT in all 150 |
+| `PercentageFeatureSet(assay = "SCT")` against the saved column | 150 | **identical in all 150**, the 30 included (2,217,328 cells) |
+| `PercentageFeatureSet(assay = "RNA")` against the saved column | 150 | identical in the 120 without mitochondrial features; differs in all 30 with them (277,450 of 296,410 cells) |
+| `PercentageFeatureSet(assay = "RNA")` against scrust's column (the 30 with mitochondrial features; job 62088185, `data/clustering/m15b/percent_mt_rna/`) | 30 | **identical in all 30** (296,410 cells): scrust's column is R's RNA-based one; the SCT-based one differs from it in the same 277,450 cells |
+
+The 30, object by object (`data/clustering/m15b/percent_mt_rna/<object>.json`; six samples, each through the five DoubletFinder inputs; 13 features each, 2 for the zebrafish's, whose protein genes the pattern misses):
+
+| object (the saved DoubletFinder object's input) | singlets | features | cells whose saved value is not the RNA counts' share | SCT recomputation = saved | RNA recomputation = scrust's |
+|---|---|---|---|---|---|
+| cellbender_fromraw_10xmousebrain | 10,485 | 13 | 10,483 | yes | yes |
+| cellbender_fromraw_4500871lane | 9,887 | 13 | 9,887 | yes | yes |
+| cellbender_fromraw_563792olfmobaob | 9,490 | 13 | 9,488 | yes | yes |
+| cellbender_fromraw_SRR18256506 | 5,311 | 13 | 5,008 | yes | yes |
+| cellbender_fromraw_SRR18256555 | 9,140 | 13 | 9,036 | yes | yes |
+| cellbender_fromraw_drerio | 9,734 | 2 | 9,378 | yes | yes |
+| decontx_raw_emptydrops_10xmousebrain | 10,561 | 13 | 10,560 | yes | yes |
+| decontx_raw_emptydrops_4500871lane | 23,192 | 13 | 8,521 | yes | yes |
+| decontx_raw_emptydrops_563792olfmobaob | 11,055 | 13 | 11,055 | yes | yes |
+| decontx_raw_emptydrops_SRR18256506 | 3,467 | 13 | 3,403 | yes | yes |
+| decontx_raw_emptydrops_SRR18256555 | 3,348 | 13 | 3,343 | yes | yes |
+| decontx_raw_emptydrops_drerio | 28,030 | 2 | 26,057 | yes | yes |
+| decontx_raw_tenx_10xmousebrain | 10,159 | 13 | 10,159 | yes | yes |
+| decontx_raw_tenx_4500871lane | 9,003 | 13 | 9,003 | yes | yes |
+| decontx_raw_tenx_563792olfmobaob | 9,336 | 13 | 9,335 | yes | yes |
+| decontx_raw_tenx_SRR18256506 | 3,078 | 13 | 3,003 | yes | yes |
+| decontx_raw_tenx_SRR18256555 | 2,686 | 13 | 2,686 | yes | yes |
+| decontx_raw_tenx_drerio | 7,158 | 2 | 6,632 | yes | yes |
+| soupx_emptydrops_10xmousebrain | 10,565 | 13 | 10,564 | yes | yes |
+| soupx_emptydrops_4500871lane | 23,239 | 13 | 22,788 | yes | yes |
+| soupx_emptydrops_563792olfmobaob | 11,056 | 13 | 11,056 | yes | yes |
+| soupx_emptydrops_SRR18256506 | 3,486 | 13 | 3,298 | yes | yes |
+| soupx_emptydrops_SRR18256555 | 3,339 | 13 | 3,326 | yes | yes |
+| soupx_emptydrops_drerio | 28,141 | 2 | 28,140 | yes | yes |
+| soupx_tenx_10xmousebrain | 10,185 | 13 | 10,184 | yes | yes |
+| soupx_tenx_4500871lane | 9,004 | 13 | 9,004 | yes | yes |
+| soupx_tenx_563792olfmobaob | 9,340 | 13 | 9,337 | yes | yes |
+| soupx_tenx_SRR18256506 | 3,083 | 13 | 2,877 | yes | yes |
+| soupx_tenx_SRR18256555 | 2,688 | 13 | 2,675 | yes | yes |
+| soupx_tenx_drerio | 7,164 | 2 | 7,164 | yes | yes |
+| **30 objects** | **296,410** | | **277,450** | **30 of 30** | **30 of 30** |
+
+scrust keeps the shared rule, the RNA counts over `nCount_RNA` (the coordinator confirmed it, 2026-11-19): a regressed `percent.mt` is always the RNA-based value, in scrust and in the workflow's branch. In the workflow, `posthocfilter_threshold.R` carries the DoubletFinder objects' column on, `downsample_clusters.R` carries its input's column into its regression, and `posthocfilter_mad.R` recomputes it on RNA.
+
+#### Without the options
+
+The M15b binary's runs of M15's T and P check ([`m15_recluster.sbatch`](../../validation/slurm/m15_recluster.sbatch), label `m15b-25fe846`, both profiles) against M15's final label's (`m15-a5de5e3`), route by route ([`m15b_unchanged.sbatch`](../../validation/slurm/m15b_unchanged.sbatch), job 62087448): **120 of 120 routes identical** (ten objects, two profiles, six routes: DoubletFinder given the labels; the re-clustering in process with and without the export; the two-command route with and without it; clustering on the fly with both scores; `scrust cluster --counts`), every file byte for byte and every `summary.json` as JSON without the timings, the command line and what records the node. The comparison sets aside one more thing (`compare_runs.py --nested-summaries`): the size and digest that a parent's manifest records for a nested output's `summary.json`, a file that holds that run's timings and so differs between any two runs. The nested `summary.json` itself is compared as JSON like every summary. A first comparison without that option (job 62086331, kept as `data/clustering/m15b/unchanged/m15b-25fe846.without-nested-flag/`) reported 60 routes differing, in exactly those two members of 53 manifests and nothing else.
+
+#### scrust doubletfinder with the options
+
+[`m15b_recluster.sbatch`](../../validation/slurm/m15b_recluster.sbatch), label `m15b-25fe846` (array jobs 62087206 in the production profile, 62087207 in the portable one): **every check holds on all 20** (ten objects, two profiles).
+
+| check | files compared per run | result |
+|---|---|---|
+| `a_files`: `scrust doubletfinder --recluster` against `scrust doubletfinder`, then `scrust cluster --counts <out>/singlets --params re.toml --metadata metadata.tsv` | 24 | identical, 20 of 20 |
+| `a_recluster`: `singlets_clusters/`, every file | 17 | identical, 20 of 20 |
+| `hook_alone`: clustering on the fly's `clusters/` against `scrust cluster --counts <input> --params hook.toml --stats silhouette,purity` (its `pca/` and `neighbors/` aside) | 17 | identical, 20 of 20 |
+| `df_unchanged`: DoubletFinder's own files against M15's in-process run | 6, and `result` without `result.recluster` | identical, 20 of 20 |
+| `scrust validate manifest` on the four outputs | | 20 of 20 |
+
+The regressions they made: clustering on the fly regressed `percent.mt` and `nCount_RNA`, by the workflow's pattern on the three mouse objects (13 features) and by a list elsewhere (tier T's stand-in, 7 features; three features without counts on soupx_emptydrops_sscovelli and cellbender_fromraw_ghirsutum2, whose all-zero `percent.mt` the QR moves to the edge: rank 2 of 3); the re-clustering regressed `percent.mt` by the list and a `--metadata` column.
+
+#### The loaders
+
+`percent.mt` loads as a double, exactly as written (`load_seurat()`, `load_sce()`, `add_scrust()` and `load_anndata()`), from `scrust cluster --export` and from `scrust sctransform`'s `cell_metadata.tsv`. The Seurat loader puts it after `nFeature_RNA`, before the SCT assay's columns, where the workflow's objects hold it, since their scripts call `PercentageFeatureSet()` before SCTransform. The loaders' tests ([`m15b_tests.sbatch`](../../validation/slurm/m15b_tests.sbatch), job 62086880): R 87 (82 in M15), Python 14 (13), all passing. The first run (job 62086529) failed that column-order test: the loader had added `percent.mt` after the SCT assay's columns, and now adds it with the RNA assay.
+
+### M15b tests
+
+`cargo test --workspace` passes in debug and in release, 316 tests in 47 suites each (294 in 43 at M15), none failing or ignored, no compiler warnings (job 62091694, commit `aed8f74`, under env.sh's Haswell kernel on a Xeon 8268 node, [`m15b_cargo_tests.sbatch`](../../validation/slurm/m15b_cargo_tests.sbatch); also job 62091142, the same code before `tolerances.toml`'s K14 entry was committed). Twenty-two are new:
+
+- `rcompat` (`linpack`): the residuals of an exact fit and of noise; an all-zero column pivoted out (rank 1); `Cdqrls`' refusals (a non-finite value, no rows);
+- `scio` (`features`): `make.unique()` as R's `do_makeunique`; Seurat's names and the pattern as TRE matches it; id lists (trimming, comments, repeats); `PercentageFeatureSet()`'s arithmetic;
+- `sctransform` (`regress`, `tests/m15b_regress.rs`): `lm()`'s QR (`qr`, `qraux`, rank, pivot) and `qr.resid()` with `RegressOutMatrix()`'s rows bit for bit against R's 14 models, the five rank-deficient ones included (kernel-gated: the fixtures' kernel);
+- `cluster` (`covariates`, `chain_params`, `tests/m15b_covariates.rs`, `tests/m15b_floor.rs`): the covariates' names and rules; the options and TOML keys; `make.unique()` and `PercentageFeatureSet()` against R's fixtures, on integer and real counts; when the regressed floor applies, and that it holds R's measured differences across kernels and no more;
+- `scrust` (`tests/m15b.rs`): the cases of two tier-T objects against R's runs (the labels and levels, the scores, `percent.mt`, the regressed column's bits, `scale.data`'s digest, the regression's rank and pivot; kernel-gated); the staged routes write what `scrust cluster --counts` writes; the in-memory rule (the entry point given the covariates in memory writes the command's files); `scrust doubletfinder` with the options in process against the two commands, its own SCTransform unregressed; the defaults and the refusals.
+
+The loaders' tests ([`m15b_tests.sbatch`](../../validation/slurm/m15b_tests.sbatch), job 62091155, the binary of `390342d`): R 87 (82 in M15), Python 14 (13), all passing. The new ones load `percent.mt` from an export (regressed with `nCount_RNA`, by a list of ids) and from `scrust sctransform`'s output, as a double column exactly as written, in the Seurat object (after `nFeature_RNA`), the SingleCellExperiment, `add_scrust()` and AnnData.
+
+### M15b findings
+
+- **The saved DoubletFinder objects' `percent.mt` is the SCT assay's.** `doubletfinder.R` and `scdblfinder.R` call `PercentageFeatureSet()` on the singlets of an object whose default assay is SCT, so their column is the corrected counts' share, over `nCount_SCT`. The scripts that build their objects compute it from the RNA counts. R's recomputation on the SCT assay reproduces all 150 saved columns, and its RNA-based value equals scrust's on the 30 that have mitochondrial features (above). A `percent.mt` regressed downstream of those objects (`downsample_clusters.R` regresses its input's column) is therefore the SCT assay's unless it is recomputed. The shared rule makes a regressed `percent.mt` always the RNA counts' share, in scrust and in the workflow's branch.
+- **The regression makes most of R's own `scale.data` kernel-dependent.** LINPACK's QR goes through OpenBLAS's level-1 routines for the QR itself and for every row's residuals, so 27% to 72% of `scale.data` differs between R's two profiles, against at most 0.72% without the regression. The labels, levels and graphs stay identical in all 134 cases. That is why the regression has a floor of its own.
+- **An all-zero `percent.mt` is regressed without a word in R.** Where the workflow's pattern finds no feature (in most of the panel's species), R regresses a column of zeros: `dqrdc2` moves it to the edge and the regression is on the intercept alone (rank 1, or rank 2 with `nCount_RNA`). It still goes through BLAS: those runs' `scale.data` differs across kernels in 27% to 33% of its entries. scrust refuses that by the shared rule, naming `--mt-genes`; given R's column through features without counts, it reproduces R's results bit for bit.
+- **Under one kernel the CPU type changes nothing, with the regression too.** scrust's portable runs (Xeon 8268) equal R's portable runs on tier P and the two other objects (Xeon 8480CL) bit for bit, the regressed `scale.data` included, as M8 found for the chain without it.
+
+### M15b corrections to the plan
+
+Corrected in [docs/PLAN.md](../PLAN.md) on this branch:
+
+- **A3:** the clustering chain's row: its inputs for `vars.to.regress` (a list of mitochondrial ids, a per-cell table) and `percent.mt` among its outputs.
+- **A5:** R's Fortran routines that call BLAS (LINPACK's QR) go through the same OpenBLAS by FFI, `rcompat::linpack`.
+- **A5b:** the one exception to kernel-gated grading's floor: `[clustering.floor.kernel_regressed]` when both runs record the same non-empty `vars.to.regress`.
+- **C1:** `percent.mt` and `vars.to.regress` in the workflow's scripts, researched: the pattern, the commit that removed the regression, which species it finds, and the DoubletFinder and scDblFinder objects' SCT-based column.
+- **C3:** `vars.to.regress` is no longer refused (the refused list); the commands' new options; `percent.mt` in `metadata.tsv`; C3g's loaders carry `percent.mt`; C3h's options for `scrust doubletfinder`'s two clusterings; a new section, C3j, with the code path as researched, the port, the shared options and rules, the refusals, the records and the grading decision.
+- **C5:** a new row, K14, and the note on why it has a floor of its own.
+- **C6:** a new row, M15b; the order (M15b after M15 and M14, before M14b); M15b in Step 2 and in its completion; M14b's row covers M15b's options.
+
+### M15b deviations and notes
+
+- **The floor, decided** (2026-11-19). R's own regressed runs differ across kernels beyond `[clustering.floor.kernel]`, so the portable profile's regressed runs could not be graded against it. The coordinator decided on a separate floor, measured R against R on T and P, used only when both runs record a non-empty `vars.to.regress`, with `[clustering.floor.kernel]` unchanged and exactness first. Measuring it on P took R's portable runs of tier P's 20 cases and the two other objects' 6, which the first round of R runs (both profiles on T, the production profile elsewhere) did not have: 26 more runs of the approved cases.
+- **Two labels.** The validation runs are label `m15b-25fe846`. Their first validation graded one check wrongly: where R's pattern finds no feature and scrust is given features without counts, `percent.mt`'s features were compared by name (R's none, scrust's three) and failed 31 cases, although the columns, which are what matter, were identical. The validator now compares the features only when both runs define them the same way, and the column always. That change and the regressed floor (commit `390342d`) changed no output, so the runs were validated again by `390342d`'s binary, not run again (`m15b_revalidate.sbatch`, label `m15b-390342d`). The runs' and the validator's binaries record their versions in each report.
+- **The defaults' comparison needed one more rule** (`compare_runs.py --nested-summaries`, [above](#without-the-options)); its first output is kept.
+- **Every `scrust validate cluster` report names its floor** (a row of stage `environment`, and `floor` in the JSON), `[clustering.floor.kernel]` unless both runs regressed the same covariates. The grading of every unregressed comparison is unchanged.
+- **The Seurat loader's column order.** The loaders' first test run failed one new check: the loader had added `percent.mt` after the SCT assay's columns. It now adds it with the RNA assay, where the workflow's objects hold it ([The loaders](#the-loaders)).
+- **The benchmark's R side** runs the workflow's scripts as they were before its commit 8d34de1, which differ from the current ones in `vars.to.regress = "percent.mt"` and a comment only. Where the pattern finds nothing, those scripts regress R's all-zero column, and scrust's side gets the same column through `--mt-genes` ([M15b benchmark](#m15b-benchmark)).
+- **User documentation.** M14b has not landed on main, so it will cover M15b's options with M15's (`--vars-to-regress`, `--mt-genes`, `--percent-mt`, the `[sctransform]` keys of `scrust doubletfinder`'s parameter files, `--cluster-metadata`, `--recluster-metadata`, `percent.mt`); the commands' `--help` and the README describe them.
+
+### Reproducing M15b
+
+From the repository's top directory, after `source env.sh` and `cargo build --release -p scrust`, with M8's exports of the 34 clustering objects, M7's DoubletFinder inputs and outputs, and M15's T and P runs (label `m15-a5de5e3`). Copy the binary so that later builds do not change it under the jobs:
+
+```bash
+cp target/release/scrust data/benchmarks/bin/scrust-$(git rev-parse --short HEAD)
+```
+
+The code path and the vectors (the committed fixtures, in the portable profile), then the fixtures of the end-to-end tests from two cases' R runs:
+
+```bash
+sbatch validation/slurm/m15b_vectors.sbatch
+```
+
+```bash
+bash validation/slurm/fixtures_m15b.sh
+```
+
+The cases and their inputs (no R, no `.rds`), then R's runs of every case in both profiles (the four largest objects need more memory):
+
+```bash
+PYTHONNOUSERSITE=1 .envs/loaders-py/bin/python -I validation/python/m15b_cases.py
+```
+
+```bash
+sbatch --array=1-124,129-134 --mem=36G validation/slurm/m15b_references.sbatch production
+```
+
+```bash
+sbatch --array=125-128 --mem=160G validation/slurm/m15b_references.sbatch production
+```
+
+```bash
+sbatch --array=1-124,129-134 --mem=36G validation/slurm/m15b_references.sbatch portable
+```
+
+```bash
+sbatch --array=125-128 --mem=160G validation/slurm/m15b_references.sbatch portable
+```
+
+The R-vs-R measurement behind `[clustering.floor.kernel_regressed]`:
+
+```bash
+PYTHONNOUSERSITE=1 .envs/loaders-py/bin/python -I validation/python/m15b_floor.py --tsv data/clustering/m15b/floor/r_vs_r.tsv --summary data/clustering/m15b/floor/summary.md
+```
+
+Scrust's runs of every case in both profiles, each validated against both R runs, then validated again by a later binary's validator:
+
+```bash
+SCRUST_BIN=data/benchmarks/bin/scrust-<commit> sbatch --array=1-134 validation/slurm/m15b_cluster.sbatch m15b-<commit> production
+```
+
+```bash
+SCRUST_BIN=data/benchmarks/bin/scrust-<commit> sbatch --array=1-134 --partition=shared validation/slurm/m15b_cluster.sbatch m15b-<commit> portable
+```
+
+```bash
+SCRUST_BIN=data/benchmarks/bin/scrust-<validator commit> sbatch --array=1-134%20 validation/slurm/m15b_revalidate.sbatch m15b-<commit> m15b-<validator commit>
+```
+
+`percent.mt` against the saved objects (the exports read the `.rds` files in batch jobs), and how the saved DoubletFinder objects made theirs:
+
+```bash
+sbatch --array=1-184%40 validation/slurm/m15b_saved.sbatch
+```
+
+```bash
+SCRUST_BIN=data/benchmarks/bin/scrust-<commit> sbatch --array=1-184%40 validation/slurm/m15b_saved_rust.sbatch m15b-<commit>
+```
+
+```bash
+PYTHONNOUSERSITE=1 .envs/loaders-py/bin/python -I validation/python/m15b_percent_mt.py report data/clustering/m15b/saved_rust/m15b-<commit> --tsv data/clustering/m15b/saved_rust/m15b-<commit>/summary.tsv
+```
+
+```bash
+sbatch --array=1-150%40 validation/slurm/m15b_percent_mt_sct.sbatch
+```
+
+```bash
+sbatch --array=1-20,46-50,126-130 validation/slurm/m15b_percent_mt_sct.sbatch percent_mt_rna m15b-<commit>
+```
+
+The defaults (M15's T and P check with the M15b binary, then route by route against M15's runs), and `scrust doubletfinder` with the options:
+
+```bash
+SCRUST_BIN=data/benchmarks/bin/scrust-<commit> sbatch --array=1-10 validation/slurm/m15_recluster.sbatch m15b-<commit> production
+```
+
+```bash
+SCRUST_BIN=data/benchmarks/bin/scrust-<commit> sbatch --array=1-10 --partition=shared validation/slurm/m15_recluster.sbatch m15b-<commit> portable
+```
+
+```bash
+sbatch validation/slurm/m15b_unchanged.sbatch m15b-<commit>
+```
+
+```bash
+SCRUST_BIN=data/benchmarks/bin/scrust-<commit> sbatch --array=1-10 validation/slurm/m15b_recluster.sbatch m15b-<commit> production
+```
+
+```bash
+SCRUST_BIN=data/benchmarks/bin/scrust-<commit> sbatch --array=1-10 validation/slurm/m15b_recluster.sbatch m15b-<commit> portable
+```
+
+The tests, and the manifest's section:
+
+```bash
+sbatch validation/slurm/m15b_cargo_tests.sbatch
+```
+
+```bash
+SCRUST_BIN=data/benchmarks/bin/scrust-<commit> sbatch validation/slurm/m15b_tests.sbatch
+```
+
+```bash
+PYTHONNOUSERSITE=1 .envs/loaders-py/bin/python -I validation/python/m15b_manifest.py --label m15b-<commit> --revalidate m15b-<validator commit> --cargo-job <job> --tests-job <job> --bin data/benchmarks/bin/scrust-<commit>
+```
+
+The benchmark: [docs/benchmarks.md](../benchmarks.md), "Updating this page" (tool `cluster_regress`, and `VARIANTS="b1 b32"` for the chain without the regression).
