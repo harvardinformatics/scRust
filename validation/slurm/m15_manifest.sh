@@ -95,4 +95,8 @@ if [ -n "$tests_job" ]; then
     for f in data/clustering/m15/tests/"$tests_job"/r.log data/clustering/m15/tests/"$tests_job"/python.log; do
         [ -f "$f" ] && entry "$f" check "the loaders' own tests: $(basename "$f")"
     done
+    # the binary the loaders' tests ran, from the job's log (when it is not the label's)
+    tb=$(sed -n 's/^binary=\([^ ]*\) .*/\1/p' data/clustering/logs/m15/scrust-m15-tests-"$tests_job".sbatch.log 2>/dev/null | head -n 1)
+    tb=${tb#"$PWD"/}
+    [ -n "$tb" ] && [ -f "$tb" ] && [ "$tb" != "data/doubletfinder/logs/bin/scrust-$label" ] && entry "$tb" run-record "the pinned scrust binary of the loaders' tests"
 fi
