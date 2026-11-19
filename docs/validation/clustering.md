@@ -32,7 +32,7 @@ This is Step 2's main report, as [doubletfinder.md](doubletfinder.md) is Step 1'
 | Plan corrections | A1, A3, A7, B3, C3f, C3h, C5's K12, C6's M15 ([M15 corrections](#m15-corrections-to-the-plan)). |
 | User documentation | **For M14b:** M14b has not landed on main, so it will cover M15's options; the commands' `--help` and the README describe them. |
 | Documentation | This report and [clustering_m15.tsv](clustering_m15.tsv); `docs/output_manifest.md` (nested outputs); `[clustering.K12]` and `[clustering.K12_recluster]` in `validation/tolerances.toml`; M15's section of `validation/manifest.toml`; the README's status and usage; the commands' `--help`; NOTICE; `docs/benchmarks.md`. |
-| Tests | `cargo test --workspace`: 292 tests in 43 suites, debug and release, none failing, no warnings; the loaders' tests: R 82, Python 13, all passing ([M15 tests](#m15-tests)). |
+| Tests | `cargo test --workspace`: 294 tests in 43 suites, debug and release, none failing, no warnings (commit `be1447f`); the loaders' tests: R 82, Python 13, all passing ([M15 tests](#m15-tests)). |
 
 ## M14 outcome
 
@@ -1655,13 +1655,13 @@ On the five tier-P DoubletFinder objects, by `docs/benchmarks.md`'s method: thre
 
 ### M15 tests
 
-`cargo test --workspace` passes in debug and in release, 292 tests in 43 suites each, none failing or ignored, no compiler warnings (job 61969344, commit `dcc96c6`, under env.sh's Haswell kernel, [`m15_cargo_tests.sbatch`](../../validation/slurm/m15_cargo_tests.sbatch); also job 61960683 at `49e8be7`, the panel's binary). Eleven are new:
+`cargo test --workspace` passes in debug and in release, 294 tests in 43 suites each, none failing or ignored, no compiler warnings (job 62009626, commit `be1447f`, under env.sh's Haswell kernel, [`m15_cargo_tests.sbatch`](../../validation/slurm/m15_cargo_tests.sbatch); also jobs 61994011 at `3fc8b25`, 61969344 at `dcc96c6` and 61960683 at `49e8be7`). Thirteen are new:
 
-- `scio`: `Counts` (keeping cells in place equals selecting columns, explicit zeros included; written and read back, the same), `Factor` (codes, labels, the files' text), the manifest's nested outputs (the parent lists the nested `summary.json` alone, the check recurses, a given digest is kept), and the 10x writer's digests (each file's size and SHA-256 as written);
+- `scio`: `Counts` (keeping cells in place equals selecting columns, explicit zeros included; written and read back, the same), `Factor` (codes, labels, the files' text), the manifest's nested outputs (the parent lists the nested `summary.json` alone; the check recurses level by level, digests included, up to eight levels; absolute and `..` paths are refused and not followed; a given digest is kept), `memory::settle` (allowed again and again, the heap usable after it), and the 10x writer's digests (each file's size and SHA-256 as written);
 - `cluster` (`tests/m15_entry_point.rs`): counts taken or borrowed give the same result, and borrowed counts are left as they were; the result that keeps only the labels computes what the complete one does; the observer-only form agrees; the guard's message names its context;
-- `scrust` (`tests/m15.rs`): the in-memory rule (the entry point's result, written by the library's writer, is `scrust cluster --counts --export`'s files and `result`); clustering on the fly (DoubletFinder's files equal a run given the labels it computed; `clusters/`; the manifests); its labels and levels are R's (kernel-gated, on three tier-T objects); the re-clustering in process against the two-command route, with and without the export; the refusals.
+- `scrust` (`tests/m15.rs`): the in-memory rule (the entry point's result, written by the library's writer, is `scrust cluster --counts --export`'s files and `result`); clustering on the fly (DoubletFinder's files equal a run given the labels it computed; `clusters/` is `scrust cluster --counts`' output, `pca/` and `neighbors/` aside; `result.clustering`'s four fields; the manifests, `scrust validate manifest` recursing into `clusters/` and refusing it listed outside its parent); its labels and levels are R's (kernel-gated, on three tier-T objects); the re-clustering in process against the two-command route, with and without the export; the refusals.
 
-The loaders' tests ([`m15_tests.sbatch`](../../validation/slurm/m15_tests.sbatch), job 61969347, the release binary of `dcc96c6`; also job 61960696 with `49e8be7`'s): R 82 (78 in M14), Python 13 (12), all passing. The new ones load a DoubletFinder output with both nested outputs as before, and each nested output on its own.
+The loaders' tests ([`m15_tests.sbatch`](../../validation/slurm/m15_tests.sbatch), job 62009627, the release binary of `be1447f`; also job 61994013 with `3fc8b25`'s): R 82 (78 in M14), Python 13 (12), all passing. The new ones load a DoubletFinder output with both nested outputs as before, and each nested output on its own: in R, `load_seurat()` on `singlets_clusters/` and `add_scrust()` with `clusters/`; in Python, `load_anndata()` on `singlets_clusters/`, and `clusters/`' labels, levels and scores. With the new role, the R loader's slot test offers 8,712 wrong combinations of role, scale and format (8,496 in M14), and refuses every one.
 
 ### M15 findings
 

@@ -1,7 +1,7 @@
 """Compare a scrust clustering with a saved workflow object's (milestone M15).
 
-The candidate is a `scrust cluster` output directory (here the singlets' re-clustering,
-`scrust doubletfinder --recluster`'s `recluster/`, or `clusters/` of clustering on the fly); the
+The candidate is a `scrust cluster` output directory (here the singlets' re-clustering, `scrust
+doubletfinder --recluster`'s `singlets_clusters/`, or `clusters/` of clustering on the fly); the
 reference is an export's `saved/` directory (validation/R/export_clustering.R, any level), which
 holds the saved object's metadata.tsv and its factors' levels. Checks, each identical or not:
 
