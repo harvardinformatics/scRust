@@ -29,7 +29,8 @@ cat <<'EOF'
 #               runs (time_*.txt) and the fingerprint
 #   data/doubletfinder/<object>/rust/<label>/<profile>_recluster/   validation/slurm/m15_recluster.sbatch
 #               on T and P: the checks (checks/*.json), time_*.txt, the fingerprint
-#   data/doubletfinder/<object>/rust/<label>/memory/memory.tsv   validation/slurm/m15_memory.sbatch
+#   data/doubletfinder/<object>/rust/<label>{,-rc}/memory/memory.tsv   validation/slurm/m15_memory.sbatch
+#               (clustering on the fly; with MODES="given recluster2 inprocess", the re-clustering)
 #   data/doubletfinder/logs/bin/scrust-<label>, data/benchmarks/bin/scrust-<commit>   the binaries
 #   data/clustering/m15/cargo_tests/<job>/results.tsv, data/clustering/m15/tests/<job>/{r,python}.log
 
@@ -76,8 +77,11 @@ for d in data/doubletfinder/*/rust/"$label"/*_recluster; do
         [ -f "$f" ] && entry "$f" run-record "the re-clustering's runs, $prof profile: $(basename "$f")" "$obj"
     done
 done
-for f in data/doubletfinder/*/rust/*/memory/memory.tsv; do
-    [ -f "$f" ] && entry "$f" check "peak memory of clustering on the fly, with the labels given, repeated" "$(echo "$f" | cut -d/ -f3)"
+for f in data/doubletfinder/*/rust/"$label"/memory/memory.tsv; do
+    [ -f "$f" ] && entry "$f" check "peak memory of clustering on the fly, settled or not, and with the labels given, repeated" "$(echo "$f" | cut -d/ -f3)"
+done
+for f in data/doubletfinder/*/rust/"$label"-rc/memory/memory.tsv; do
+    [ -f "$f" ] && entry "$f" check "peak memory of the whole rule in process and of the two commands, repeated" "$(echo "$f" | cut -d/ -f3)"
 done
 for f in data/doubletfinder/logs/bin/scrust-"$label" data/benchmarks/bin/scrust-*; do
     case $f in *b6f6e4e) continue ;; esac

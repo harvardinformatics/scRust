@@ -7,7 +7,8 @@
 Per object of validation/doubletfinder_panel.tsv, from data/doubletfinder/<object>/rust/<label>/
 production/: the cells and singlets; each check (c_step1, k12_labels, k12_files, k12_saved,
 k12_logged, a_files, b_saved, manifests); the clusters found on the fly and in the re-clustering;
-peak RSS and wall time of the four runs, and M7's; the node, CPU model and OpenBLAS kernel.
+peak RSS and wall time of the four runs, and M7's; where the in-process run's and the hook's peaks
+were reached (summary.json's phases); the node, CPU model and OpenBLAS kernel.
 """
 
 import csv
@@ -98,11 +99,49 @@ def obj_row(obj, label, logs):
     for k in ("m7", "given", "hook", "recluster2", "inprocess"):
         out[k + "_peak_gib"] = gib(row[k + "_peak_kib"])
         out[k + "_wall_s"] = float(row[k + "_wall_s"])
+    # where each in-process peak was reached: summary.json records the peak at the end of each phase
+    ph = jload(os.path.join(d, "inprocess", "run", "summary.json"))["run"]["phases"]
+    peaks = [v["peak_rss_kib"] for v in ph.values() if v.get("peak_rss_kib")]
+    out["inprocess_df_peak_gib"] = gib(ph["singlets"]["peak_rss_kib"])
+    out["inprocess_rose"] = max(peaks) > ph["singlets"]["peak_rss_kib"]
+    ph = jload(os.path.join(d, "hook", "run", "summary.json"))["run"]["phases"]
+    peaks = [v["peak_rss_kib"] for v in ph.values() if v.get("peak_rss_kib")]
+    out["hook_cluster_peak_gib"] = gib(ph["clustering: write"]["peak_rss_kib"])
+    out["hook_set_by_clustering"] = max(peaks) == ph["clustering: write"]["peak_rss_kib"]
     fp = jload(os.path.join(d, "fingerprint.json"))
     out["node"] = row["node"]
     out["cpu_model"] = fp.get("cpu_model", "")
     out["openblas"] = fp.get("openblas_corename", "")
     return out
+
+
+TP = ["soupx_tenx_test", "soupx_emptydrops_test", "decontx_raw_tenx_test", "decontx_raw_emptydrops_test", "cellbender_fromraw_test",
+      "soupx_tenx_SRR18256555", "soupx_tenx_10xmousebrain", "soupx_emptydrops_4500871lane", "soupx_emptydrops_sscovelli",
+      "cellbender_fromraw_ghirsutum2"]
+
+
+def tp_table(label):
+    """The T and P re-clustering checks (m15_recluster.sbatch), both profiles."""
+    out = ["| object | profile | (a) in process ÷ two commands | (a) with the export | (b) against the saved re-clustering | clustering on the fly against the saved input |",
+           "|---|---|---|---|---|---|"]
+    n = 0
+    for obj in TP:
+        for prof in ("production", "portable"):
+            d = os.path.join(ROOT, "data", "doubletfinder", obj, "rust", label, prof + "_recluster", "checks")
+            if not os.path.isdir(d):
+                continue
+            n += 1
+            cells = []
+            for f in ("a_files.json", "a_export.json"):
+                i, k = check_files(jload(os.path.join(d, f)))
+                cells.append(f"{'identical' if i == k else 'DIFFERS'}, {i} of {k} files")
+            for f in ("b_saved.json", "hook_saved.json"):
+                j = jload(os.path.join(d, f))
+                diff = [c["check"] for c in j["checks"] if c["status"] == "differs"]
+                made = [c for c in j["checks"] if c["status"] != "not made"]
+                cells.append(f"identical, {len(made)} checks" if j["pass"] else "differs: " + ", ".join(diff))
+            out.append(f"| {obj} | {prof} | " + " | ".join(cells) + " |")
+    return "\n".join(out) if n else ""
 
 
 def main(argv):
@@ -149,6 +188,7 @@ def main(argv):
     hook_given = [(r["hook_peak_gib"] / r["given_peak_gib"], r["object"]) for r in rows]
     inproc = [(r["inprocess_peak_gib"] / max(r["given_peak_gib"], r["recluster2_peak_gib"]), r["object"]) for r in rows]
     inproc_sum = [(r["inprocess_peak_gib"] / (r["given_peak_gib"] + r["recluster2_peak_gib"]), r["object"]) for r in rows]
+    inproc_df = [(r["inprocess_df_peak_gib"] / r["given_peak_gib"], r["object"]) for r in rows]
     t_ratio = [(r["inprocess_wall_s"] / (r["given_wall_s"] + r["recluster2_wall_s"]), r["object"]) for r in rows]
     h_ratio = [(r["hook_wall_s"] / r["given_wall_s"], r["object"]) for r in rows]
 
@@ -162,9 +202,12 @@ def main(argv):
     print(f"| peak RSS, clustering on the fly ÷ --clusters (same binary, same node) | {span(hook_given)} |")
     print(f"| peak RSS, whole rule in process ÷ the larger of the two commands' | {span(inproc)} |")
     print(f"| peak RSS, whole rule in process ÷ the sum of the two commands' | {span(inproc_sum)} |")
+    print(f"| peak RSS, the in-process run's DoubletFinder phases (to the end of `singlets`) ÷ --clusters' run, the same code | {span(inproc_df)} |")
     print(f"| wall time, clustering on the fly ÷ --clusters | {span(h_ratio)} |")
     print(f"| wall time, whole rule in process ÷ the two commands' sum | {span(t_ratio)} |")
     print(f"| objects whose peak with clustering on the fly is more than 10% above M7's | {sum(1 for x, _ in hook_m7 if x > 1.10)} |")
+    print(f"| objects whose peak with clustering on the fly was reached in the clustering's phases | {sum(1 for r in rows if r['hook_set_by_clustering'])} |")
+    print(f"| objects whose in-process peak rose during the re-clustering | {sum(1 for r in rows if r['inprocess_rose'])} |")
     print()
     tot = lambda k: sum(r[k] for r in rows)
     print(f"Peak RSS, largest: M7 {max(r['m7_peak_gib'] for r in rows):.2f} GiB, --clusters {max(r['given_peak_gib'] for r in rows):.2f}, "
@@ -191,10 +234,14 @@ def main(argv):
               f"{'8 of 8' if r['pass'] else ', '.join(k for k in CHECKS if r[k] != 'identical')} | "
               f"{r['m7_peak_gib']:.2f}, {r['given_peak_gib']:.2f}, {r['hook_peak_gib']:.2f}, {r['recluster2_peak_gib']:.2f}, {r['inprocess_peak_gib']:.2f} | "
               f"{r['m7_wall_s']:.1f}, {r['given_wall_s']:.1f}, {r['hook_wall_s']:.1f}, {r['recluster2_wall_s']:.1f}, {r['inprocess_wall_s']:.1f} |")
+    tp = tp_table(label)
+    if tp:
+        print()
+        print(tp)
     if tsv:
         cols = ["object", "arm", "cells", "singlets", "clusters_on_the_fly", "clusters_recluster", "pK", "nExp"] + CHECKS + \
                [k + "_detail" for k in CHECKS] + ["pass"] + [f"{k}_{m}" for m in ("peak_gib", "wall_s") for k in ("m7", "given", "hook", "recluster2", "inprocess")] + \
-               ["node", "cpu_model", "openblas"]
+               ["inprocess_df_peak_gib", "inprocess_rose", "hook_cluster_peak_gib", "hook_set_by_clustering", "node", "cpu_model", "openblas"]
         with open(tsv, "w") as f:
             f.write("\t".join(cols) + "\n")
             for r in rows:

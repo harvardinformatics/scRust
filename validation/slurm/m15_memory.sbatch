@@ -3,6 +3,10 @@
 # before DoubletFinder (cli::settle_memory: glibc's mmap threshold fixed at 128 KiB and the free
 # pages returned; SCRUST_NO_SETTLE=1 skips it), against the same binary given the labels (M7's
 # command), on the objects named, in the production profile on Sapphire Rapids, 8 threads as M7.
+# MODES (default "given hook hook_nosettle") picks the modes; for the re-clustering,
+# "given recluster2 inprocess": the two commands (DoubletFinder given the labels, then scrust
+# cluster on its singlets/) against the whole rule in one process (--recluster). Each run's
+# summary.json records the peak at the end of each phase, so where the peak was reached.
 # Each mode runs <repeats> times; /usr/bin/time -v records the peak. Output:
 # data/doubletfinder/<object>/rust/<label>/memory/<mode>_<k>/ (the run) and memory.tsv (object,
 # mode, repeat, peak RSS KiB, wall s).
@@ -40,12 +44,16 @@ for obj in "$@"; do
     mkdir -p "$out"
     [ -f "$out/memory.tsv" ] || printf 'object\tmode\trepeat\tpeak_rss_kib\twall_s\tnode\n' > "$out/memory.tsv"
     for k in $(seq 1 "$reps"); do
-        for mode in given hook hook_nosettle; do
+        for mode in ${MODES:-given hook hook_nosettle}; do
             d=$out/${mode}_$k
             rm -rf "$d"
             mkdir -p "$d"
             args=(doubletfinder --counts "$inp" --out "$d/run" --threads "$threads")
-            [ "$mode" = given ] && args+=(--clusters "$inp/seurat_clusters.tsv")
+            case $mode in
+                given) args+=(--clusters "$inp/seurat_clusters.tsv") ;;
+                recluster2) args=(cluster --counts "$out/given_$k/run/singlets" --preset workflow --out "$d/run" --threads "$threads") ;;
+                inprocess) args+=(--clusters "$inp/seurat_clusters.tsv" --recluster) ;;
+            esac
             if [ "$mode" = hook_nosettle ]; then
                 SCRUST_NO_SETTLE=1 /usr/bin/time -v -o "$d/time_v.txt" "$bin" "${args[@]}" 2> "$d/stderr.txt"
             else
@@ -54,7 +62,9 @@ for obj in "$@"; do
             peak=$(sed -n 's/^\s*Maximum resident set size (kbytes): //p' "$d/time_v.txt")
             wall=$(sed -n 's/^\s*Elapsed (wall clock) time (h:mm:ss or m:ss): //p' "$d/time_v.txt" | awk -F: '{ s = 0; for (i = 1; i <= NF; i++) s = s * 60 + $i; print s }')
             printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$obj" "$mode" "$k" "$peak" "$wall" "$(hostname -s)" | tee -a "$out/memory.tsv"
-            rm -rf "$d/run/singlets"   # identical to the panel's; the rest is kept
+            # singlets/, identical to the panel's, once nothing reads it any more
+            [ "$mode" = given ] && [[ " ${MODES:-} " == *" recluster2 "* ]] || rm -rf "$d/run/singlets"
         done
+        rm -rf "$out/given_$k/run/singlets"
     done
 done
