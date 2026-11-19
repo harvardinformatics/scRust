@@ -60,6 +60,10 @@ DF_OBJECTS = [o for o in OBJECTS if o.startswith(("soupx_", "cellbender_"))]
 DF_M15 = "doubletfinder_m15"
 DF_TOOLS = ("doubletfinder", DF_M15)
 
+# M15b's clustering with SCTransform's vars.to.regress = "percent.mt" (run_r.sbatch and
+# run_rust.sbatch cluster_regress): the clustering's phases and variants
+CLUSTER_TOOLS = ("cluster", "cluster_regress")
+
 # Rust phases' default kinds; M15's in-process clusterings record their stages as
 # "clustering: <stage>" and "recluster: <stage>" (compute unless named here)
 RUST_KIND = {
@@ -216,7 +220,7 @@ def output_phase(tool, rel, mode, late=False):
     stage files in the write phase (STAGE_WRITER's did it after each stage)."""
     if rel == "summary.json":
         return "(tail)"  # written after the last phase mark
-    if tool == "cluster":
+    if tool in CLUSTER_TOOLS:
         if rel.startswith("counts/"):
             return "load"
         if "w" not in mode:
@@ -756,10 +760,13 @@ def stats(vals):
 
 def write_table(per):
     rows = []
-    for tool in ("cluster", "doubletfinder", DF_M15):
-        objs = OBJECTS if tool == "cluster" else DF_OBJECTS
+    for tool in ("cluster", "cluster_regress", "doubletfinder", DF_M15):
+        objs = OBJECTS if tool in CLUSTER_TOOLS else DF_OBJECTS
         variants = {
             "cluster": [("without --export", "n"), ("with --export", "x")],
+            # M15b: b, the same binary's chain without the regression (VARIANTS="b1 b32"), against
+            # R's runs of the current scripts (the cluster tool's)
+            "cluster_regress": [("without --export", "n"), ("with --export", "x"), ("without the regression", "b")],
             "doubletfinder": [("DoubletFinder alone", "alone"), ("whole rule", "rule")],
             # M15 (one binary for all four): the hook's cost (h against alone) and the in-process
             # hand-off's (inprocess against rule)
@@ -767,13 +774,13 @@ def write_table(per):
                      ("whole rule", "rule"), ("whole rule, in process", "inprocess")],
         }[tool]
         for obj in objs:
-            if tool == DF_M15 and not any(k[0] == DF_M15 and k[1] == obj for k in per):
+            if tool in (DF_M15, "cluster_regress") and not any(k[0] == tool and k[1] == obj for k in per):
                 continue
             for label, v in variants:
                 # R's DoubletFinder runs serve both DoubletFinder tools (no new R runs for M15)
-                r_tool = "doubletfinder" if tool == DF_M15 else tool
+                r_tool = "doubletfinder" if tool == DF_M15 else ("cluster" if v == "b" else tool)
                 r_runs = per.get((r_tool, obj, "R", "R-alone" if v in ("alone", "hook") else "R"), [])
-                v1, v32 = {"n": ("n1", "n32"), "x": ("x1", "x32"), "alone": ("d1", "d32"), "rule": ("d1+r1", "d32+r32"),
+                v1, v32 = {"n": ("n1", "n32"), "x": ("x1", "x32"), "b": ("b1", "b32"), "alone": ("d1", "d32"), "rule": ("d1+r1", "d32+r32"),
                            "hook": ("h1", "h32"), "inprocess": ("p1", "p32")}[v]
                 units = {"R": r_runs, "Rust1": per.get((tool, obj, "Rust", v1), []),
                          "Rust32": per.get((tool, obj, "Rust", v32), [])}

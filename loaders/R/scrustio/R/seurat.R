@@ -64,6 +64,13 @@ load_seurat <- function(dir, check_sha256 = FALSE) {
     rownames(counts) <- feat$seurat
     obj <- SeuratObject::CreateSeuratObject(counts = counts)
   }
+  md <- .read_metadata(m)
+  if (!is.null(obj) && !is.null(md) && "percent.mt" %in% colnames(md)) {
+    # percent.mt (M15b) before the SCT assay's columns, where the workflow's objects hold it (their
+    # scripts call PercentageFeatureSet() before SCTransform())
+    if (!identical(rownames(md), cells)) stop("scrustio: the metadata's cells differ from the object's", call. = FALSE)
+    obj <- SeuratObject::AddMetaData(obj, metadata = md[, "percent.mt", drop = FALSE])
+  }
   if (.has_role(m, "sct_counts")) {
     sct <- .sct_assay(m, feat, cells, counts)
     if (is.null(obj)) {
@@ -78,7 +85,7 @@ load_seurat <- function(dir, check_sha256 = FALSE) {
          "(scrust cluster --export holds both); add its per-cell columns to an object with add_scrust()",
          call. = FALSE)
   }
-  obj <- .add_metadata_seurat(obj, m)
+  obj <- .add_metadata_seurat(obj, m, md)
   if (.has_role(m, "pca_embeddings")) obj[["pca"]] <- .pca_reduction(m, feat, cells)
   for (g in list(c("graph_nn", "SCT_nn"), c("graph_snn", "SCT_snn"))) {
     if (!.has_role(m, g[1])) next
@@ -171,9 +178,9 @@ load_seurat <- function(dir, check_sha256 = FALSE) {
 
 # meta.data: the output's per-cell columns (and DoubletFinder's calls), each with Seurat's type,
 # factors in their levels' order. Columns Seurat computes itself when the assays are added
-# (nCount_RNA, nFeature_RNA, nCount_SCT, nFeature_SCT) must equal the output's.
-.add_metadata_seurat <- function(obj, m) {
-  md <- .read_metadata(m)
+# (nCount_RNA, nFeature_RNA, nCount_SCT, nFeature_SCT) must equal the output's, as must
+# percent.mt when load_seurat() has added it with the RNA assay. `md`: .read_metadata(m).
+.add_metadata_seurat <- function(obj, m, md = .read_metadata(m)) {
   calls <- .read_doublet_calls(m)
   cells <- colnames(obj)
   if (!is.null(calls)) {
@@ -186,7 +193,7 @@ load_seurat <- function(dir, check_sha256 = FALSE) {
   if (!identical(rownames(md), cells)) stop("scrustio: the metadata's cells differ from the object's", call. = FALSE)
   have <- obj[[]]
   for (col in intersect(colnames(md), colnames(have))) {
-    if (!col %in% c("nCount_RNA", "nFeature_RNA", "nCount_SCT", "nFeature_SCT")) {
+    if (!col %in% c("nCount_RNA", "nFeature_RNA", "nCount_SCT", "nFeature_SCT", "percent.mt")) {
       stop("scrustio: the output's column ", col, " would replace the object's", call. = FALSE)
     }
     if (!identical(as.double(md[[col]]), as.double(have[[col]]))) {

@@ -6,10 +6,18 @@ anchor lines; nothing else changes. The script checks that removing the inserted
 back the source exactly, and records each source's git blob id and sha256.
 
   PYTHONNOUSERSITE=1 python3 -I make_workflow_copies.py
+  PYTHONNOUSERSITE=1 python3 -I make_workflow_copies.py --rev 8d34de1^ --out workflow_regress \
+      --only tenx2seuratrds.R soupx.R emptydrops.R cellbender2seurat.R silhouette_utils.R
 
-Sources: <pipeline>/workflow/scripts/<name> at the pipeline repo's HEAD (read only).
-Copies:  validation/benchmark/workflow/scripts/<name>, plus SOURCES.tsv.
+Sources: <pipeline>/workflow/scripts/<name> at the pipeline repo's HEAD (read only), or, with
+--rev, the blob at that revision (git show, read only). Milestone M15b's benchmark of SCTransform
+with vars.to.regress uses the clustering scripts at 8d34de1^, the commit before the workflow
+dropped vars.to.regress = "percent.mt" (they differ from HEAD's in that call and its comment
+lines only: `git log 8d34de1^..ea053fa` touches them only in 8d34de1).
+Copies:  validation/benchmark/<out>/scripts/<name> (out: workflow), plus SOURCES.tsv.
 """
+
+import argparse
 
 import hashlib
 import os
@@ -18,7 +26,6 @@ import sys
 
 PIPE = "/n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq_preprocessing/scRNAseq-preprocessing"
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "workflow", "scripts")
 
 HEAD = 'source("workflow/scripts/bench_markers.R")\nbench_phase("packages", "startup")\n'
 
@@ -86,24 +93,36 @@ OCCURRENCE = {
 }
 
 
-def git_blob(path):
+def git_blob(path, rev="HEAD"):
     rel = os.path.relpath(path, PIPE)
     out = subprocess.check_output(
-        ["timeout", "60", "git", "--no-optional-locks", "-C", PIPE, "rev-parse", "HEAD:" + rel])
+        ["timeout", "60", "git", "--no-optional-locks", "-C", PIPE, "rev-parse", rev + ":" + rel])
     return out.decode().strip()
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--rev", default="HEAD", help="the pipeline repo's revision (HEAD: its working tree, checked clean)")
+    ap.add_argument("--out", default="workflow", help="the copies' directory under validation/benchmark/")
+    ap.add_argument("--only", nargs="*", help="these scripts only")
+    args = ap.parse_args()
+    OUT = os.path.join(HERE, args.out, "scripts")
     os.makedirs(OUT, exist_ok=True)
     head = subprocess.check_output(
-        ["timeout", "60", "git", "--no-optional-locks", "-C", PIPE, "rev-parse", "HEAD"]).decode().strip()
+        ["timeout", "60", "git", "--no-optional-locks", "-C", PIPE, "rev-parse", args.rev]).decode().strip()
     dirty = subprocess.check_output(
         ["timeout", "60", "git", "--no-optional-locks", "-C", PIPE, "status", "--porcelain", "--",
-         "workflow/scripts", "workflow/rules"]).decode().strip()
+         "workflow/scripts", "workflow/rules"]).decode().strip() if args.rev == "HEAD" else ""
     rows = []
     for name, markers in SCRIPTS.items():
+        if args.only and name not in args.only:
+            continue
         src = os.path.join(PIPE, "workflow", "scripts", name)
-        raw = open(src, "rb").read()
+        if args.rev == "HEAD":
+            raw = open(src, "rb").read()
+        else:
+            raw = subprocess.check_output(
+                ["timeout", "60", "git", "--no-optional-locks", "-C", PIPE, "show", "%s:workflow/scripts/%s" % (args.rev, name)])
         text = raw.decode()
         lines = text.split("\n")
         out = []
@@ -143,12 +162,19 @@ def main():
         with open(tmp, "w") as fh:
             fh.write(body)
         os.rename(tmp, dst)  # atomic: an R process that has the old file open keeps reading it
-        rows.append((name, src, git_blob(src), hashlib.sha256(raw).hexdigest(),
+        rows.append((name, src if args.rev == "HEAD" else "%s:workflow/scripts/%s" % (args.rev, name), git_blob(src, args.rev), hashlib.sha256(raw).hexdigest(),
                      hashlib.sha256(body.encode()).hexdigest(), str(inserted + (0 if name == "silhouette_utils.R" else 3))))
         print("%-22s %2d marker lines" % (name, inserted + (0 if name == "silhouette_utils.R" else 3)))
-    with open(os.path.join(HERE, "workflow", "SOURCES.tsv"), "w") as fh:
-        fh.write("# pipeline repo %s HEAD %s; workflow/scripts and workflow/rules %s\n" % (
-            PIPE, head, "clean" if not dirty else "MODIFIED: " + dirty.replace("\n", "; ")))
+    if args.out != "workflow":
+        # the markers' helper, as the HEAD copies have it
+        import shutil
+        shutil.copyfile(os.path.join(HERE, "workflow", "scripts", "bench_markers.R"), os.path.join(OUT, "bench_markers.R"))
+    with open(os.path.join(HERE, args.out, "SOURCES.tsv"), "w") as fh:
+        if args.rev == "HEAD":
+            fh.write("# pipeline repo %s HEAD %s; workflow/scripts and workflow/rules %s\n" % (
+                PIPE, head, "clean" if not dirty else "MODIFIED: " + dirty.replace("\n", "; ")))
+        else:
+            fh.write("# pipeline repo %s at %s (%s), read with git show\n" % (PIPE, args.rev, head))
         fh.write("copy\tsource\tgit_blob\tsource_sha256\tcopy_sha256\tlines_added\n")
         for r in rows:
             fh.write("\t".join(r) + "\n")

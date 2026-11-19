@@ -185,6 +185,37 @@ singlets with the workflow's chain, and its PCA guard gives the message of
 require_min_cells_for_pca(context = "doubletfinder") (silhouette_utils.R),
 in crates/cluster/src/chain.rs.
 
+SCTransform's vars.to.regress and the workflow's percent.mt (milestone M15b)
+port:
+
+- R 4.5.3 (GPL-2 | GPL-3): LINPACK's QR as R modified it, src/appl/dqrdc2.f
+  (Householder reflections with R's limited column pivoting and rank, tol
+  1e-07 as lm.fit() passes it through src/library/stats/src/lm.c's Cdqrls and
+  src/appl/dqrls.f), src/appl/dqrsl.f (job 10: Q'y and the residuals) and
+  src/appl/dqrutl.f's dqrrsd, as qr.resid() (src/library/base/R/qr.R) calls
+  them, translated statement by statement into crates/rcompat/src/linpack.rs;
+  the BLAS routines they call (dnrm2, dscal, ddot, daxpy) are the conda env's
+  OpenBLAS 0.3.34 through FFI, as R's own are. make.unique()
+  (src/main/unique.c's do_makeunique), in crates/scio/src/features.rs.
+- Seurat 5.5.1 (MIT): ScaleData.default's regression and RegressOutMatrix()
+  (R/preprocessing.R: lm()'s QR once, qr.resid() per row, then FastRowScale's
+  centring and ScaleData's NA to 0), as SCTransform.default calls them on
+  scale.data's clipped rows, in crates/sctransform/src/regress.rs and
+  residuals.rs; PercentageFeatureSet() (R/utilities.R) and the row names
+  Read10X() and CreateSeuratObject() give features (with SeuratObject 5.4.0's
+  CheckFeaturesNames()), in crates/scio/src/features.rs; vars.to.regress'
+  checks and covariates (SCTransform.Seurat's latent.data), in
+  crates/cluster/src/covariates.rs.
+- Matrix 1.7-6 (GPL (>= 2)): colSums() of a dgCMatrix (src/sparse.c's
+  Csparse_colsum: each column's stored values, in stored order, added in
+  double), PercentageFeatureSet()'s numerator and denominator.
+- The workflow's percent.mt (scRNAseq-preprocessing, workflow/scripts/*.R:
+  PercentageFeatureSet(obj, pattern = "(?i)^mt-") before SCTransform), and the
+  workflow's scripts before its commit 8d34de1, which passed
+  vars.to.regress = "percent.mt" to SCTransform: the benchmark's
+  validation/benchmark/workflow_regress/ copies them at 8d34de1^, with
+  phase-marker lines added and nothing else changed (its SOURCES.tsv).
+
 The benchmark's harness, validation/benchmark/ (moved there from
 data/benchmarks/scripts/ in milestone M15), runs copies of the workflow's
 tenx2seuratrds.R, soupx.R, emptydrops.R, cellbender2seurat.R, doubletfinder.R

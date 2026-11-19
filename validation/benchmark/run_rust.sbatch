@@ -5,6 +5,13 @@
 #     scrust cluster --counts data/clustering/<object>/input --preset workflow [--export],
 #     at 1 and 32 threads: variants n1, x1, n32, x32 (n: without --export, x: with it), in
 #     that order
+#   SCRUST_BIN=<binary> sbatch --job-name=bench-rust-<tool> run_rust.sbatch cluster_regress <object> <rep>
+#     milestone M15b: as cluster, with SCTransform's vars.to.regress = "percent.mt" (--vars-to-regress
+#     percent.mt; where the workflow's pattern finds no feature, which scrust refuses, the same
+#     all-zero covariate through --mt-genes data/clustering/m15b/inputs/<object>/zero_genes.txt, as
+#     M15b's validation runs); variants n1, x1, n32, x32; checked against M15b's validation run.
+#     VARIANTS="b1 b32" adds to a repeat the same binary's chain without the regression (b: as n,
+#     checked against the cluster tool's reference), the like for like for what the regression costs
 #   sbatch --job-name=bench-rust-<tool> run_rust.sbatch doubletfinder <object> <rep>
 #     scrust doubletfinder --counts data/doubletfinder/<object>/input --clusters .../seurat_clusters.tsv,
 #     then scrust cluster --counts <its singlets/> --preset workflow --export (the clustering of
@@ -50,7 +57,7 @@ source /n/holylfs05/LABS/informatics/Lab/projects/afreedman/scRNAseq-preprocessi
 model=$(lscpu | sed -n 's/^Model name: *//p')
 case $model in *8480CL*) ;; *) echo "$(hostname -s): CPU model '$model', not an 8480CL; not run" >&2; exit 3 ;; esac
 
-[ $# -eq 3 ] || { echo "usage: run_rust.sbatch cluster|doubletfinder|doubletfinder_m15 <object> <rep>" >&2; exit 2; }
+[ $# -eq 3 ] || { echo "usage: run_rust.sbatch cluster|cluster_regress|doubletfinder|doubletfinder_m15 <object> <rep>" >&2; exit 2; }
 tool=$1 obj=$2 rep=$3
 S=$(realpath "${SCRUST_ROOT:-${SLURM_SUBMIT_DIR:-$PWD}}")  # the repository (submit from its top directory)
 B=$S/data/benchmarks
@@ -145,6 +152,26 @@ cluster)
         prune "$out"
     done
     ;;
+cluster_regress)
+    input=$S/data/clustering/$obj/input
+    ref=$(ls -d "$S"/data/clustering/m15b/rust/*/"$obj"/pm/production/run 2>/dev/null | tail -n 1)
+    regress=(--vars-to-regress percent.mt)
+    zero=$S/data/clustering/m15b/inputs/$obj/zero_genes.txt
+    [ -f "$zero" ] && regress+=(--mt-genes "$zero")
+    for v in ${VARIANTS:-n1 x1 n32 x32}; do
+        t=${v:1}
+        out=$scratch/$v
+        extra=("${regress[@]}")
+        vref=$ref
+        case ${v:0:1} in
+            x) extra+=(--export) ;;
+            b) extra=() vref=$S/data/clustering/$obj/rust/m13-9ce0adb/bench/t1 ;;  # without the regression
+        esac
+        measure "$v" "$input" "$out" -- cluster --counts "$input" --preset workflow "${extra[@]}" --out "$out" --threads "$t"
+        same "$v" "$out" "$vref" seurat_clusters.tsv seurat_clusters_levels.txt clusters.tsv optimizer_ids.tsv nclusters.txt cluster_ids.txt pca/embeddings.tsv neighbors/knn_index.tsv neighbors/snn.mtx.gz
+        prune "$out"
+    done
+    ;;
 doubletfinder)
     input=$S/data/doubletfinder/$obj/input
     ref=$S/data/doubletfinder/$obj/runs/direct-production-sapphirerapids
@@ -213,7 +240,7 @@ if [ "$status" = 0 ] && [ -e "$final" ]; then
         rm -rf "${final:?}/$v"
         mv "$run/$v" "$final/$v"
     done
-    { echo "== variants ${VARIANTS} replaced:"; cat "$run/env.txt"; } >> "$final/env_replaced.txt"
+    { echo "== variants ${VARIANTS} replaced (or added):"; cat "$run/env.txt"; } >> "$final/env_replaced.txt"
     rm -rf "$run"
 elif [ "$status" = 0 ]; then
     mv "$run" "$final"

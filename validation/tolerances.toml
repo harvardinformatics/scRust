@@ -456,6 +456,42 @@ K10_genes = { values_differing = 0, objects = 34 }
 correct_residuals_beyond_clip = { values_differing = 0, objects = 34 }
 vst_umi_corrected_nnz = { values_differing = 0, objects = 34 }
 
+# R-vs-R floor with SCTransform's vars.to.regress (M15b; docs/PLAN.md A5b, C3j, C5's K14; decided
+# 2026-11-19). The regression's QR (R's LINPACK dqrdc2 and dqrsl, through OpenBLAS's dnrm2,
+# dscal, ddot and daxpy) makes every regressed row of scale.data kernel-dependent, and the PCA and
+# the scores after it move with it, beyond [clustering.floor.kernel]. So a floor of its own,
+# used only when both runs record the same non-empty vars.to.regress (crates/cluster/src/validate.rs
+# floor_for: R's result.regression.vars, scrust's run.parameters.sctransform.vars_to_regress); it
+# stands alone: an array it does not list is exact. [clustering.floor.kernel] and every unregressed
+# grading are unchanged.
+# Measured as [clustering.floor.kernel] was (M8; M11 with the grader's statistics): R's direct runs
+# of every case in the production profile (OPENBLAS_CORETYPE unset: SapphireRapids, Xeon 8480CL)
+# and the portable one (Haswell; tier T on Xeon 8268 nodes, the others on 8480CL: under one kernel
+# the CPU type changes nothing, M8's [clustering.floor.cpu_type]), validation/slurm/
+# m15b_references.sbatch; compared by validation/python/m15b_floor.py, which ports
+# scio::grade::stats line for line (and reproduces the validator's figures), on the arrays the
+# validator grades for these runs, in both directions (either run as the reference); each bound
+# the maximum over the cases, rounded up to two significant digits; cells_differing the total over
+# the cases, so it bounds one case too. The cases: validation/m15b_cases.tsv, all 134 (27 tier-T
+# objects x 4 cases; the 4 mouse tier-P objects x 4, the other 3 tier-P objects 4 cases; the
+# zebrafish and the bearded dragon x 3): percent.mt by the workflow's pattern and by a list of
+# ids, with nCount_RNA, and a --metadata column. data/clustering/m15b/floor/: r_vs_r.tsv (every
+# case, array and direction), summary.md (the maxima by tier, the case that sets each). set_by
+# names that case (the reference's profile in brackets); t, p and x give the maximum on tier T, P
+# and the two other objects.
+# Identical across kernels in every case, and so not listed (exact): the labels and levels
+# (seurat_clusters, SCT_snn_res.0.8), both graphs, the variable features, the corrected counts,
+# percent.mt (102 cases write it) and the counts' columns, the regression's rank and pivot.
+[clustering.floor.kernel_regressed]
+S2d_scale_data = { max_abs = 5.6e-13, max_fraction_differing = 0.72, cases_differing = 130, set_by = "max_abs: soupx_emptydrops_4500871lane ids_ncount (production); fraction: posthocfilt_threshold_scdblfinder_decontx_raw_tenx_test ids_ncount", t = "9.6e-15, 0.7145", p = "5.578e-13, 0.6572", x = "4.547e-13, 0.6953", note = "the 130 cases whose runs kept scale.data (the four light-level ones keep its digest)" }
+S3_embeddings_dims_1_30 = { max_abs = 6.2e-10, max_scaled = 2.6e-12, cases_differing = 134, set_by = "max_abs: soupx_emptydrops_sscovelli pm (production); max_scaled: decontx_raw_tenx_test ids (portable)", t = "3.793e-11, 2.542e-12", p = "6.181e-10, 2.323e-12", x = "2.229e-10, 8.556e-13" }
+S3_embeddings_dims_31_50 = { max_abs = 5.5e-6, cases_differing = 134, set_by = "posthocfilt_threshold_scdblfinder_cellbender_fromraw_test pm (production)", t = "5.462e-6", p = "5.128e-10", x = "1.038e-10", note = "trailing components of the smallest tier-T objects, as in [clustering.floor.kernel]" }
+S3_loadings = { max_abs = 1.7e-7, max_scaled = 6.0e-7, cases_differing = 134, set_by = "posthocfilt_threshold_scdblfinder_cellbender_fromraw_test pm (production; portable for max_scaled)", t = "1.666e-7, 5.947e-7", p = "2.331e-12, 4.424e-12", x = "1.14e-12, 2.692e-12" }
+S3_sdev = { max_abs = 2.7e-13, max_scaled = 5.0e-14, cases_differing = 134, set_by = "posthocfilt_threshold_scdblfinder_cellbender_fromraw_test pm (production; portable for max_scaled)", t = "2.618e-13, 4.959e-14", p = "1.013e-13, 5.493e-15", x = "3.464e-14, 1.52e-15" }
+total_variance = { max_abs = 1.2e-13, max_scaled = 2.2e-16, cases_differing = 1, set_by = "doubletfinder_soupx_tenx_test meta (production; portable for max_scaled)", t = "1.137e-13, 2.116e-16", p = "0", x = "0", note = "identical across kernels without the regression" }
+K8_silhouette_width = { max_abs = 2.0e-12, cases_differing = 130, set_by = "soupx_emptydrops_sscovelli pm (production)", t = "6.409e-14", p = "1.945e-12", x = "6.581e-14" }
+K9_purity = { cells_differing = 34, max_abs = 0.026, cases_differing = 18, set_by = "max_abs: doubletfinder_cellbender_fromraw_test ids (production); cells: 18 cases, at most 2 cells in one", t = "30 cells, 0.0258", p = "4 cells, 0.005554", x = "0" }
+
 # Kernel-gated grading (M11; docs/PLAN.md A5b mechanism 3): `scrust validate cluster` grades every
 # check exactly when the reference's and the candidate's recorded OpenBLAS kernels match;
 # otherwise, or when either run records none, BLAS-free checks stay exact and BLAS-dependent ones
@@ -480,6 +516,14 @@ saved_object_kernel = "SapphireRapids"
 blas_free = ["FindClusters' settings", "barcodes", "nCount_RNA", "nFeature_RNA", "S2a", "SCTransform's RNG states", "RunPCA's entry and irlba's entry states", "approxSilhouette teacher-forced on R's embeddings and labels", "neighborPurity teacher-forced on R's embeddings and labels (M12)", "the purity certificate (a property of the search)", "every check of a run started from R's embeddings or SNN graph", "K10_genes, correct()'s settings, its median log_umi and RNG state at its entry, sct_features and sct_cells (M13)", "the output manifest (M13)"]
 blas_dependent = ["S2b", "S2c", "S2d", "scale.data's digest", "S3", "irlba's exit state", "K3", "K4", "K5", "K6", "K7", "K8", "K9 (M12)", "K10: the corrected counts, their log1p, nCount_SCT, nFeature_SCT, the residuals beyond the clip range (M13)", "K10 teacher-forced (correct()'s mu is a dgemm; graded under the validator's own kernel against R's)", "the result section's numbers", "the saved object's labels, silhouette widths, purities, nCount_SCT, nFeature_SCT and SCT layers"]
 floor = "clustering.floor.kernel"
+# M15b: when both runs record the same non-empty vars.to.regress (R's result.regression.vars,
+# scrust's run.parameters.sctransform.vars_to_regress), [clustering.floor.kernel_regressed]
+# instead, on its own (an array it does not list is exact); every other comparison, the saved
+# object's included, keeps [clustering.floor.kernel]. percent.mt and the regression's covariates
+# are BLAS-free; its rank and pivot, and scale.data value by value, BLAS-dependent.
+floor_regressed = "clustering.floor.kernel_regressed"
+blas_free_m15b = ["percent.mt", "a regressed --metadata column", "the regression's covariates and columns", "percent.mt's features"]
+blas_dependent_m15b = ["the regression's rank and pivot", "scale.data value by value"]
 
 # K0, Kiss64Random (M9): RcppAnnoy 0.0.23's kissrandom.h, compiled with the R env's compiler and
 # flags (tests/fixtures/clustering/k0/, M8), against crates/neighbors (tests/k0_kiss64.rs):

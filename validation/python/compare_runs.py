@@ -10,6 +10,11 @@ summary), and files present on one side only can be allowed under given director
 files written (``files.entries`` and ``run.files`` of each ``summary.json`` above them), which the
 other side cannot have.
 
+``--nested-summaries`` (M15b) also sets aside, in each manifest (``files.entries`` of a
+``summary.json``), the ``sha256`` and ``bytes`` of the entries that list a nested output's
+``summary.json``: that file holds timings, so its digest differs between any two runs, while the file
+itself is compared as JSON like every summary. Without it, those members are compared, as M15 did.
+
 Used for:
 - K12: ``scrust doubletfinder`` clustering on the fly against M7's runs (``--only-right
   clusters`` and ``--ignore`` for the clustering's own members of summary.json), and its
@@ -22,6 +27,7 @@ Used for:
 Usage:
   python -I compare_runs.py <left dir> <right dir> [--json <report.json>] [--ignore <file>:a.b]...
                             [--only-left <dir>]... [--only-right <dir>]... [--result-only]
+                            [--nested-summaries]
 
 ``--result-only`` compares only ``result`` of the top-level ``summary.json`` (M7's runs record
 another command line, inputs and paths). Exit status 0 when nothing differs.
@@ -117,12 +123,24 @@ def drop_entries(j, rel, dirs):
     return out, n
 
 
+def drop_nested_digests(j):
+    """The summary.json ``j`` with the ``sha256`` and ``bytes`` of its manifest's entries for nested
+    ``summary.json`` files set aside (``--nested-summaries``)."""
+    f = j.get("files") if isinstance(j, dict) else None
+    if not (isinstance(f, dict) and isinstance(f.get("entries"), list)):
+        return j
+    nested = lambda e: isinstance(e, dict) and str(e.get("path", "")).endswith("/summary.json")
+    entries = [{k: v for k, v in e.items() if k not in ("sha256", "bytes")} if nested(e) else e for e in f["entries"]]
+    return {**j, "files": {**f, "entries": entries}}
+
+
 def main(argv):
     args = argv[1:]
     report = None
     ignore = set(["*:files.provenance.command_line"])
     only_left, only_right = [], []
     result_only = False
+    nested_summaries = False
     pos = []
     i = 0
     while i < len(args):
@@ -144,6 +162,9 @@ def main(argv):
             i += 2
         elif a == "--result-only":
             result_only = True
+            i += 1
+        elif a == "--nested-summaries":
+            nested_summaries = True
             i += 1
         else:
             pos.append(a)
@@ -175,6 +196,8 @@ def main(argv):
                 a, b = {"result": a.get("result")}, {"result": b.get("result")}
             a, na = drop_entries(a, rel, only_left)
             b, nb = drop_entries(b, rel, only_right)
+            if nested_summaries:
+                a, b = drop_nested_digests(a), drop_nested_digests(b)
             ign = {p.split(":", 1)[1] for p in ignore if p.split(":", 1)[0] in ("*", rel)}
             d = diff_json(strip(a, ign), strip(b, ign))
             row = {"file": rel, "status": "identical (as JSON, timings and command line aside)" if not d else "differs", "members": d}

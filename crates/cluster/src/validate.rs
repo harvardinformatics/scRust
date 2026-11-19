@@ -73,7 +73,12 @@
 //! SNN graph, none. When both runs recorded the same OpenBLAS kernel, every check is exact.
 //! Otherwise ([`Mode::Tolerance`]) BLAS-dependent checks are graded against
 //! `[clustering.floor.kernel]` (`validation/tolerances.toml`, embedded at build time), and the
-//! report says so.
+//! report says so. When both runs regressed the same covariates out of `scale.data`
+//! (SCTransform's `vars.to.regress`, M15b: R's `result.regression.vars`, the candidate's
+//! `run.parameters.sctransform.vars_to_regress`), they are graded against
+//! `[clustering.floor.kernel_regressed]` instead, R's own differences across kernels measured
+//! with the regression ([`floor_for`]); every other comparison, the saved object's included, keeps
+//! `[clustering.floor.kernel]`.
 
 use crate::find_clusters::Factor;
 use crate::purity::neighbor_purity;
@@ -89,6 +94,42 @@ pub const TOLERANCES: &str = include_str!("../../../validation/tolerances.toml")
 /// The floor of the clustering chain's checks.
 pub fn floor() -> Floor {
     Floor::from_toml(TOLERANCES, "clustering.floor.kernel").expect("validation/tolerances.toml has [clustering.floor.kernel]")
+}
+
+/// The floor of runs that regressed covariates out of `scale.data` (SCTransform's
+/// `vars.to.regress`, M15b): R against R across kernels with the regression, on M15b's cases. Used
+/// only by [`floor_for`]; it stands alone: an array it does not list is identical across kernels,
+/// so exact.
+pub fn floor_regressed() -> Floor {
+    Floor::from_toml(TOLERANCES, "clustering.floor.kernel_regressed").expect("validation/tolerances.toml has [clustering.floor.kernel_regressed]")
+}
+
+/// The covariates a run regressed out of `scale.data`, as its `summary.json` records them: R's
+/// reference runs in `result.regression.vars`, scrust's in `run.parameters.sctransform.
+/// vars_to_regress` (and `result.sctransform.regression.vars_to_regress`); none when it did not.
+pub fn regressed(summary: Option<&Json>) -> Vec<String> {
+    let Some(s) = summary else { return Vec::new() };
+    let r = s.get("result");
+    let mut v = str_list(r.and_then(|r| r.get("regression")).and_then(|g| g.get("vars")));
+    if v.is_empty() {
+        v = str_list(s.get("run").and_then(|r| r.get("parameters")).and_then(|p| p.get("sctransform")).and_then(|p| p.get("vars_to_regress")));
+    }
+    if v.is_empty() {
+        v = str_list(r.and_then(|r| r.get("sctransform")).and_then(|t| t.get("regression")).and_then(|g| g.get("vars_to_regress")));
+    }
+    v
+}
+
+/// The floor a comparison is graded against: `[clustering.floor.kernel_regressed]` when both runs
+/// record the same non-empty `vars.to.regress`, otherwise `[clustering.floor.kernel]`, as before
+/// M15b. Returns the covariates when the regressed floor applies.
+pub fn floor_for(reference: Option<&Json>, candidate: &Json) -> (Floor, Option<Vec<String>>) {
+    let (r, c) = (regressed(reference), regressed(Some(candidate)));
+    if !c.is_empty() && r == c {
+        (floor_regressed(), Some(c))
+    } else {
+        (floor(), None)
+    }
 }
 
 /// The outcome of one check.
@@ -140,6 +181,9 @@ pub struct Report {
     pub reference: PathBuf,
     pub candidate: PathBuf,
     pub mode: Mode,
+    /// The floor tolerance mode grades against (`clustering.floor.kernel`, or
+    /// `clustering.floor.kernel_regressed` when both runs regressed the same covariates).
+    pub floor: String,
     /// The mode of the checks against the saved object, under its own kernel.
     pub saved_mode: Option<Mode>,
     pub checks: Vec<Check>,
@@ -183,6 +227,7 @@ impl Report {
             ("candidate", Json::Str(self.candidate.display().to_string())),
             ("pass", Json::Bool(self.pass())),
             ("grading", mode(&self.mode)),
+            ("floor", Json::Str(self.floor.clone())),
             ("saved_grading", self.saved_mode.as_ref().map(mode).unwrap_or(Json::Null)),
             (
                 "by_stage",
@@ -525,14 +570,21 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
     let c_params = c_params_all.get("cluster").cloned().unwrap_or(c_params_all.clone());
     let start = c_run.get("start").and_then(Json::as_str).unwrap_or("snn").to_string();
     let mode = grade::mode(grade::recorded_kernel(r_summary.as_ref()).as_deref(), grade::recorded_kernel(Some(&c_summary)).as_deref());
-    let mut g = Grader { mode, floor: floor(), start, checks: Vec::new() };
+    let (floor, regressed_vars) = floor_for(r_summary.as_ref(), &c_summary);
+    let floor_name = floor.source.clone();
+    let mut g = Grader { mode, floor, start, checks: Vec::new() };
 
-    // the environment: which mode, and why
+    // the environment: which mode, and why; and the floor
     {
         let rk = grade::recorded_kernel(r_summary.as_ref()).unwrap_or_else(|| "none recorded".into());
         let ck = grade::recorded_kernel(Some(&c_summary)).unwrap_or_else(|| "none recorded".into());
         let detail = format!("R {rk}, Rust {ck}; {} mode: {}", g.mode.name(), g.mode.reason());
         g.push("environment", "OpenBLAS kernel", Class::BlasFree, "-".into(), Status::NotApplicable, 1, 0, detail);
+        let detail = match &regressed_vars {
+            Some(v) => format!("[{floor_name}]: both runs regressed {} out of scale.data (vars.to.regress); used only in tolerance mode", v.join(",")),
+            None => format!("[{floor_name}]: used only in tolerance mode"),
+        };
+        g.push("environment", "the floor", Class::BlasFree, "-".into(), Status::NotApplicable, 1, 0, detail);
     }
 
     // settings
@@ -568,7 +620,7 @@ pub fn compare(reference: &Path, candidate: &Path, opts: &CompareOptions) -> Res
     teacher_forced_purity(&mut g, reference, &r_meta, r_scalars.as_ref())?;
     teacher_forced_correct(&mut g, reference, candidate, opts.counts.as_deref(), &r_summary, &r_meta, r_scalars.as_ref())?;
     manifest_check(&mut g, candidate, &c_summary);
-    Ok(Report { reference: reference.to_path_buf(), candidate: candidate.to_path_buf(), mode: g.mode, saved_mode, checks: g.checks })
+    Ok(Report { reference: reference.to_path_buf(), candidate: candidate.to_path_buf(), mode: g.mode, floor: floor_name, saved_mode, checks: g.checks })
 }
 
 /// K7 (M10): FindClusters, resolution by resolution, and the workflow's files.
@@ -1391,7 +1443,17 @@ fn compare_files(g: &mut Grader, reference: &Path, candidate: &Path, r_summary: 
         if let Some(pm) = rr.get("covariates").and_then(|c| c.get("percent_mt")) {
             let c_pm = c_sct.and_then(|s| s.get("percent_mt"));
             let r_feats = str_list(pm.get("features"));
+            let defs = (pm.get("definition").and_then(Json::as_str), c_pm.and_then(|c| c.get("definition")).and_then(Json::as_str));
             match c_pm {
+                // R's pattern and the candidate's list of ids (a case that gives R's all-zero
+                // column through features without counts): the values are compared, not the
+                // features
+                Some(_) if defs.0 != defs.1 => g.not_applicable(
+                    "M15b",
+                    "result: percent.mt's features",
+                    Inputs::Free,
+                    format!("R's definition is {}, the candidate's {} ({} feature(s) in R's run): metadata.tsv's percent.mt is compared", defs.0.unwrap_or("?"), defs.1.unwrap_or("?"), r_feats.len()),
+                ),
                 Some(cp) => {
                     let c_n = jnum(cp, "n_features").map(|v| v as usize);
                     let c_first = str_list(cp.get("features_first"));
@@ -1472,10 +1534,13 @@ fn compare_saved(g: &mut Grader, saved: &Path, saved_kernel: &str, c_summary: &J
     match (s_meta.col("silhouette_width"), c_meta.col("silhouette_width")) {
         (Some(a), Some(b)) if same_n => {
             let s = grade::stats(&meta_numbers(&s_meta, a), &meta_numbers(c_meta, b), n, 1, false);
-            // graded under the saved object's kernel
+            // graded under the saved object's kernel, against [clustering.floor.kernel]: the
+            // workflow's saved objects did not regress
             let keep = std::mem::replace(&mut g.mode, mode.clone());
+            let keep_floor = std::mem::replace(&mut g.floor, floor());
             g.numeric("saved", "silhouette_width", Inputs::Pca, "K8_silhouette_width", &s, &format!("saved under {saved_kernel}"));
             g.mode = keep;
+            g.floor = keep_floor;
         }
         (Some(_), _) => g.not_applicable("saved", "silhouette_width", Inputs::Pca, "the candidate did not compute silhouette widths".into()),
         _ => {}
@@ -1484,8 +1549,10 @@ fn compare_saved(g: &mut Grader, saved: &Path, saved_kernel: &str, c_summary: &J
         (Some(a), Some(b)) if same_n => {
             let s = grade::stats(&meta_numbers(&s_meta, a), &meta_numbers(c_meta, b), n, 1, false);
             let keep = std::mem::replace(&mut g.mode, mode.clone());
+            let keep_floor = std::mem::replace(&mut g.floor, floor());
             g.numeric("saved", "neighborhood_purity", Inputs::Pca, "K9_purity", &s, &format!("saved under {saved_kernel}"));
             g.mode = keep;
+            g.floor = keep_floor;
         }
         (Some(_), _) => g.not_applicable("saved", "neighborhood_purity", Inputs::Pca, "the candidate did not compute purities".into()),
         _ => {}

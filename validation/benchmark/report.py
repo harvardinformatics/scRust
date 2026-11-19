@@ -109,6 +109,10 @@ def side_cells(r, side):
 TOOL_LABEL = {
     ("cluster", "without --export"): "Clustering; Rust without `--export`",
     ("cluster", "with --export"): "Clustering; Rust with `--export`",
+    # M15b: SCTransform with vars.to.regress = "percent.mt"
+    ("cluster_regress", "without --export"): "M15b: clustering, vars.to.regress; Rust without `--export`",
+    ("cluster_regress", "with --export"): "M15b: clustering, vars.to.regress; Rust with `--export`",
+    ("cluster_regress", "without the regression"): "M15b: clustering, the same binary without vars.to.regress",
     ("doubletfinder", "DoubletFinder alone"): "DoubletFinder alone",
     ("doubletfinder", "whole rule"): "DoubletFinder rule, whole (no RunUMAP)",
     # M15, one binary for the four rows
@@ -154,6 +158,42 @@ def m15_table(tab, t):
             obj, cell(a), cell(h), f_x(ratio(h, a, "cpu_total_s")), f_x(ratio(h, a, "wall_total_s")), f_x(ratio(h, a, "peak_gib")),
             cell(two), cell(one), f_x(ratio(one, two, "cpu_total_s")), f_x(ratio(one, two, "wall_total_s")), f_x(ratio(one, two, "peak_gib")),
             f_s(r_cpu), f_gib(r_peak), f_x(r_cpu / o_cpu if o_cpu == o_cpu and o_cpu else float("nan")), f_x(r_peak / o_peak if o_peak == o_peak and o_peak else float("nan"))))
+    return "\n".join(out)
+
+
+def m15b_table(tab, t):
+    """M15b's rows at t threads: the chain with SCTransform's vars.to.regress = "percent.mt"
+    against R's workflow script as it was before the pipeline's commit 8d34de1, and what the
+    regression costs each side: R's against the cluster rows' R runs (the current scripts, which
+    differ in the argument only), Rust's against the same binary's chain without it (variant b)."""
+    by = {(r["tool"], r["object"], r["rust_variant"]): r for r in tab}
+    objs = []
+    for r in tab:
+        if r["tool"] == "cluster_regress" and r["object"] not in objs:
+            objs.append(r["object"])
+    side = "Rust%s" % t
+
+    def get(r, s, k):
+        return num(r.get("%s_%s" % (s, k))) if r is not None and r.get(s + "_reps", "0") not in ("", "0") else float("nan")
+
+    def div(a, b):
+        return a / b if a == a and b == b and b else float("nan")
+
+    out = ["| object | R with vars.to.regress: CPU s / peak GiB | R: ÷ without (CPU, peak) | Rust with: CPU s / wall s / peak GiB | Rust: ÷ without (CPU, peak) "
+           "| with --export: CPU s / peak GiB | R ÷ Rust, with: CPU · peak | R ÷ Rust with --export: CPU · peak |",
+           "|" + "---|" * 8]
+    for obj in objs:
+        rn, rx = by.get(("cluster_regress", obj, "without --export")), by.get(("cluster_regress", obj, "with --export"))
+        bn = by.get(("cluster_regress", obj, "without the regression"))
+        r_cpu, r_peak = get(rn, "R", "cpu_total_s"), get(rn, "R", "peak_gib")
+        b_cpu, b_peak = get(bn, "R", "cpu_total_s"), get(bn, "R", "peak_gib")
+        n_cpu, n_wall, n_peak = get(rn, side, "cpu_total_s"), get(rn, side, "wall_total_s"), get(rn, side, "peak_gib")
+        x_cpu, x_peak = get(rx, side, "cpu_total_s"), get(rx, side, "peak_gib")
+        bn_cpu, bn_peak = get(bn, side, "cpu_total_s"), get(bn, side, "peak_gib")
+        out.append("| %s | %s / %s | %s, %s | %s / %s / %s | %s, %s | %s / %s | %s · %s | %s · %s |" % (
+            obj, f_s(r_cpu), f_gib(r_peak), f_x(div(r_cpu, b_cpu)), f_x(div(r_peak, b_peak)),
+            f_s(n_cpu), f_s(n_wall), f_gib(n_peak), f_x(div(n_cpu, bn_cpu)), f_x(div(n_peak, bn_peak)),
+            f_s(x_cpu), f_gib(x_peak), f_x(div(r_cpu, n_cpu)), f_x(div(r_peak, n_peak)), f_x(div(r_cpu, x_cpu)), f_x(div(r_peak, x_peak))))
     return "\n".join(out)
 
 
@@ -279,6 +319,8 @@ RULE = {
 }
 for o in ORDER:
     RULE.setdefault(("doubletfinder", o), "doubletfinder")
+    # M15b: the same rules' scripts as they were before the pipeline's commit 8d34de1
+    RULE[("cluster_regress", o)] = RULE[("cluster", o)] + ", at 8d34de1^ (vars.to.regress)"
 
 
 def df_alone_table(runs, kinds):
@@ -443,6 +485,10 @@ def main():
         for t in ("1", "32"):
             md.append("\n## M15: clustering on the fly and the re-clustering in one process, %s thread%s\n" % (t, "" if t == "1" else "s"))
             md.append(m15_table(tab, t))
+    if any(r["tool"] == "cluster_regress" for r in tab):
+        for t in ("1", "32"):
+            md.append("\n## M15b: the chain with SCTransform's vars.to.regress, %s thread%s\n" % (t, "" if t == "1" else "s"))
+            md.append(m15b_table(tab, t))
     md.append("\n## Ranges\n")
     md.append(ranges_table(tab))
     md.append("\n## R's scripts, whole, and the workflow's jobs\n")

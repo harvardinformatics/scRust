@@ -5,7 +5,9 @@
 
 R runs: the number of clusters (and their ids) against the workflow's log (the clustering panel's
 log_final_clusters; for DoubletFinder, Rust's clustering of the same singlets), and the size of
-the output .rds against the size of the workflow's saved .rds.
+the output .rds against the size of the workflow's saved .rds. For cluster_regress (M15b), the
+number of clusters and their ids against M15b's R reference run of the same chain (case pm; the
+run's check.txt), and the .rds size only recorded: no saved object has the regression.
 Rust runs: same.txt (outputs against the reference runs: identical / identical data lines /
 DIFFERENT) and the exit code.
 """
@@ -29,14 +31,22 @@ for d in sorted(glob.glob(os.path.join(B, "runs", "r", "*", "*", "rep*"))):
         size, rel, full = line.rstrip("\n").split("\t")
         outs[rel] = int(size)
     rds = [k for k in outs if k.endswith(".rds")]
+    chk = open(os.path.join(d, "check.txt")).read()
+    m = re.search(r"nclusters=(\d+)", chk)
+    ncl = m.group(1) if m else "?"
+    if tool == "cluster_regress":
+        for k in rds:
+            print("\t".join(["R", tool, obj, rep, "workflow script", "output .rds bytes", str(outs[k]), "-", "recorded (no saved object has the regression)"]))
+        m = re.search(r"M15b's R reference run's final clusters \((.*)\): (\d*)", chk)
+        want = m.group(2) if m else "?"
+        ok = ncl == want and "nclusters: same" in chk
+        print("\t".join(["R", tool, obj, rep, "workflow script", "clusters and their ids", ncl, want + " (M15b's R reference run, case pm)", "same" if ok else "DIFFERENT"]))
+        continue
     saved = panel[obj]["saved"] if tool == "cluster" else dfsets[obj]["saved"]
     saved_size = os.path.getsize(os.path.join(PIPE, saved))
     for k in rds:
         print("\t".join(["R", tool, obj, rep, "workflow script", "output .rds bytes", str(outs[k]), str(saved_size),
                          "same" if outs[k] == saved_size else "differs by %+d" % (outs[k] - saved_size)]))
-    chk = open(os.path.join(d, "check.txt")).read()
-    m = re.search(r"nclusters=(\d+)", chk)
-    ncl = m.group(1) if m else "?"
     if tool == "cluster":
         want = panel[obj]["log_final_clusters"]
     else:

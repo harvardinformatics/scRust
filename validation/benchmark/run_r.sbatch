@@ -2,6 +2,10 @@
 # Benchmark (scRust data/benchmarks): one run of a preprocessing-workflow R script, as the
 # workflow's job runs it, with phase markers (scripts/workflow/scripts/, made by
 # make_workflow_copies.py: the workflow's scripts plus marker lines, nothing else changed).
+# Tool cluster_regress (milestone M15b) runs the clustering scripts as they were before the
+# workflow's commit 8d34de1, with SCTransform(vars.to.regress = "percent.mt")
+# (validation/benchmark/workflow_regress/), and checks the clusters against M15b's R reference run
+# of the same chain (validation/slurm/m15b_references.sbatch, case pm).
 #
 #   sbatch --mem=<mem> --time=<time> --job-name=bench-r-<tool> run_r.sbatch <tool> <object> <rep>
 #   (submit_r.sh takes <mem> and <time> from r_runs.tsv)
@@ -55,7 +59,9 @@ final=$B/runs/r/$tool/$obj/rep$rep
 run=$final.partial.${SLURM_JOB_ID:-local}
 rm -rf "$run"
 mkdir -p "$run/out" "$run/work"
-ln -s "$S/validation/benchmark/workflow" "$run/work/workflow"
+wf=workflow
+[ "$tool" = cluster_regress ] && wf=workflow_regress
+ln -s "$S/validation/benchmark/$wf" "$run/work/workflow"
 args=${args//\{out\}/$run/out}
 
 # the OpenBLAS kernel these nodes give the workflow's libopenblas with OPENBLAS_CORETYPE unset
@@ -67,7 +73,7 @@ core=$(env -u OPENBLAS_CORETYPE OPENBLAS_NUM_THREADS=1 "$SCRUST" fingerprint 2>/
     echo "kernel=$(uname -r) cpus=$(taskset -cp $$ | sed 's/.*: //') mem_request=${SLURM_MEM_PER_NODE:-?}M openblas_core=$core"
     echo "tool=$tool object=$obj rule=$rule script=$script rep=$rep"
     echo "R=$REnv/bin/Rscript $("$REnv/bin/R" --version | head -n 1)"
-    echo "copies: $(sed -n 1p "$S/validation/benchmark/workflow/SOURCES.tsv")"
+    echo "copies: $(sed -n 1p "$S/validation/benchmark/$wf/SOURCES.tsv")"
     echo "start=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "$run/env.txt"
 cat "$run/env.txt"
@@ -109,6 +115,13 @@ cat "$run/outputs.tsv"
             $S/validation/clustering_panel.tsv)
         echo "workflow's final clusters (clustering_panel.tsv): $want"
         [ "$ncl" = "$want" ] && echo "nclusters: same" || echo "nclusters: DIFFERENT"
+    fi
+    if [ "$tool" = cluster_regress ]; then
+        refrun=$(ls -d "$S"/data/clustering/m15b/runs/"$obj"/pm/direct-production-* 2>/dev/null | grep -v partial | head -n 1)
+        want=$(cat "$refrun/nclusters.txt" 2>/dev/null)
+        echo "M15b's R reference run's final clusters ($refrun): $want"
+        [ "$ncl" = "$want" ] && cmp -s <(paste -sd, "$run"/out/*_cluster_ids.txt) <(paste -sd, "$refrun/cluster_ids.txt") \
+            && echo "nclusters: same" || echo "nclusters: DIFFERENT"
     fi
 } > "$run/check.txt" 2>&1
 cat "$run/check.txt"
